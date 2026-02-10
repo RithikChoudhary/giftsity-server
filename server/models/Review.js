@@ -26,5 +26,7 @@ reviewSchema.index({ productId: 1 });
 reviewSchema.index({ customerId: 1 });
 reviewSchema.index({ sellerId: 1 });
 reviewSchema.index({ orderId: 1 });
+// Prevent duplicate reviews: one review per customer per product per order
+reviewSchema.index({ orderId: 1, customerId: 1, productId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Review', reviewSchema);

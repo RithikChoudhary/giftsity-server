@@ -13,6 +13,7 @@ cloudinary.config({
  * @param {object} options - override defaults (folder, transformation, etc.)
  */
 const uploadImage = async (imageData, options = {}) => {
+  if (!imageData || typeof imageData !== 'string') throw new Error('Invalid image data: expected a base64 string or URL');
   const defaults = {
     folder: 'giftsity',
     resource_type: 'image',
@@ -30,6 +31,7 @@ const uploadImage = async (imageData, options = {}) => {
  * @param {object} options - override defaults (folder, etc.)
  */
 const uploadVideo = async (videoData, options = {}) => {
+  if (!videoData || typeof videoData !== 'string') throw new Error('Invalid video data: expected a base64 string or URL');
   const defaults = {
     folder: 'giftsity',
     resource_type: 'video',

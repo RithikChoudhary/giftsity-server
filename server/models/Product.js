@@ -6,7 +6,13 @@ const productSchema = new mongoose.Schema({
   slug: { type: String, unique: true },
   description: { type: String, default: '' },
   price: { type: Number, required: true, min: 1 },
-  comparePrice: { type: Number, default: null }, // MRP / strikethrough price
+  comparePrice: {
+    type: Number, default: null,
+    validate: {
+      validator: function(v) { return !v || v > this.price; },
+      message: 'Compare price must be greater than selling price'
+    }
+  },
   category: { type: String, required: true },
   subcategory: { type: String, default: '' },
 
@@ -26,7 +32,7 @@ const productSchema = new mongoose.Schema({
     height: { type: Number, default: 0 }
   }],
 
-  stock: { type: Number, required: true, default: 0 },
+  stock: { type: Number, required: true, default: 0, min: 0 },
   sku: { type: String, default: '' },
 
   // Shipping info

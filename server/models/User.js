@@ -1,9 +1,15 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true, match: [/^\S+@\S+\.\S+$/, 'Invalid email format'] },
   name: { type: String, default: '' },
-  phone: { type: String, default: '' },
+  phone: {
+    type: String, default: '',
+    validate: {
+      validator: function(v) { return !v || /^[0-9]{10}$/.test(v); },
+      message: 'Phone must be 10 digits'
+    }
+  },
   userType: {
     type: String,
     enum: ['admin', 'seller', 'customer'],
@@ -101,7 +107,7 @@ const userSchema = new mongoose.Schema({
 // email uniqueness handled by schema `unique: true`
 userSchema.index({ userType: 1, status: 1 });
 userSchema.index({ 'sellerProfile.businessName': 'text' });
-userSchema.index({ 'sellerProfile.businessSlug': 1 });
+userSchema.index({ 'sellerProfile.businessSlug': 1 }, { unique: true, sparse: true, partialFilterExpression: { 'sellerProfile.businessSlug': { $gt: '' } } });
 userSchema.index({ 'sellerProfile.referralCode': 1 });
 
 userSchema.pre('save', function (next) {

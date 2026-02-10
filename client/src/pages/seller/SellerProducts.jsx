@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, Plus, Edit3, Trash2, Eye, EyeOff, Loader, X, Upload, Image } from 'lucide-react';
+import { Package, Plus, Edit3, Trash2, Eye, EyeOff, Loader, X, Upload, Image, Film } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import API, { SellerAPI } from '../../api';
@@ -14,8 +14,8 @@ export default function SellerProducts() {
 
   const emptyForm = { title: '', description: '', price: '', category: '', stock: '', weight: '', images: [], isCustomizable: false, customizationOptions: [] };
   const [form, setForm] = useState(emptyForm);
-  const [imageFiles, setImageFiles] = useState([]);
-  const [imagePreviews, setImagePreviews] = useState([]);
+  const [mediaFiles, setMediaFiles] = useState([]); // { file, type: 'image'|'video' }
+  const [mediaPreviews, setMediaPreviews] = useState([]); // { url, type: 'image'|'video', isExisting: bool }
 
   useEffect(() => { loadProducts(); loadCategories(); }, []);
 
@@ -38,29 +38,42 @@ export default function SellerProducts() {
     if (product) {
       setEditing(product._id);
       setForm({ title: product.title, description: product.description, price: product.price, category: product.category, stock: product.stock, weight: product.weight || '', images: product.images || [], isCustomizable: product.isCustomizable || false, customizationOptions: product.customizationOptions || [] });
-      setImagePreviews(product.images?.map(i => i.url) || []);
+      // Build previews from existing images + media
+      const existingPreviews = (product.images || []).map(i => ({ url: i.url, type: 'image', isExisting: true }));
+      const existingMedia = (product.media || []).filter(m => m.type === 'video').map(m => ({ url: m.thumbnailUrl || m.url, type: 'video', isExisting: true }));
+      setMediaPreviews([...existingPreviews, ...existingMedia]);
     } else {
       setEditing(null);
       setForm(emptyForm);
-      setImagePreviews([]);
+      setMediaPreviews([]);
     }
-    setImageFiles([]);
+    setMediaFiles([]);
     setShowForm(true);
   };
 
-  const handleImageChange = (e) => {
+  const handleMediaChange = (e) => {
     const files = Array.from(e.target.files);
-    setImageFiles(prev => [...prev, ...files]);
-    files.forEach(f => setImagePreviews(prev => [...prev, URL.createObjectURL(f)]));
+    files.forEach(f => {
+      const isVideo = f.type.startsWith('video/');
+      setMediaFiles(prev => [...prev, { file: f, type: isVideo ? 'video' : 'image' }]);
+      setMediaPreviews(prev => [...prev, { url: URL.createObjectURL(f), type: isVideo ? 'video' : 'image', isExisting: false }]);
+    });
   };
 
-  const removeImage = (idx) => {
-    setImagePreviews(prev => prev.filter((_, i) => i !== idx));
-    if (idx < (form.images?.length || 0)) {
-      setForm(f => ({ ...f, images: f.images.filter((_, i) => i !== idx) }));
+  const removeMedia = (idx) => {
+    const preview = mediaPreviews[idx];
+    setMediaPreviews(prev => prev.filter((_, i) => i !== idx));
+    if (preview?.isExisting) {
+      // Remove from existing images in form
+      const existingImageCount = form.images?.length || 0;
+      if (idx < existingImageCount) {
+        setForm(f => ({ ...f, images: f.images.filter((_, i) => i !== idx) }));
+      }
     } else {
-      const fileIdx = idx - (form.images?.length || 0);
-      setImageFiles(prev => prev.filter((_, i) => i !== fileIdx));
+      // Remove from new files
+      const existingCount = mediaPreviews.filter(p => p.isExisting).length;
+      const fileIdx = idx - existingCount;
+      setMediaFiles(prev => prev.filter((_, i) => i !== fileIdx));
     }
   };
 
@@ -81,7 +94,7 @@ export default function SellerProducts() {
         formData.append('customizationOptions', JSON.stringify(form.customizationOptions));
       }
       if (form.images) formData.append('existingImages', JSON.stringify(form.images));
-      imageFiles.forEach(f => formData.append('images', f));
+      mediaFiles.forEach(({ file }) => formData.append('media', file));
 
       if (editing) {
         await SellerAPI.put(`/products/${editing}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
@@ -209,19 +222,27 @@ export default function SellerProducts() {
                   </div>
                 )}
               </div>
-              {/* Images */}
+              {/* Images & Videos */}
               <div>
-                <label className="text-xs text-theme-muted font-medium mb-2 block">Images</label>
+                <label className="text-xs text-theme-muted font-medium mb-2 block">Images & Videos</label>
                 <div className="flex flex-wrap gap-2 mb-2">
-                  {imagePreviews.map((url, i) => (
+                  {mediaPreviews.map((preview, i) => (
                     <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden bg-inset border border-edge">
-                      <img src={url} alt="" className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => removeImage(i)} className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"><X className="w-3 h-3 text-white" /></button>
+                      {preview.type === 'video' ? (
+                        <div className="w-full h-full flex items-center justify-center bg-zinc-800">
+                          <Film className="w-6 h-6 text-amber-400" />
+                          <span className="absolute bottom-0.5 left-0.5 text-[8px] text-white bg-black/60 px-1 rounded">Video</span>
+                        </div>
+                      ) : (
+                        <img src={preview.url} alt="" className="w-full h-full object-cover" />
+                      )}
+                      <button type="button" onClick={() => removeMedia(i)} className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"><X className="w-3 h-3 text-white" /></button>
                     </div>
                   ))}
-                  <label className="w-20 h-20 rounded-lg border-2 border-dashed border-edge hover:border-amber-500/50 flex items-center justify-center cursor-pointer transition-colors">
+                  <label className="w-20 h-20 rounded-lg border-2 border-dashed border-edge hover:border-amber-500/50 flex flex-col items-center justify-center cursor-pointer transition-colors gap-0.5">
                     <Upload className="w-5 h-5 text-theme-dim" />
-                    <input type="file" accept="image/*" multiple onChange={handleImageChange} className="hidden" />
+                    <span className="text-[8px] text-theme-dim">IMG/VID</span>
+                    <input type="file" accept="image/*,video/mp4,video/webm" multiple onChange={handleMediaChange} className="hidden" />
                   </label>
                 </div>
               </div>

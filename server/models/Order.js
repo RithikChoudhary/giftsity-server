@@ -16,8 +16,8 @@ const orderSchema = new mongoose.Schema({
   // Seller (for B2C marketplace)
   sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
-  // Items
-  items: [{
+  // Items (must have at least 1)
+  items: { type: [{
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
     title: String,
     price: Number,
@@ -30,7 +30,7 @@ const orderSchema = new mongoose.Schema({
       value: { type: String, default: '' },
       imageUrls: [{ type: String }]
     }]
-  }],
+  }], validate: [arr => arr.length > 0, 'Order must have at least one item'] },
 
   // Shipping
   shippingAddress: {
