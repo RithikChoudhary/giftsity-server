@@ -6,8 +6,15 @@ const connectDB = require('./config/db');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+// Middleware - CORS supports comma-separated origins in CLIENT_URL (e.g. "https://giftsity.com,https://www.giftsity.com")
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173').split(',').map(s => s.trim());
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) cb(null, true);
+    else cb(new Error('CORS not allowed'));
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 
 // Routes
