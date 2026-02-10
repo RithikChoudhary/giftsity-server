@@ -34,6 +34,22 @@ app.use('/api/coupons', require('./routes/coupons'));
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', platform: 'Giftsity' }));
 
+// 404 handler for undefined routes
+app.use((req, res) => {
+  res.status(404).json({ message: `Route ${req.method} ${req.originalUrl} not found` });
+});
+
+// Global error handler
+app.use((err, req, res, _next) => {
+  console.error('[Server Error]', err.message);
+  res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
+});
+
+// Graceful error handling
+process.on('unhandledRejection', (err) => {
+  console.error('[Unhandled Rejection]', err);
+});
+
 // Start
 connectDB().then(() => {
   app.listen(PORT, () => {
