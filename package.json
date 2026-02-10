@@ -1,0 +1,30 @@
+{
+  "name": "giftsity-server",
+  "version": "1.0.0",
+  "description": "Giftsity - The Gift Marketplace",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"nodemon server/index.js\" \"nodemon server-seller/index.js\"",
+    "dev:main": "nodemon server/index.js",
+    "dev:seller": "nodemon server-seller/index.js",
+    "start": "node server/index.js",
+    "start:seller": "node server-seller/index.js",
+    "seed": "node server/seed.js"
+  },
+  "dependencies": {
+    "cloudinary": "^2.9.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.16",
+    "sharp": "^0.33.2"
+  },
+  "devDependencies": {
+    "axios": "^1.13.5",
+    "concurrently": "^9.2.1",
+    "nodemon": "^3.1.9"
+  }
+}

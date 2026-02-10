@@ -1,0 +1,282 @@
+const express = require('express');
+const Product = require('../models/Product');
+const Order = require('../models/Order');
+const SellerPayout = require('../models/SellerPayout');
+const PlatformSettings = require('../models/PlatformSettings');
+const { requireAuth, requireSeller } = require('../middleware/auth');
+const { uploadImage, deleteImage } = require('../config/cloudinary');
+const { slugify } = require('../utils/slugify');
+const { getCommissionRate } = require('../utils/commission');
+const router = express.Router();
+
+router.use(requireAuth, requireSeller);
+
+// GET /api/seller/dashboard
+router.get('/dashboard', async (req, res) => {
+  try {
+    const sellerId = req.user._id;
+    const settings = await PlatformSettings.getSettings();
+    const commissionRate = getCommissionRate(req.user, settings);
+
+    const totalOrders = await Order.countDocuments({ sellerId, paymentStatus: 'paid' });
+    const totalSalesAgg = await Order.aggregate([
+      { $match: { sellerId: req.user._id, paymentStatus: 'paid' } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' }, commission: { $sum: '$commissionAmount' }, sellerEarnings: { $sum: '$sellerAmount' } } }
+    ]);
+
+    const stats = totalSalesAgg[0] || { total: 0, commission: 0, sellerEarnings: 0 };
+    const pendingOrders = await Order.countDocuments({ sellerId, status: { $in: ['pending', 'confirmed', 'processing'] } });
+    const totalProducts = await Product.countDocuments({ sellerId });
+    const activeProducts = await Product.countDocuments({ sellerId, isActive: true });
+
+    // Current period earnings (orders delivered but not yet paid out)
+    const pendingPayoutAgg = await Order.aggregate([
+      { $match: { sellerId: req.user._id, paymentStatus: 'paid', status: 'delivered', payoutStatus: 'pending' } },
+      { $group: { _id: null, total: { $sum: '$sellerAmount' }, count: { $sum: 1 } } }
+    ]);
+    const pendingPayout = pendingPayoutAgg[0] || { total: 0, count: 0 };
+
+    const recentOrders = await Order.find({ sellerId }).sort({ createdAt: -1 }).limit(10).select('orderNumber status totalAmount sellerAmount createdAt items');
+
+    res.json({
+      stats: {
+        totalSales: stats.total,
+        totalOrders,
+        totalCommissionPaid: stats.commission,
+        totalEarnings: stats.sellerEarnings,
+        pendingOrders,
+        totalProducts,
+        activeProducts
+      },
+      currentPeriodEarnings: {
+        pendingAmount: pendingPayout.total,
+        pendingOrderCount: pendingPayout.count
+      },
+      yourCommissionRate: commissionRate,
+      recentOrders
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// GET /api/seller/products
+router.get('/products', async (req, res) => {
+  try {
+    const products = await Product.find({ sellerId: req.user._id }).sort({ createdAt: -1 });
+    res.json({ products });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/seller/products
+router.post('/products', async (req, res) => {
+  try {
+    const data = { ...req.body, sellerId: req.user._id };
+    data.slug = slugify(data.title);
+
+    // Handle image uploads
+    if (data.newImages && Array.isArray(data.newImages)) {
+      const uploaded = [];
+      for (const img of data.newImages) {
+        if (img.startsWith('data:')) {
+          const result = await uploadImage(img, { folder: 'giftsity/products' });
+          uploaded.push(result);
+        }
+      }
+      data.images = uploaded;
+      delete data.newImages;
+    }
+
+    const product = new Product(data);
+    await product.save();
+    res.status(201).json({ product, message: 'Product created' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// PUT /api/seller/products/:id
+router.put('/products/:id', async (req, res) => {
+  try {
+    const product = await Product.findOne({ _id: req.params.id, sellerId: req.user._id });
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+
+    const data = { ...req.body, updatedAt: Date.now() };
+
+    // Handle new image uploads
+    if (data.newImages && Array.isArray(data.newImages)) {
+      const uploaded = [];
+      for (const img of data.newImages) {
+        if (img.startsWith('data:')) {
+          const result = await uploadImage(img, { folder: 'giftsity/products' });
+          uploaded.push(result);
+        }
+      }
+      data.images = [...(data.existingImages || []), ...uploaded];
+      delete data.newImages;
+      delete data.existingImages;
+    }
+
+    // Handle deleted images
+    if (data.deletedImageIds && Array.isArray(data.deletedImageIds)) {
+      for (const publicId of data.deletedImageIds) {
+        await deleteImage(publicId);
+      }
+      delete data.deletedImageIds;
+    }
+
+    Object.assign(product, data);
+    await product.save();
+    res.json({ product, message: 'Product updated' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// DELETE /api/seller/products/:id
+router.delete('/products/:id', async (req, res) => {
+  try {
+    const product = await Product.findOne({ _id: req.params.id, sellerId: req.user._id });
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+
+    // Delete images from Cloudinary
+    for (const img of product.images) {
+      if (img.publicId) await deleteImage(img.publicId);
+    }
+
+    await Product.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Product deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/seller/orders
+router.get('/orders', async (req, res) => {
+  try {
+    const { status, page = 1, limit = 20 } = req.query;
+    const filter = { sellerId: req.user._id };
+    if (status) filter.status = status;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const orders = await Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)).populate('customerId', 'name email phone');
+    const total = await Order.countDocuments(filter);
+
+    res.json({ orders, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /api/seller/orders/:id/ship
+router.put('/orders/:id/ship', async (req, res) => {
+  try {
+    const { courierName, trackingNumber, estimatedDelivery } = req.body;
+    const order = await Order.findOne({ _id: req.params.id, sellerId: req.user._id });
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    order.status = 'shipped';
+    order.trackingInfo = {
+      courierName: courierName || '',
+      trackingNumber: trackingNumber || '',
+      shippedAt: new Date(),
+      estimatedDelivery: estimatedDelivery ? new Date(estimatedDelivery) : null
+    };
+    await order.save();
+    res.json({ order, message: 'Order marked as shipped' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/seller/payouts
+router.get('/payouts', async (req, res) => {
+  try {
+    const payouts = await SellerPayout.find({ sellerId: req.user._id }).sort({ createdAt: -1 });
+    res.json({ payouts });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/seller/settings
+router.get('/settings', async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    res.json({
+      sellerProfile: user.sellerProfile,
+      name: user.name,
+      phone: user.phone,
+      email: user.email
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /api/seller/settings
+router.put('/settings', async (req, res) => {
+  try {
+    const { businessName, businessAddress, pickupAddress, bankDetails, phone } = req.body;
+    const user = req.user;
+
+    if (businessName) user.sellerProfile.businessName = businessName;
+    if (businessAddress) user.sellerProfile.businessAddress = businessAddress;
+    if (pickupAddress) user.sellerProfile.pickupAddress = pickupAddress;
+    if (bankDetails) user.sellerProfile.bankDetails = bankDetails;
+    if (phone) user.phone = phone;
+
+    await user.save();
+    res.json({ message: 'Settings updated' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/seller/marketing
+router.get('/marketing', async (req, res) => {
+  try {
+    const user = req.user;
+    res.json({
+      referralCode: user.sellerProfile.referralCode,
+      referralCount: user.sellerProfile.referralCount || 0,
+      referralLink: `${process.env.CLIENT_URL}/seller/join?ref=${user.sellerProfile.referralCode}`,
+      rewards: {
+        featured: user.sellerProfile.referralCount >= 3,
+        credit: user.sellerProfile.referralCount >= 5,
+        lockedRate: user.sellerProfile.referralCount >= 10
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Need User model for settings route
+const User = require('../models/User');
+
+// POST /api/seller/request-unsuspend - request suspension removal
+router.post('/request-unsuspend', async (req, res) => {
+  try {
+    const user = req.user;
+    if (user.status !== 'suspended') {
+      return res.status(400).json({ message: 'Your account is not suspended' });
+    }
+    const { reason } = req.body;
+    if (!reason || reason.trim().length < 10) {
+      return res.status(400).json({ message: 'Please provide a detailed reason (at least 10 characters)' });
+    }
+
+    user.sellerProfile.suspensionRemovalRequested = true;
+    user.sellerProfile.suspensionRemovalReason = reason.trim();
+    await user.save();
+
+    res.json({ message: 'Suspension removal request submitted. Admin will review your request.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+module.exports = router;

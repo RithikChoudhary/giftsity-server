@@ -1,0 +1,49 @@
+const mongoose = require('mongoose');
+
+const platformSettingsSchema = new mongoose.Schema({
+  // Commission
+  globalCommissionRate: { type: Number, default: 0 },
+  newSellerCommissionRate: { type: Number, default: null }, // null = use global
+  commissionGrandfatherDate: { type: Date, default: null }, // sellers before this date keep old rate
+  paymentGatewayFeeRate: { type: Number, default: 3 },
+
+  // Payouts
+  payoutSchedule: {
+    type: String,
+    enum: ['weekly', 'biweekly', 'monthly'],
+    default: 'biweekly'
+  },
+  minimumPayoutAmount: { type: Number, default: 500 },
+
+  // Business rules
+  minimumProductPrice: { type: Number, default: 200 },
+  maxFeaturedProducts: { type: Number, default: 10 },
+  maxImagesPerProduct: { type: Number, default: 5 },
+
+  // Contact
+  supportEmail: { type: String, default: '' },
+  supportPhone: { type: String, default: '' },
+
+  // Social
+  instagramUrl: { type: String, default: '' },
+  facebookUrl: { type: String, default: '' },
+  whatsappNumber: { type: String, default: '' },
+
+  // Platform info
+  platformName: { type: String, default: 'Giftsity' },
+  tagline: { type: String, default: 'The Gift Marketplace' },
+
+  updatedAt: { type: Date, default: Date.now },
+  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
+});
+
+// Ensure only one settings document exists
+platformSettingsSchema.statics.getSettings = async function () {
+  let settings = await this.findOne();
+  if (!settings) {
+    settings = await this.create({});
+  }
+  return settings;
+};
+
+module.exports = mongoose.model('PlatformSettings', platformSettingsSchema);
