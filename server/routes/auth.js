@@ -102,9 +102,11 @@ router.post('/upload-avatar', upload.single('avatar'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
+    // Use user-specific folder if authenticated, else generic
+    const userId = req.user?._id || 'anonymous';
     const result = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
-        { folder: 'giftsity/avatars', transformation: [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }] },
+        { folder: `giftsity/avatars/${userId}`, transformation: [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }] },
         (err, result) => err ? reject(err) : resolve(result)
       );
       stream.end(req.file.buffer);

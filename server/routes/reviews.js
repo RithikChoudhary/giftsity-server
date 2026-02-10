@@ -70,7 +70,7 @@ router.post('/', requireAuth, async (req, res) => {
     if (images && Array.isArray(images)) {
       for (const img of images.slice(0, 3)) { // max 3 images
         if (img.startsWith('data:')) {
-          const result = await uploadImage(img, { folder: 'giftsity/reviews' });
+          const result = await uploadImage(img, { folder: `giftsity/reviews/${req.user._id}` });
           uploadedImages.push(result);
         }
       }

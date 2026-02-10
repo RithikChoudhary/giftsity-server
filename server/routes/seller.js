@@ -4,7 +4,7 @@ const Order = require('../models/Order');
 const SellerPayout = require('../models/SellerPayout');
 const PlatformSettings = require('../models/PlatformSettings');
 const { requireAuth, requireSeller } = require('../middleware/auth');
-const { uploadImage, deleteImage } = require('../config/cloudinary');
+const { uploadImage, uploadVideo, deleteImage, deleteVideo, deleteMedia } = require('../config/cloudinary');
 const { slugify } = require('../utils/slugify');
 const { getCommissionRate } = require('../utils/commission');
 const router = express.Router();
@@ -73,21 +73,39 @@ router.get('/products', async (req, res) => {
 // POST /api/seller/products
 router.post('/products', async (req, res) => {
   try {
-    const data = { ...req.body, sellerId: req.user._id };
+    const sellerId = req.user._id;
+    const data = { ...req.body, sellerId };
     data.slug = slugify(data.title);
+    const sellerFolder = `giftsity/products/${sellerId}`;
+
+    const uploadedImages = [];
+    const uploadedMedia = [];
 
     // Handle image uploads
     if (data.newImages && Array.isArray(data.newImages)) {
-      const uploaded = [];
       for (const img of data.newImages) {
         if (img.startsWith('data:')) {
-          const result = await uploadImage(img, { folder: 'giftsity/products' });
-          uploaded.push(result);
+          const result = await uploadImage(img, { folder: sellerFolder });
+          uploadedImages.push(result);
+          uploadedMedia.push({ type: 'image', url: result.url, publicId: result.publicId });
         }
       }
-      data.images = uploaded;
       delete data.newImages;
     }
+
+    // Handle video uploads
+    if (data.newVideos && Array.isArray(data.newVideos)) {
+      for (const vid of data.newVideos) {
+        if (vid.startsWith('data:')) {
+          const result = await uploadVideo(vid, { folder: `${sellerFolder}/videos` });
+          uploadedMedia.push({ type: 'video', url: result.url, thumbnailUrl: result.thumbnailUrl, publicId: result.publicId, duration: result.duration, width: result.width, height: result.height });
+        }
+      }
+      delete data.newVideos;
+    }
+
+    if (uploadedImages.length > 0) data.images = uploadedImages;
+    if (uploadedMedia.length > 0) data.media = uploadedMedia;
 
     const product = new Product(data);
     await product.save();
@@ -100,17 +118,19 @@ router.post('/products', async (req, res) => {
 // PUT /api/seller/products/:id
 router.put('/products/:id', async (req, res) => {
   try {
-    const product = await Product.findOne({ _id: req.params.id, sellerId: req.user._id });
+    const sellerId = req.user._id;
+    const product = await Product.findOne({ _id: req.params.id, sellerId });
     if (!product) return res.status(404).json({ message: 'Product not found' });
 
     const data = { ...req.body, updatedAt: Date.now() };
+    const sellerFolder = `giftsity/products/${sellerId}`;
 
     // Handle new image uploads
     if (data.newImages && Array.isArray(data.newImages)) {
       const uploaded = [];
       for (const img of data.newImages) {
         if (img.startsWith('data:')) {
-          const result = await uploadImage(img, { folder: 'giftsity/products' });
+          const result = await uploadImage(img, { folder: sellerFolder });
           uploaded.push(result);
         }
       }
@@ -119,12 +139,38 @@ router.put('/products/:id', async (req, res) => {
       delete data.existingImages;
     }
 
+    // Handle new video uploads
+    if (data.newVideos && Array.isArray(data.newVideos)) {
+      const uploadedMedia = [];
+      for (const vid of data.newVideos) {
+        if (vid.startsWith('data:')) {
+          const result = await uploadVideo(vid, { folder: `${sellerFolder}/videos` });
+          uploadedMedia.push({ type: 'video', url: result.url, thumbnailUrl: result.thumbnailUrl, publicId: result.publicId, duration: result.duration, width: result.width, height: result.height });
+        }
+      }
+      data.media = [...(data.existingMedia || []), ...uploadedMedia];
+      delete data.newVideos;
+      delete data.existingMedia;
+    }
+
     // Handle deleted images
     if (data.deletedImageIds && Array.isArray(data.deletedImageIds)) {
       for (const publicId of data.deletedImageIds) {
         await deleteImage(publicId);
       }
       delete data.deletedImageIds;
+    }
+
+    // Handle deleted media (images + videos)
+    if (data.deletedMediaIds && Array.isArray(data.deletedMediaIds)) {
+      for (const item of data.deletedMediaIds) {
+        if (typeof item === 'object' && item.publicId) {
+          await deleteMedia(item.publicId, item.type || 'image');
+        } else if (typeof item === 'string') {
+          await deleteImage(item);
+        }
+      }
+      delete data.deletedMediaIds;
     }
 
     Object.assign(product, data);
@@ -141,9 +187,14 @@ router.delete('/products/:id', async (req, res) => {
     const product = await Product.findOne({ _id: req.params.id, sellerId: req.user._id });
     if (!product) return res.status(404).json({ message: 'Product not found' });
 
-    // Delete images from Cloudinary
-    for (const img of product.images) {
+    // Delete all images from Cloudinary
+    for (const img of product.images || []) {
       if (img.publicId) await deleteImage(img.publicId);
+    }
+
+    // Delete all media (images + videos) from Cloudinary
+    for (const m of product.media || []) {
+      if (m.publicId) await deleteMedia(m.publicId, m.type || 'image');
     }
 
     await Product.findByIdAndDelete(req.params.id);
