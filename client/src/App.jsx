@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
@@ -54,10 +54,17 @@ const AdminCustomers = lazy(() => import('./pages/admin/AdminCustomers'));
 const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'));
 const NotFound = lazy(() => import('./components/NotFound'));
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
+
 export default function App() {
   return (
     <ThemeProvider>
     <BrowserRouter>
+      <ScrollToTop />
       <AuthProvider>
         <CartProvider>
         <WishlistProvider>
