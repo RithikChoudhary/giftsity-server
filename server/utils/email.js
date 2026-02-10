@@ -1,19 +1,33 @@
-const nodemailer = require('nodemailer');
+// ============================================================
+// EMAIL SERVICE - Using Resend (HTTP API, works on Render free tier)
+// To switch back to Gmail SMTP, uncomment the nodemailer section
+// below and comment out the Resend section.
+// ============================================================
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
-});
+const { Resend } = require('resend');
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+const FROM_EMAIL = process.env.FROM_EMAIL || 'Giftsity <no-reply@no-reply.giftsity.com>';
+
+// ============================================================
+// GMAIL SMTP (commented out - Render free tier blocks SMTP ports)
+// ============================================================
+// const nodemailer = require('nodemailer');
+// const transporter = nodemailer.createTransport({
+//   host: process.env.SMTP_HOST,
+//   port: parseInt(process.env.SMTP_PORT || '587'),
+//   secure: false,
+//   auth: {
+//     user: process.env.SMTP_USER,
+//     pass: process.env.SMTP_PASS
+//   }
+// });
+// ============================================================
 
 const sendOTP = async (email, otp) => {
   console.log(`[Email] Sending OTP ${otp} to: ${email}`);
-  await transporter.sendMail({
-    from: `"Giftsity" <${process.env.SMTP_USER}>`,
+  await resend.emails.send({
+    from: FROM_EMAIL,
     to: email,
     subject: `Your Giftsity Login Code: ${otp}`,
     html: `
@@ -47,8 +61,8 @@ const sendOrderConfirmation = async (email, order, type = 'customer') => {
     </div>
   ` : '';
 
-  await transporter.sendMail({
-    from: `"Giftsity" <${process.env.SMTP_USER}>`,
+  await resend.emails.send({
+    from: FROM_EMAIL,
     to: email,
     subject,
     html: `
@@ -65,8 +79,8 @@ const sendOrderConfirmation = async (email, order, type = 'customer') => {
 };
 
 const sendPayoutNotification = async (email, payout) => {
-  await transporter.sendMail({
-    from: `"Giftsity" <${process.env.SMTP_USER}>`,
+  await resend.emails.send({
+    from: FROM_EMAIL,
     to: email,
     subject: `Payout Processed - ₹${payout.netPayout.toLocaleString()}`,
     html: `
@@ -86,8 +100,8 @@ const sendPayoutNotification = async (email, payout) => {
 };
 
 const sendCommissionChangeNotification = async (email, sellerName, oldRate, newRate) => {
-  await transporter.sendMail({
-    from: `"Giftsity" <${process.env.SMTP_USER}>`,
+  await resend.emails.send({
+    from: FROM_EMAIL,
     to: email,
     subject: `Platform Fee Update - Giftsity`,
     html: `
@@ -109,8 +123,8 @@ const sendB2BInquiryNotification = async (inquiry) => {
   const adminEmail = process.env.ADMIN_EMAIL;
   if (!adminEmail) return;
 
-  await transporter.sendMail({
-    from: `"Giftsity" <${process.env.SMTP_USER}>`,
+  await resend.emails.send({
+    from: FROM_EMAIL,
     to: adminEmail,
     subject: `New B2B Inquiry from ${inquiry.companyName}`,
     html: `
@@ -135,8 +149,8 @@ const sendB2BInquiryNotification = async (inquiry) => {
 
 const sendShippedEmail = async (email, order) => {
   const tracking = order.trackingInfo || {};
-  await transporter.sendMail({
-    from: `"Giftsity" <${process.env.SMTP_USER}>`,
+  await resend.emails.send({
+    from: FROM_EMAIL,
     to: email,
     subject: `Your Order #${order.orderNumber} Has Been Shipped!`,
     html: `
@@ -156,8 +170,8 @@ const sendShippedEmail = async (email, order) => {
 };
 
 const sendDeliveredEmail = async (email, order) => {
-  await transporter.sendMail({
-    from: `"Giftsity" <${process.env.SMTP_USER}>`,
+  await resend.emails.send({
+    from: FROM_EMAIL,
     to: email,
     subject: `Order #${order.orderNumber} Delivered!`,
     html: `
@@ -176,8 +190,8 @@ const sendDeliveredEmail = async (email, order) => {
 };
 
 const sendReviewRequestEmail = async (email, order) => {
-  await transporter.sendMail({
-    from: `"Giftsity" <${process.env.SMTP_USER}>`,
+  await resend.emails.send({
+    from: FROM_EMAIL,
     to: email,
     subject: `How was your gift? Review Order #${order.orderNumber}`,
     html: `
