@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CreditCard, DollarSign, Clock, CheckCircle } from 'lucide-react';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import API from '../../api';
+import { SellerAPI } from '../../api';
 
 export default function SellerPayouts() {
   const [payouts, setPayouts] = useState([]);
@@ -11,7 +11,7 @@ export default function SellerPayouts() {
 
   const loadPayouts = async () => {
     try {
-      const { data } = await API.get('/seller/payouts');
+      const { data } = await SellerAPI.get('/payouts');
       setPayouts(Array.isArray(data) ? data : data.payouts || []);
     } catch (e) { console.error(e); }
     setLoading(false);

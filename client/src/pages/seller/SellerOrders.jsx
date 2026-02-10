@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Package, Truck, CheckCircle, Clock, XCircle, Loader, ChevronDown, ChevronUp, MapPin, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import API from '../../api';
+import { SellerAPI } from '../../api';
 
 const statusConfig = {
   pending: { color: 'text-yellow-400 bg-yellow-400/10', icon: Clock },
@@ -29,7 +29,7 @@ export default function SellerOrders() {
 
   const loadOrders = async () => {
     try {
-      const { data } = await API.get('/seller/orders');
+      const { data } = await SellerAPI.get('/orders');
       const orderList = Array.isArray(data) ? data : data.orders || [];
       setOrders(orderList);
 
@@ -38,7 +38,7 @@ export default function SellerOrders() {
       const shippableOrders = orderList.filter(o => shippableStatuses.includes(o.status));
       for (const order of shippableOrders) {
         try {
-          const { data: trackData } = await API.get(`/seller/shipping/${order._id}/track`);
+          const { data: trackData } = await SellerAPI.get(`/shipping/${order._id}/track`);
           if (trackData.shipment) {
             setShipmentInfo(prev => ({ ...prev, [order._id]: trackData.shipment }));
           }
@@ -51,7 +51,7 @@ export default function SellerOrders() {
   const updateStatus = async (orderId, newStatus) => {
     setUpdating(orderId);
     try {
-      await API.put(`/seller/orders/${orderId}/status`, { status: newStatus });
+      await SellerAPI.put(`/orders/${orderId}/status`, { status: newStatus });
       toast.success(`Order ${newStatus}`);
       loadOrders();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
@@ -63,7 +63,7 @@ export default function SellerOrders() {
     setCourierLoading(true);
     setCouriers([]);
     try {
-      const { data } = await API.post('/seller/shipping/serviceability', { orderId });
+      const { data } = await SellerAPI.post('/shipping/serviceability', { orderId });
       setCouriers(data.couriers || []);
       if (!data.couriers?.length) toast.error('No couriers available for this route');
     } catch (err) { toast.error(err.response?.data?.message || 'Failed to check serviceability'); }
@@ -73,7 +73,7 @@ export default function SellerOrders() {
   const createShipment = async (orderId) => {
     setUpdating(orderId);
     try {
-      const { data } = await API.post(`/seller/shipping/${orderId}/create`);
+      const { data } = await SellerAPI.post(`/shipping/${orderId}/create`);
       setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
       toast.success('Shipment created on Shiprocket!');
       loadOrders();
@@ -85,12 +85,12 @@ export default function SellerOrders() {
     setUpdating(orderId);
     try {
       // Step 1: Create shipment on Shiprocket
-      const { data } = await API.post(`/seller/shipping/${orderId}/create`);
+      const { data } = await SellerAPI.post(`/shipping/${orderId}/create`);
       setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
       toast.success('Shipment created!');
 
       // Step 2: Immediately assign the selected courier
-      const { data: assignData } = await API.post(`/seller/shipping/${orderId}/assign-courier`, { courierId });
+      const { data: assignData } = await SellerAPI.post(`/shipping/${orderId}/assign-courier`, { courierId });
       setShipmentInfo(prev => ({ ...prev, [orderId]: assignData.shipment }));
       toast.success(`Courier assigned: ${assignData.shipment?.courierName}`);
       setCouriers([]);
@@ -102,7 +102,7 @@ export default function SellerOrders() {
   const assignCourier = async (orderId, courierId) => {
     setUpdating(orderId);
     try {
-      const { data } = await API.post(`/seller/shipping/${orderId}/assign-courier`, { courierId });
+      const { data } = await SellerAPI.post(`/shipping/${orderId}/assign-courier`, { courierId });
       setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
       toast.success(`Courier assigned: ${data.shipment?.courierName}`);
     } catch (err) { toast.error(err.response?.data?.message || 'Failed to assign courier'); }
@@ -112,7 +112,7 @@ export default function SellerOrders() {
   const schedulePickup = async (orderId) => {
     setUpdating(orderId);
     try {
-      const { data } = await API.post(`/seller/shipping/${orderId}/pickup`);
+      const { data } = await SellerAPI.post(`/shipping/${orderId}/pickup`);
       setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
       toast.success('Pickup scheduled! Order marked as shipped.');
       loadOrders();
@@ -122,14 +122,14 @@ export default function SellerOrders() {
 
   const getTracking = async (orderId) => {
     try {
-      const { data } = await API.get(`/seller/shipping/${orderId}/track`);
+      const { data } = await SellerAPI.get(`/shipping/${orderId}/track`);
       setTrackingData(prev => ({ ...prev, [orderId]: data }));
     } catch (err) { console.error(err); }
   };
 
   const getLabel = async (orderId) => {
     try {
-      const { data } = await API.get(`/seller/shipping/${orderId}/label`);
+      const { data } = await SellerAPI.get(`/shipping/${orderId}/label`);
       if (data.labelUrl) window.open(data.labelUrl, '_blank');
       else toast.error('Label not available yet');
     } catch (err) { toast.error('Failed to get label'); }

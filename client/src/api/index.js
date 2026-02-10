@@ -1,28 +1,41 @@
 import axios from 'axios';
 
-const API = axios.create({ baseURL: '/api' });
+// Main API (auth, products, orders, admin, reviews, store, wishlist, coupons, b2b)
+const API = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || '/api'
+});
 
-API.interceptors.request.use((config) => {
+// Seller API (seller dashboard, products, orders, shipping) — separate server in production
+const SellerAPI = axios.create({
+  baseURL: import.meta.env.VITE_SELLER_API_URL || '/api/seller'
+});
+
+// Shared interceptors for both instances
+function attachAuth(config) {
   const token = localStorage.getItem('giftsity_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
-});
+}
 
-API.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    // Only clear auth on 401 from protected endpoints (not login/register/otp routes)
-    if (err.response?.status === 401) {
-      const url = err.config?.url || '';
-      const isAuthRoute = url.includes('/auth/send-otp') || url.includes('/auth/verify-otp') || url.includes('/auth/register');
-      if (!isAuthRoute) {
-        localStorage.removeItem('giftsity_token');
-        localStorage.removeItem('giftsity_user');
-      }
+function handleAuthError(err) {
+  if (err.response?.status === 401) {
+    const url = err.config?.url || '';
+    const isAuthRoute = url.includes('/auth/send-otp') || url.includes('/auth/verify-otp') || url.includes('/auth/register');
+    if (!isAuthRoute) {
+      localStorage.removeItem('giftsity_token');
+      localStorage.removeItem('giftsity_user');
     }
-    return Promise.reject(err);
   }
-);
+  return Promise.reject(err);
+}
+
+API.interceptors.request.use(attachAuth);
+API.interceptors.response.use((res) => res, handleAuthError);
+
+SellerAPI.interceptors.request.use(attachAuth);
+SellerAPI.interceptors.response.use((res) => res, handleAuthError);
+
+// --- API exports ---
 
 export const authAPI = {
   sendOtp: (email) => API.post('/auth/send-otp', { email }),
@@ -49,27 +62,27 @@ export const orderAPI = {
 };
 
 export const sellerAPI = {
-  getDashboard: () => API.get('/seller/dashboard'),
-  getProducts: () => API.get('/seller/products'),
-  createProduct: (data) => API.post('/seller/products', data),
-  updateProduct: (id, data) => API.put(`/seller/products/${id}`, data),
-  deleteProduct: (id) => API.delete(`/seller/products/${id}`),
-  getOrders: (params) => API.get('/seller/orders', { params }),
-  shipOrder: (id, data) => API.put(`/seller/orders/${id}/ship`, data),
-  getPayouts: () => API.get('/seller/payouts'),
-  getSettings: () => API.get('/seller/settings'),
-  updateSettings: (data) => API.put('/seller/settings', data),
-  getMarketing: () => API.get('/seller/marketing'),
-  requestUnsuspend: (reason) => API.post('/seller/request-unsuspend', { reason }),
+  getDashboard: () => SellerAPI.get('/dashboard'),
+  getProducts: () => SellerAPI.get('/products'),
+  createProduct: (data) => SellerAPI.post('/products', data),
+  updateProduct: (id, data) => SellerAPI.put(`/products/${id}`, data),
+  deleteProduct: (id) => SellerAPI.delete(`/products/${id}`),
+  getOrders: (params) => SellerAPI.get('/orders', { params }),
+  shipOrder: (id, data) => SellerAPI.put(`/orders/${id}/ship`, data),
+  getPayouts: () => SellerAPI.get('/payouts'),
+  getSettings: () => SellerAPI.get('/settings'),
+  updateSettings: (data) => SellerAPI.put('/settings', data),
+  getMarketing: () => SellerAPI.get('/marketing'),
+  requestUnsuspend: (reason) => SellerAPI.post('/request-unsuspend', { reason }),
 };
 
 export const shippingAPI = {
-  checkServiceability: (orderId) => API.post('/seller/shipping/serviceability', { orderId }),
-  createShipment: (orderId, data) => API.post(`/seller/shipping/${orderId}/create`, data),
-  assignCourier: (orderId, courierId) => API.post(`/seller/shipping/${orderId}/assign-courier`, { courierId }),
-  schedulePickup: (orderId) => API.post(`/seller/shipping/${orderId}/pickup`),
-  getTracking: (orderId) => API.get(`/seller/shipping/${orderId}/track`),
-  getLabel: (orderId) => API.get(`/seller/shipping/${orderId}/label`),
+  checkServiceability: (orderId) => SellerAPI.post('/shipping/serviceability', { orderId }),
+  createShipment: (orderId, data) => SellerAPI.post(`/shipping/${orderId}/create`, data),
+  assignCourier: (orderId, courierId) => SellerAPI.post(`/shipping/${orderId}/assign-courier`, { courierId }),
+  schedulePickup: (orderId) => SellerAPI.post(`/shipping/${orderId}/pickup`),
+  getTracking: (orderId) => SellerAPI.get(`/shipping/${orderId}/track`),
+  getLabel: (orderId) => SellerAPI.get(`/shipping/${orderId}/label`),
 };
 
 export const adminAPI = {
@@ -121,4 +134,5 @@ export const reviewAPI = {
   hide: (id, reason) => API.put(`/reviews/${id}/hide`, { reason }),
 };
 
+export { SellerAPI };
 export default API;

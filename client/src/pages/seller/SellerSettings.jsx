@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Settings, Store, CreditCard, MapPin, Loader, AlertTriangle, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
-import API from '../../api';
+import { SellerAPI } from '../../api';
 
 export default function SellerSettings() {
   const { user, login } = useAuth();
@@ -18,7 +18,7 @@ export default function SellerSettings() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const { data } = await API.get('/seller/settings');
+        const { data } = await SellerAPI.get('/settings');
         const sp = data.sellerProfile || data;
         setStoreForm({ businessName: sp.businessName || '', businessType: sp.businessType || 'individual', gstNumber: sp.gstNumber || '', instagramUsername: sp.instagramUsername || '' });
         setBankForm({ accountHolderName: sp.bankDetails?.accountHolderName || '', accountNumber: sp.bankDetails?.accountNumber || '', ifscCode: sp.bankDetails?.ifscCode || '', bankName: sp.bankDetails?.bankName || '' });
@@ -39,7 +39,7 @@ export default function SellerSettings() {
   const saveStore = async () => {
     setLoading(true);
     try {
-      const { data } = await API.put('/seller/settings', { businessName: storeForm.businessName, businessType: storeForm.businessType, gstNumber: storeForm.gstNumber, instagramUsername: storeForm.instagramUsername });
+      const { data } = await SellerAPI.put('/settings', { businessName: storeForm.businessName, businessType: storeForm.businessType, gstNumber: storeForm.gstNumber, instagramUsername: storeForm.instagramUsername });
       login(data.token, data.user);
       toast.success('Store settings saved');
     } catch (err) { toast.error('Failed to save'); }
@@ -49,7 +49,7 @@ export default function SellerSettings() {
   const saveBank = async () => {
     setLoading(true);
     try {
-      const { data } = await API.put('/seller/settings', { bankDetails: bankForm });
+      const { data } = await SellerAPI.put('/settings', { bankDetails: bankForm });
       login(data.token, data.user);
       toast.success('Bank details saved');
     } catch (err) { toast.error('Failed to save'); }
@@ -59,7 +59,7 @@ export default function SellerSettings() {
   const saveAddress = async () => {
     setLoading(true);
     try {
-      const { data } = await API.put('/seller/settings', { businessAddress: addressForm, pickupAddress: pickupForm });
+      const { data } = await SellerAPI.put('/settings', { businessAddress: addressForm, pickupAddress: pickupForm });
       login(data.token, data.user);
       toast.success('Address saved');
     } catch (err) { toast.error('Failed to save'); }
@@ -70,7 +70,7 @@ export default function SellerSettings() {
     if (!suspendMsg) return toast.error('Please provide a reason');
     setLoading(true);
     try {
-      await API.post('/seller/request-unsuspend', { reason: suspendMsg });
+      await SellerAPI.post('/request-unsuspend', { reason: suspendMsg });
       toast.success('Reactivation request sent to admin');
       setSuspendMsg('');
     } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }

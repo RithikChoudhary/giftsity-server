@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { DollarSign, ShoppingCart, Package, TrendingUp, ArrowRight, Clock, AlertTriangle } from 'lucide-react';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import API from '../../api';
+import { SellerAPI } from '../../api';
 
 export default function SellerDashboard() {
   const { user } = useAuth();
@@ -15,7 +15,7 @@ export default function SellerDashboard() {
 
   const loadDashboard = async () => {
     try {
-      const { data } = await API.get('/seller/dashboard');
+      const { data } = await SellerAPI.get('/dashboard');
       setStats(data.stats || data);
       setRecentOrders(data.recentOrders || []);
     } catch (e) { console.error(e); }

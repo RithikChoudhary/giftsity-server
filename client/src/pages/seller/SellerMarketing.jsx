@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Megaphone, Copy, Share2, Gift, Users, Star, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
-import API from '../../api';
+import { SellerAPI } from '../../api';
 
 export default function SellerMarketing() {
   const { user } = useAuth();
@@ -14,7 +14,7 @@ export default function SellerMarketing() {
   useEffect(() => {
     const fetchMarketing = async () => {
       try {
-        const { data } = await API.get('/seller/marketing');
+        const { data } = await SellerAPI.get('/marketing');
         if (data) setSp(prev => ({ ...prev, ...data }));
       } catch { /* fallback to context data */ }
     };

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Package, Plus, Edit3, Trash2, Eye, EyeOff, Loader, X, Upload, Image } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import API from '../../api';
+import API, { SellerAPI } from '../../api';
 
 export default function SellerProducts() {
   const [products, setProducts] = useState([]);
@@ -21,7 +21,7 @@ export default function SellerProducts() {
 
   const loadProducts = async () => {
     try {
-      const { data } = await API.get('/seller/products');
+      const { data } = await SellerAPI.get('/products');
       setProducts(Array.isArray(data) ? data : data.products || []);
     } catch (e) { console.error(e); }
     setLoading(false);
@@ -84,10 +84,10 @@ export default function SellerProducts() {
       imageFiles.forEach(f => formData.append('images', f));
 
       if (editing) {
-        await API.put(`/seller/products/${editing}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        await SellerAPI.put(`/products/${editing}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         toast.success('Product updated');
       } else {
-        await API.post('/seller/products', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        await SellerAPI.post('/products', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         toast.success('Product created');
       }
       setShowForm(false);
@@ -98,7 +98,7 @@ export default function SellerProducts() {
 
   const toggleActive = async (id, isActive) => {
     try {
-      await API.put(`/seller/products/${id}`, { isActive: !isActive });
+      await SellerAPI.put(`/products/${id}`, { isActive: !isActive });
       loadProducts();
       toast.success(isActive ? 'Product hidden' : 'Product visible');
     } catch (e) { toast.error('Failed'); }
@@ -107,7 +107,7 @@ export default function SellerProducts() {
   const deleteProduct = async (id) => {
     if (!confirm('Delete this product?')) return;
     try {
-      await API.delete(`/seller/products/${id}`);
+      await SellerAPI.delete(`/products/${id}`);
       loadProducts();
       toast.success('Deleted');
     } catch (e) { toast.error('Failed'); }
