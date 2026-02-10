@@ -18,7 +18,7 @@ export default function AdminProducts() {
     try {
       const params = new URLSearchParams({ page, limit: 20 });
       if (search) params.set('search', search);
-      const { data } = await API.get(`/api/admin/products?${params}`);
+      const { data } = await API.get(`/admin/products?${params}`);
       setProducts(data.products || []);
       setTotal(data.total || 0);
     } catch (e) { console.error(e); }
@@ -27,7 +27,7 @@ export default function AdminProducts() {
 
   const toggleFeatured = async (id, featured) => {
     try {
-      await API.put(`/api/admin/products/${id}`, { isFeatured: !featured });
+      await API.put(`/admin/products/${id}/feature`);
       toast.success(featured ? 'Removed from featured' : 'Featured!');
       loadProducts();
     } catch (e) { toast.error('Failed'); }
@@ -35,7 +35,7 @@ export default function AdminProducts() {
 
   const toggleActive = async (id, active) => {
     try {
-      await API.put(`/api/admin/products/${id}`, { isActive: !active });
+      await API.put(`/admin/products/${id}/toggle`);
       toast.success(active ? 'Hidden' : 'Visible');
       loadProducts();
     } catch (e) { toast.error('Failed'); }
@@ -44,7 +44,7 @@ export default function AdminProducts() {
   const deleteProduct = async (id) => {
     if (!confirm('Delete this product?')) return;
     try {
-      await API.delete(`/api/admin/products/${id}`);
+      await API.delete(`/admin/products/${id}`);
       toast.success('Deleted');
       loadProducts();
     } catch (e) { toast.error('Failed'); }

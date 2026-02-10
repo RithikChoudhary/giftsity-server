@@ -4,7 +4,7 @@ const productSchema = new mongoose.Schema({
   sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   title: { type: String, required: true },
   slug: { type: String, unique: true },
-  description: { type: String, required: true },
+  description: { type: String, default: '' },
   price: { type: Number, required: true, min: 1 },
   comparePrice: { type: Number, default: null }, // MRP / strikethrough price
   category: { type: String, required: true },
@@ -49,6 +49,19 @@ const productSchema = new mongoose.Schema({
   reviewCount: { type: Number, default: 0 },
 
   tags: [{ type: String }],
+
+  // Customization support
+  isCustomizable: { type: Boolean, default: false },
+  customizationOptions: [{
+    label: { type: String, required: true },
+    type: { type: String, enum: ['text', 'image', 'select'], default: 'text' },
+    required: { type: Boolean, default: false },
+    placeholder: { type: String, default: '' },
+    maxLength: { type: Number, default: 100 },
+    maxFiles: { type: Number, default: 5 },
+    selectOptions: [{ type: String }],
+    extraPrice: { type: Number, default: 0 }
+  }],
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

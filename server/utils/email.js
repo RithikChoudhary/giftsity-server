@@ -133,10 +133,75 @@ const sendB2BInquiryNotification = async (inquiry) => {
   });
 };
 
+const sendShippedEmail = async (email, order) => {
+  const tracking = order.trackingInfo || {};
+  await transporter.sendMail({
+    from: `"Giftsity" <${process.env.SMTP_USER}>`,
+    to: email,
+    subject: `Your Order #${order.orderNumber} Has Been Shipped!`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a2e;border-radius:16px;">
+        <h1 style="color:#f5c518;margin:0 0 8px;font-size:24px;">Giftsity</h1>
+        <h2 style="color:#eee;margin:0 0 20px;">Your order is on its way!</h2>
+        <div style="background:#2a2a4a;border-radius:8px;padding:16px;margin:0 0 16px;">
+          <p style="color:#ccc;margin:4px 0;">Order: <strong style="color:#eee;">#${order.orderNumber}</strong></p>
+          ${tracking.courierName ? `<p style="color:#ccc;margin:4px 0;">Courier: ${tracking.courierName}</p>` : ''}
+          ${tracking.trackingNumber ? `<p style="color:#ccc;margin:4px 0;">Tracking: <strong style="color:#f5c518;">${tracking.trackingNumber}</strong></p>` : ''}
+          ${tracking.estimatedDelivery ? `<p style="color:#ccc;margin:4px 0;">Expected by: ${new Date(tracking.estimatedDelivery).toLocaleDateString()}</p>` : ''}
+        </div>
+        <p style="color:#888;font-size:13px;">You can track your order from your Giftsity account.</p>
+      </div>
+    `
+  });
+};
+
+const sendDeliveredEmail = async (email, order) => {
+  await transporter.sendMail({
+    from: `"Giftsity" <${process.env.SMTP_USER}>`,
+    to: email,
+    subject: `Order #${order.orderNumber} Delivered!`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a2e;border-radius:16px;">
+        <h1 style="color:#f5c518;margin:0 0 8px;font-size:24px;">Giftsity</h1>
+        <h2 style="color:#eee;margin:0 0 20px;">Your order has been delivered!</h2>
+        <div style="background:#1a2e1a;border-radius:8px;padding:16px;margin:0 0 16px;">
+          <p style="color:#8f8;margin:4px 0;font-weight:bold;">Order #${order.orderNumber} - Delivered</p>
+          <p style="color:#ccc;margin:4px 0;">Total: ₹${(order.totalAmount || 0).toLocaleString()}</p>
+        </div>
+        <p style="color:#ccc;font-size:14px;margin:16px 0;">Loved your purchase? Leave a review to help other shoppers!</p>
+        <p style="color:#888;font-size:13px;">Thank you for shopping with Giftsity!</p>
+      </div>
+    `
+  });
+};
+
+const sendReviewRequestEmail = async (email, order) => {
+  await transporter.sendMail({
+    from: `"Giftsity" <${process.env.SMTP_USER}>`,
+    to: email,
+    subject: `How was your gift? Review Order #${order.orderNumber}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a2e;border-radius:16px;">
+        <h1 style="color:#f5c518;margin:0 0 8px;font-size:24px;">Giftsity</h1>
+        <h2 style="color:#eee;margin:0 0 20px;">Tell us about your purchase!</h2>
+        <p style="color:#ccc;font-size:14px;">Your order #${order.orderNumber} was delivered recently. We'd love to hear your feedback!</p>
+        <div style="background:#2a2a4a;border-radius:8px;padding:16px;margin:16px 0;text-align:center;">
+          <p style="color:#f5c518;font-size:28px;margin:0;">⭐ ⭐ ⭐ ⭐ ⭐</p>
+          <p style="color:#ccc;margin:8px 0 0;font-size:14px;">Rate your experience</p>
+        </div>
+        <p style="color:#888;font-size:13px;">Log in to your Giftsity account to leave a review.</p>
+      </div>
+    `
+  });
+};
+
 module.exports = {
   sendOTP,
   sendOrderConfirmation,
   sendPayoutNotification,
   sendCommissionChangeNotification,
-  sendB2BInquiryNotification
+  sendB2BInquiryNotification,
+  sendShippedEmail,
+  sendDeliveredEmail,
+  sendReviewRequestEmail
 };

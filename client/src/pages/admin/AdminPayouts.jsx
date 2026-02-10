@@ -15,7 +15,7 @@ export default function AdminPayouts() {
 
   const loadPayouts = async () => {
     try {
-      const { data } = await API.get('/api/admin/payouts/pending');
+      const { data } = await API.get('/admin/payouts');
       setPayouts(Array.isArray(data) ? data : data.payouts || []);
     } catch (e) { console.error(e); }
     setLoading(false);
@@ -24,7 +24,7 @@ export default function AdminPayouts() {
   const calculatePayouts = async () => {
     setCalculating(true);
     try {
-      const { data } = await API.post('/api/admin/payouts/calculate');
+      const { data } = await API.post('/admin/payouts/calculate');
       toast.success(`${data.count || 0} payouts calculated`);
       loadPayouts();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
@@ -35,7 +35,7 @@ export default function AdminPayouts() {
     if (!txnId) return toast.error('Enter transaction ID');
     setMarkingPaid(payoutId);
     try {
-      await API.put(`/api/admin/payouts/${payoutId}/mark-paid`, { transactionId: txnId });
+      await API.put(`/admin/payouts/${payoutId}/mark-paid`, { transactionId: txnId });
       toast.success('Payout marked as paid');
       setTxnId('');
       setMarkingPaid(null);

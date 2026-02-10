@@ -47,22 +47,34 @@ router.post('/verify-otp', async (req, res) => {
     const { email, otp } = req.body;
     if (!email || !otp) return res.status(400).json({ message: 'Email and OTP required' });
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
-    if (!user) return res.status(400).json({ message: 'No account found' });
+    const normalizedEmail = email.toLowerCase().trim();
+    const otpStr = String(otp).trim();
+
+    // Atomic: find user with matching OTP, clear it in one step (prevents race conditions from double-submit)
+    const user = await User.findOneAndUpdate(
+      {
+        email: normalizedEmail,
+        otp: otpStr,
+        otpExpiry: { $gt: new Date() }
+      },
+      { $set: { otp: null, otpExpiry: null } },
+      { new: true }
+    );
+
+    if (!user) {
+      // Provide specific error message
+      const existingUser = await User.findOne({ email: normalizedEmail });
+      if (!existingUser) return res.status(400).json({ message: 'No account found' });
+      if (!existingUser.otp || !existingUser.otpExpiry) return res.status(400).json({ message: 'OTP expired or not requested. Please resend OTP.' });
+      if (new Date() > existingUser.otpExpiry) return res.status(400).json({ message: 'OTP expired. Request a new one.' });
+      return res.status(400).json({ message: 'Invalid OTP' });
+    }
+
     // Suspended sellers CAN log in to request removal - but show suspended status
     // Only fully blocked for non-sellers
     if (user.status === 'suspended' && user.userType !== 'seller') {
       return res.status(403).json({ message: 'Account suspended' });
     }
-
-    if (!user.otp || !user.otpExpiry) return res.status(400).json({ message: 'No OTP requested' });
-    if (new Date() > user.otpExpiry) return res.status(400).json({ message: 'OTP expired. Request a new one.' });
-    if (user.otp !== otp) return res.status(400).json({ message: 'Invalid OTP' });
-
-    // Clear OTP
-    user.otp = null;
-    user.otpExpiry = null;
-    await user.save();
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
@@ -185,6 +197,13 @@ router.post('/register-seller', async (req, res) => {
 
     if (referredByUser) {
       referredByUser.sellerProfile.referralCount = (referredByUser.sellerProfile.referralCount || 0) + 1;
+      const rc = referredByUser.sellerProfile.referralCount;
+      // Referral rewards
+      if (rc >= 10) {
+        // Lock 0% commission for 1 year
+        referredByUser.sellerProfile.commissionRate = 0;
+        referredByUser.sellerProfile.commissionLockedUntil = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+      }
       await referredByUser.save();
     }
 

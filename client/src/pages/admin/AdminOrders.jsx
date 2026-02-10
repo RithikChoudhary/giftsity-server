@@ -25,7 +25,7 @@ export default function AdminOrders() {
     try {
       const params = new URLSearchParams({ page, limit: 20 });
       if (filter !== 'all') params.set('status', filter);
-      const { data } = await API.get(`/api/admin/orders?${params}`);
+      const { data } = await API.get(`/admin/orders?${params}`);
       setOrders(data.orders || []);
       setTotal(data.total || 0);
     } catch (e) { console.error(e); }
@@ -70,7 +70,7 @@ export default function AdminOrders() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-theme-muted">
                   <div>
                     <p className="text-theme-dim">Product</p>
-                    <p className="text-theme-secondary">{o.productSnapshot?.title || 'N/A'}</p>
+                    <p className="text-theme-secondary">{o.items?.[0]?.title || 'N/A'}{o.items?.length > 1 ? ` +${o.items.length - 1}` : ''}</p>
                   </div>
                   <div>
                     <p className="text-theme-dim">Customer</p>

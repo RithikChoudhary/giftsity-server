@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Package, ChevronRight, Star, Clock, Truck, CheckCircle, XCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import API from '../../api';
 
@@ -17,23 +18,53 @@ const statusConfig = {
 export default function CustomerOrders() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     if (!user) return navigate('/auth?redirect=/orders');
-    loadOrders();
+
+    // Check if returning from Cashfree payment
+    const cfId = searchParams.get('cf_id');
+    if (cfId) {
+      verifyPayment(cfId);
+    } else {
+      loadOrders();
+    }
   }, [user]);
+
+  const verifyPayment = async (orderId) => {
+    setVerifying(true);
+    try {
+      const { data } = await API.post('/orders/verify-payment', { orderId });
+      toast.success('Payment verified! Your order is confirmed.');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Payment verification failed';
+      if (msg.includes('not completed')) toast.error('Payment was not completed. Please try again.');
+      else toast.error(msg);
+    }
+    // Clear the cf_id param
+    setSearchParams({});
+    setVerifying(false);
+    loadOrders();
+  };
 
   const loadOrders = async () => {
     try {
-      const { data } = await API.get('/api/orders/my-orders');
+      const { data } = await API.get('/orders/my-orders');
       setOrders(Array.isArray(data) ? data : data.orders || []);
     } catch (e) { console.error(e); }
     setLoading(false);
   };
 
-  if (loading) return <LoadingSpinner />;
+  if (loading || verifying) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh]">
+      <LoadingSpinner />
+      {verifying && <p className="text-theme-muted mt-4 text-sm">Verifying your payment...</p>}
+    </div>
+  );
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -63,13 +94,17 @@ export default function CustomerOrders() {
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 bg-inset rounded-lg overflow-hidden shrink-0">
-                    {order.productSnapshot?.image ? <img src={order.productSnapshot.image} alt="" className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-theme-dim m-auto mt-4" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-theme-primary truncate">{order.productSnapshot?.title || 'Product'}</p>
-                    <p className="text-xs text-theme-muted">Qty: {order.quantity} &middot; Rs. {order.totalAmount?.toLocaleString('en-IN')}</p>
-                  </div>
+                  {(() => { const item = order.items?.[0]; return (
+                    <>
+                      <div className="w-14 h-14 bg-inset rounded-lg overflow-hidden shrink-0">
+                        {item?.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-theme-dim m-auto mt-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-theme-primary truncate">{item?.title || 'Product'}{order.items?.length > 1 ? ` +${order.items.length - 1} more` : ''}</p>
+                        <p className="text-xs text-theme-muted">Qty: {order.items?.reduce((s, i) => s + (i.quantity || 1), 0) || 1} &middot; Rs. {order.totalAmount?.toLocaleString('en-IN')}</p>
+                      </div>
+                    </>
+                  ); })()}
                   <ChevronRight className="w-4 h-4 text-theme-dim group-hover:text-theme-primary transition-colors" />
                 </div>
                 {order.status === 'delivered' && (

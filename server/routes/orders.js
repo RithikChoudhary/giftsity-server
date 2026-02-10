@@ -20,11 +20,26 @@ const generateOrderNumber = () => {
 // POST /api/orders - create order + Cashfree payment session
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { items, shippingAddress } = req.body;
+    const { items, shippingAddress, couponCode } = req.body;
     if (!items || !items.length) return res.status(400).json({ message: 'No items' });
     if (!shippingAddress) return res.status(400).json({ message: 'Shipping address required' });
 
     const settings = await PlatformSettings.getSettings();
+
+    // Validate coupon if provided
+    let couponDiscount = 0;
+    let validCoupon = null;
+    if (couponCode) {
+      try {
+        const Coupon = require('../models/Coupon');
+        validCoupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true, expiresAt: { $gt: new Date() } });
+        if (validCoupon && validCoupon.usedCount < validCoupon.usageLimit) {
+          // We'll calculate discount after we know itemTotal
+        } else {
+          validCoupon = null;
+        }
+      } catch (e) { /* Coupon model may not exist yet, skip */ }
+    }
 
     // Group items by seller
     const sellerGroups = {};
@@ -36,7 +51,7 @@ router.post('/', requireAuth, async (req, res) => {
       }
       const sid = product.sellerId.toString();
       if (!sellerGroups[sid]) sellerGroups[sid] = [];
-      sellerGroups[sid].push({ product, quantity: item.quantity });
+      sellerGroups[sid].push({ product, quantity: item.quantity, customizations: item.customizations || [] });
     }
 
     const orders = [];
@@ -62,7 +77,8 @@ router.post('/', requireAuth, async (req, res) => {
           image: i.product.images[0]?.url || '',
           sku: i.product.sku || '',
           quantity: i.quantity,
-          sellerId
+          sellerId,
+          customizations: i.customizations || []
         })),
         shippingAddress,
         itemTotal,
@@ -72,6 +88,35 @@ router.post('/', requireAuth, async (req, res) => {
       });
       await order.save();
       orders.push(order);
+    }
+
+    // Apply coupon discount if valid
+    const grandTotalBeforeDiscount = orders.reduce((s, o) => s + o.totalAmount, 0);
+    if (validCoupon) {
+      let discount = 0;
+      if (validCoupon.type === 'percent') {
+        discount = (grandTotalBeforeDiscount * validCoupon.value) / 100;
+        if (validCoupon.maxDiscount > 0) discount = Math.min(discount, validCoupon.maxDiscount);
+      } else {
+        discount = validCoupon.value;
+      }
+      discount = Math.min(Math.round(discount), grandTotalBeforeDiscount);
+
+      // Distribute discount across orders proportionally
+      let remaining = discount;
+      for (let i = 0; i < orders.length; i++) {
+        const order = orders[i];
+        const share = i === orders.length - 1 ? remaining : Math.round(discount * (order.totalAmount / grandTotalBeforeDiscount));
+        order.couponCode = validCoupon.code;
+        order.discountAmount = share;
+        order.totalAmount = Math.max(0, order.totalAmount - share);
+        remaining -= share;
+        await order.save();
+      }
+
+      // Increment usage count
+      validCoupon.usedCount += 1;
+      await validCoupon.save();
     }
 
     // Create Cashfree order for the total
@@ -193,6 +238,40 @@ router.get('/:id', requireAuth, async (req, res) => {
     res.json({ order });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/orders/:id/cancel - customer cancels own order (pending/confirmed only)
+router.post('/:id/cancel', requireAuth, async (req, res) => {
+  try {
+    const order = await Order.findOne({ _id: req.params.id, customerId: req.user._id });
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    if (!['pending', 'confirmed'].includes(order.status)) {
+      return res.status(400).json({ message: `Cannot cancel order with status "${order.status}". Only pending or confirmed orders can be cancelled.` });
+    }
+
+    order.status = 'cancelled';
+    order.cancelledAt = new Date();
+    order.cancelReason = req.body.reason || 'Cancelled by customer';
+    await order.save();
+
+    // Restore stock if payment was completed
+    if (order.paymentStatus === 'paid') {
+      for (const item of order.items) {
+        await Product.findByIdAndUpdate(item.productId, {
+          $inc: { stock: item.quantity, orderCount: -item.quantity }
+        });
+      }
+      // Note: Refund should be initiated separately (Cashfree refund API)
+      order.paymentStatus = 'refunded';
+      await order.save();
+    }
+
+    res.json({ message: 'Order cancelled successfully', order });
+  } catch (err) {
+    console.error('Cancel order error:', err.message);
+    res.status(500).json({ message: 'Failed to cancel order' });
   }
 });
 

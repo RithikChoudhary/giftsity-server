@@ -19,15 +19,11 @@ export default function AdminSellers() {
 
   const loadSellers = async () => {
     try {
-      const [allRes, pendRes] = await Promise.all([
-        API.get('/api/admin/sellers'),
-        API.get('/api/admin/sellers/pending')
-      ]);
-      const allSellers = Array.isArray(allRes.data) ? allRes.data : allRes.data.sellers || [];
+      const { data } = await API.get('/admin/sellers');
+      const allSellers = Array.isArray(data) ? data : data.sellers || [];
       setSellers(allSellers);
-      setPending(Array.isArray(pendRes.data) ? pendRes.data : pendRes.data.sellers || []);
-      // Find reactivation requests
-      setReactivationRequests(allSellers.filter(s => s.status === 'suspended' && s.sellerProfile?.reactivationRequest));
+      setPending(allSellers.filter(s => s.status === 'pending'));
+      setReactivationRequests(allSellers.filter(s => s.status === 'suspended' && (s.sellerProfile?.suspensionRemovalRequested || s.sellerProfile?.reactivationRequest)));
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -35,7 +31,7 @@ export default function AdminSellers() {
   const approveSeller = async (id) => {
     setActionLoading(id);
     try {
-      await API.put(`/api/admin/sellers/${id}/approve`);
+      await API.put(`/admin/sellers/${id}/approve`);
       toast.success('Seller approved!');
       loadSellers();
     } catch (err) { toast.error('Failed'); }
@@ -45,7 +41,7 @@ export default function AdminSellers() {
   const rejectSeller = async (id) => {
     setActionLoading(id);
     try {
-      await API.put(`/api/admin/sellers/${id}/reject`);
+      await API.put(`/admin/sellers/${id}/suspend`);
       toast.success('Seller rejected');
       loadSellers();
     } catch (err) { toast.error('Failed'); }
@@ -56,7 +52,7 @@ export default function AdminSellers() {
     if (!confirm('Suspend this seller? Their products will be hidden.')) return;
     setActionLoading(id);
     try {
-      await API.put(`/api/admin/sellers/${id}/suspend`);
+      await API.put(`/admin/sellers/${id}/suspend`);
       toast.success('Seller suspended');
       loadSellers();
     } catch (err) { toast.error('Failed'); }
@@ -66,7 +62,7 @@ export default function AdminSellers() {
   const reactivateSeller = async (id) => {
     setActionLoading(id);
     try {
-      await API.put(`/api/admin/sellers/${id}/reactivate`);
+      await API.put(`/admin/sellers/${id}/approve`);
       toast.success('Seller reactivated!');
       loadSellers();
     } catch (err) { toast.error('Failed'); }
@@ -75,7 +71,7 @@ export default function AdminSellers() {
 
   const saveCommission = async (sellerId) => {
     try {
-      await API.put(`/api/admin/sellers/${sellerId}/commission`, { commissionRate: commissionValue });
+      await API.put(`/admin/sellers/${sellerId}/commission`, { commissionRate: commissionValue });
       toast.success('Commission updated');
       setEditingCommission(null);
       loadSellers();

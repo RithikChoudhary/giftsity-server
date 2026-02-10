@@ -12,7 +12,7 @@ export default function AdminDashboard() {
 
   const loadDashboard = async () => {
     try {
-      const { data } = await API.get('/api/admin/dashboard');
+      const { data } = await API.get('/admin/dashboard');
       setStats(data);
     } catch (e) { console.error(e); }
     setLoading(false);

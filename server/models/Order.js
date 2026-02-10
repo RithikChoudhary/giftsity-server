@@ -24,7 +24,12 @@ const orderSchema = new mongoose.Schema({
     image: String,
     sku: String,
     quantity: { type: Number, default: 1 },
-    sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    customizations: [{
+      label: { type: String, default: '' },
+      value: { type: String, default: '' },
+      imageUrls: [{ type: String }]
+    }]
   }],
 
   // Shipping
@@ -85,6 +90,10 @@ const orderSchema = new mongoose.Schema({
     default: 'pending'
   },
   payoutId: { type: mongoose.Schema.Types.ObjectId, ref: 'SellerPayout', default: null },
+
+  // Coupon/discount
+  couponCode: { type: String, default: '' },
+  discountAmount: { type: Number, default: 0 },
 
   notes: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now },

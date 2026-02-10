@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Gift, Mail, ArrowRight, Loader } from 'lucide-react';
+import { Gift, Mail, ArrowRight, Loader, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import API from '../../api';
 
@@ -16,6 +16,9 @@ export default function Auth() {
   const [otp, setOtp] = useState('');
   const [isNew, setIsNew] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  const timerRef = useRef(null);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (user) {
@@ -26,34 +29,71 @@ export default function Auth() {
     }
   }, [user]);
 
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+  const startResendTimer = useCallback(() => {
+    setResendTimer(30);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setResendTimer(prev => {
+        if (prev <= 1) { clearInterval(timerRef.current); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
   const handleSendOTP = async (e) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     if (!email) return toast.error('Enter your email');
+    submittingRef.current = true;
     setLoading(true);
     try {
-      const { data } = await API.post('/api/auth/send-otp', { email });
+      const { data } = await API.post('/auth/send-otp', { email });
       setIsNew(data.isNew);
       setStep('otp');
+      startResendTimer();
       toast.success('OTP sent to your email!');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to send OTP');
+    }
+    submittingRef.current = false;
+    setLoading(false);
+  };
+
+  const handleResendOTP = async () => {
+    if (resendTimer > 0) return;
+    setLoading(true);
+    try {
+      await API.post('/auth/send-otp', { email });
+      setOtp('');
+      startResendTimer();
+      toast.success('New OTP sent!');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to resend OTP');
     }
     setLoading(false);
   };
 
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
-    if (!otp) return toast.error('Enter OTP');
+    if (submittingRef.current) return;
+    if (!otp.trim()) return toast.error('Enter OTP');
     if (isNew && !name) return toast.error('Enter your name');
+    submittingRef.current = true;
     setLoading(true);
     try {
-      const body = { email, otp };
+      const body = { email, otp: otp.trim() };
       if (isNew) { body.name = name; body.phone = phone; }
-      const { data } = await API.post('/api/auth/verify-otp', body);
+      const { data } = await API.post('/auth/verify-otp', body);
       login(data.token, data.user);
       toast.success(`Welcome${isNew ? '' : ' back'}, ${data.user.name}!`);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Invalid OTP');
+      submittingRef.current = false; // Allow retry only on failure
     }
     setLoading(false);
   };
@@ -104,7 +144,19 @@ export default function Auth() {
             <button type="submit" disabled={loading} className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors">
               {loading ? <Loader className="w-4 h-4 animate-spin" /> : 'Verify & Sign In'}
             </button>
-            <button type="button" onClick={() => { setStep('email'); setOtp(''); }} className="w-full text-sm text-theme-muted hover:text-theme-primary transition-colors">Change email</button>
+            <div className="flex items-center justify-between">
+              <button type="button" onClick={() => { setStep('email'); setOtp(''); }} className="text-sm text-theme-muted hover:text-theme-primary transition-colors">Change email</button>
+              <button
+                type="button"
+                onClick={handleResendOTP}
+                disabled={resendTimer > 0 || loading}
+                className="text-sm text-amber-400 hover:text-amber-300 disabled:text-theme-dim disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+              >
+                <RefreshCw className="w-3 h-3" />
+                {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+              </button>
+            </div>
+            <p className="text-[11px] text-theme-dim text-center">OTP expires in 10 minutes</p>
           </form>
         )}
       </div>

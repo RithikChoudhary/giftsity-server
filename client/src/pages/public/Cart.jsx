@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-import { ShoppingBag, Trash2, Minus, Plus, ArrowRight, ArrowLeft, CreditCard, MapPin, Loader } from 'lucide-react';
+import { ShoppingBag, Trash2, Minus, Plus, ArrowRight, ArrowLeft, CreditCard, MapPin, Loader, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import API from '../../api';
 
@@ -13,16 +13,59 @@ export default function Cart() {
   const [step, setStep] = useState('cart'); // cart | address | payment
   const [address, setAddress] = useState({ name: '', phone: '', street: '', city: '', state: '', pincode: '' });
   const [loading, setLoading] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressIdx, setSelectedAddressIdx] = useState(-1); // -1 = new address
+  const [couponCode, setCouponCode] = useState('');
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponApplied, setCouponApplied] = useState('');
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
 
   useEffect(() => {
     // Pre-fill default address from user profile
     if (user?.shippingAddresses?.length > 0) {
-      const def = user.shippingAddresses.find(a => a.isDefault) || user.shippingAddresses[0];
+      setSavedAddresses(user.shippingAddresses);
+      const defIdx = user.shippingAddresses.findIndex(a => a.isDefault);
+      const idx = defIdx >= 0 ? defIdx : 0;
+      setSelectedAddressIdx(idx);
+      const def = user.shippingAddresses[idx];
       if (def) setAddress({ name: def.name || user.name || '', phone: def.phone || user.phone || '', street: def.street || '', city: def.city || '', state: def.state || '', pincode: def.pincode || '' });
     }
   }, [user]);
 
-  const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const selectAddress = (idx) => {
+    setSelectedAddressIdx(idx);
+    if (idx >= 0 && savedAddresses[idx]) {
+      const a = savedAddresses[idx];
+      setAddress({ name: a.name || user?.name || '', phone: a.phone || user?.phone || '', street: a.street || '', city: a.city || '', state: a.state || '', pincode: a.pincode || '' });
+    } else {
+      setAddress({ name: '', phone: '', street: '', city: '', state: '', pincode: '' });
+    }
+  };
+
+  const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  const total = Math.max(0, subtotal - couponDiscount);
+
+  const applyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setApplyingCoupon(true);
+    try {
+      const { data } = await API.post('/coupons/apply', { code: couponCode, orderTotal: subtotal });
+      setCouponDiscount(data.discount);
+      setCouponApplied(data.code);
+      toast.success(`Coupon applied! Rs. ${data.discount} off`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Invalid coupon');
+      setCouponDiscount(0);
+      setCouponApplied('');
+    }
+    setApplyingCoupon(false);
+  };
+
+  const removeCoupon = () => {
+    setCouponCode('');
+    setCouponDiscount(0);
+    setCouponApplied('');
+  };
 
   const handleCheckout = () => {
     if (!user) return navigate('/auth?redirect=/cart');
@@ -33,32 +76,24 @@ export default function Cart() {
     if (!address.name || !address.phone || !address.street || !address.city || !address.state || !address.pincode) return toast.error('Fill all address fields');
     setLoading(true);
     try {
-      // Create order for each seller group
-      const sellerGroups = {};
-      items.forEach(i => {
-        const sid = i.sellerId;
-        if (!sellerGroups[sid]) sellerGroups[sid] = [];
-        sellerGroups[sid].push(i);
-      });
+      const orderItems = items.map(i => ({ productId: i.productId, quantity: i.quantity, customizations: i.customizations || [] }));
+      const { data } = await API.post('/orders', { items: orderItems, shippingAddress: address, couponCode: couponApplied || undefined });
 
-      for (const sellerId of Object.keys(sellerGroups)) {
-        for (const item of sellerGroups[sellerId]) {
-          const { data } = await API.post('/api/orders', {
-            productId: item.productId,
-            quantity: item.quantity,
-            shippingAddress: address
-          });
+      // Clear cart immediately
+      clearCart();
 
-          // If payment session returned, initiate Cashfree
-          if (data.paymentSessionId && window.Cashfree) {
-            const cashfree = window.Cashfree({ mode: 'sandbox' });
-            await cashfree.checkout({ paymentSessionId: data.paymentSessionId, redirectTarget: '_self' });
-          }
-        }
+      // If Cashfree payment session returned, redirect to payment
+      const paymentSessionId = data.cashfreeOrder?.paymentSessionId || data.paymentSessionId;
+      if (paymentSessionId && window.Cashfree) {
+        const env = data.env || 'sandbox';
+        const cashfree = window.Cashfree({ mode: env });
+        await cashfree.checkout({ paymentSessionId, redirectTarget: '_self' });
+        // User will be redirected to Cashfree, then back to /orders?cf_id=...
+        return;
       }
 
-      clearCart();
-      toast.success('Order placed successfully!');
+      // If no payment gateway (shouldn't happen), just go to orders
+      toast.success('Order placed!');
       navigate('/orders');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Order failed');
@@ -99,21 +134,30 @@ export default function Cart() {
           <div className="md:col-span-2 space-y-3">
             <h1 className="text-xl font-bold text-theme-primary mb-4">Shopping Cart ({items.length})</h1>
             {items.map(item => (
-              <div key={item.productId} className="bg-card border border-edge/50 rounded-xl p-4 flex gap-4">
+              <div key={item.cartKey || item.productId} className="bg-card border border-edge/50 rounded-xl p-4 flex gap-4">
                 <div className="w-20 h-20 bg-inset rounded-lg overflow-hidden shrink-0">
                   {item.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <ShoppingBag className="w-8 h-8 text-theme-dim m-auto mt-6" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <Link to={`/product/${item.slug}`} className="font-medium text-sm text-theme-primary hover:text-amber-400 truncate block">{item.title}</Link>
                   <p className="text-xs text-theme-muted mt-0.5">{item.sellerName}</p>
+                  {item.customizations?.length > 0 && (
+                    <div className="mt-1 space-y-0.5">
+                      {item.customizations.map((c, ci) => (
+                        <p key={ci} className="text-[11px] text-amber-400/80">
+                          {c.label}: {c.value || `${c.imageUrls?.length || 0} image(s)`}
+                        </p>
+                      ))}
+                    </div>
+                  )}
                   <p className="text-sm font-bold text-theme-primary mt-1">Rs. {item.price?.toLocaleString('en-IN')}</p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <button onClick={() => removeItem(item.productId)} className="text-theme-dim hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                  <button onClick={() => removeItem(item.cartKey || item.productId)} className="text-theme-dim hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
                   <div className="flex items-center gap-1.5">
-                    <button onClick={() => updateQuantity(item.productId, item.quantity - 1)} className="w-7 h-7 flex items-center justify-center bg-inset rounded-md"><Minus className="w-3 h-3" /></button>
+                    <button onClick={() => updateQuantity(item.cartKey || item.productId, item.quantity - 1)} className="w-7 h-7 flex items-center justify-center bg-inset rounded-md"><Minus className="w-3 h-3" /></button>
                     <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.productId, item.quantity + 1)} disabled={item.quantity >= item.stock} className="w-7 h-7 flex items-center justify-center bg-inset rounded-md disabled:opacity-40"><Plus className="w-3 h-3" /></button>
+                    <button onClick={() => updateQuantity(item.cartKey || item.productId, item.quantity + 1)} disabled={item.quantity >= item.stock} className="w-7 h-7 flex items-center justify-center bg-inset rounded-md disabled:opacity-40"><Plus className="w-3 h-3" /></button>
                   </div>
                 </div>
               </div>
@@ -122,9 +166,28 @@ export default function Cart() {
           <div className="bg-card border border-edge/50 rounded-xl p-5 h-fit sticky top-24">
             <h3 className="font-semibold text-theme-primary mb-4">Order Summary</h3>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between text-theme-secondary"><span>Subtotal</span><span>Rs. {total.toLocaleString('en-IN')}</span></div>
+              <div className="flex justify-between text-theme-secondary"><span>Subtotal</span><span>Rs. {subtotal.toLocaleString('en-IN')}</span></div>
               <div className="flex justify-between text-theme-secondary"><span>Shipping</span><span className="text-green-400">Free</span></div>
+              {couponDiscount > 0 && (
+                <div className="flex justify-between text-green-400"><span>Discount ({couponApplied})</span><span>-Rs. {couponDiscount.toLocaleString('en-IN')}</span></div>
+              )}
               <div className="border-t border-edge/50 pt-2 flex justify-between font-bold text-theme-primary"><span>Total</span><span>Rs. {total.toLocaleString('en-IN')}</span></div>
+            </div>
+            {/* Coupon */}
+            <div className="mt-4">
+              {couponApplied ? (
+                <div className="flex items-center justify-between bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
+                  <span className="text-xs text-green-400 font-medium">{couponApplied} applied</span>
+                  <button onClick={removeCoupon} className="text-xs text-red-400 hover:text-red-300">Remove</button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input type="text" value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} placeholder="Coupon code" className="flex-1 px-3 py-2 bg-inset border border-edge rounded-lg text-xs text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
+                  <button onClick={applyCoupon} disabled={applyingCoupon || !couponCode} className="px-3 py-2 bg-inset border border-edge hover:border-amber-500/50 rounded-lg text-xs text-theme-muted hover:text-amber-400 transition-colors disabled:opacity-50">
+                    {applyingCoupon ? '...' : 'Apply'}
+                  </button>
+                </div>
+              )}
             </div>
             <button onClick={handleCheckout} className="w-full mt-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors">
               Checkout <ArrowRight className="w-4 h-4" />
@@ -137,6 +200,33 @@ export default function Cart() {
         <div className="max-w-lg mx-auto">
           <button onClick={() => setStep('cart')} className="flex items-center gap-1 text-sm text-theme-muted hover:text-theme-primary mb-4"><ArrowLeft className="w-4 h-4" /> Back to Cart</button>
           <h2 className="text-xl font-bold text-theme-primary mb-6 flex items-center gap-2"><MapPin className="w-5 h-5 text-amber-400" /> Shipping Address</h2>
+
+          {/* Saved addresses */}
+          {savedAddresses.length > 0 && (
+            <div className="space-y-2 mb-6">
+              <p className="text-xs font-medium text-theme-muted mb-2">Saved Addresses</p>
+              {savedAddresses.map((a, i) => (
+                <button key={i} onClick={() => selectAddress(i)} className={`w-full text-left p-3 rounded-xl border transition-colors ${selectedAddressIdx === i ? 'border-amber-500 bg-amber-500/5' : 'border-edge/50 bg-card hover:border-edge-strong'}`}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-theme-primary">{a.name || user?.name}</p>
+                      <p className="text-xs text-theme-muted">{a.street}, {a.city}, {a.state} - {a.pincode}</p>
+                      <p className="text-xs text-theme-dim">{a.phone}</p>
+                    </div>
+                    {selectedAddressIdx === i && <CheckCircle className="w-5 h-5 text-amber-500 shrink-0" />}
+                  </div>
+                  {a.isDefault && <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/10 text-amber-400 rounded mt-1 inline-block">Default</span>}
+                </button>
+              ))}
+              <button onClick={() => selectAddress(-1)} className={`w-full text-left p-3 rounded-xl border transition-colors ${selectedAddressIdx === -1 ? 'border-amber-500 bg-amber-500/5' : 'border-edge/50 bg-card hover:border-edge-strong'}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-theme-muted">+ Use a new address</span>
+                  {selectedAddressIdx === -1 && <CheckCircle className="w-5 h-5 text-amber-500 shrink-0" />}
+                </div>
+              </button>
+            </div>
+          )}
+
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -180,7 +270,7 @@ export default function Cart() {
           <div className="bg-card border border-edge/50 rounded-xl p-5 mb-6">
             <h3 className="font-semibold text-theme-primary mb-3">Order Summary</h3>
             {items.map(i => (
-              <div key={i.productId} className="flex justify-between text-sm text-theme-secondary py-1">
+              <div key={i.cartKey || i.productId} className="flex justify-between text-sm text-theme-secondary py-1">
                 <span>{i.title} x {i.quantity}</span>
                 <span>Rs. {(i.price * i.quantity).toLocaleString('en-IN')}</span>
               </div>

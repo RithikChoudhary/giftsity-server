@@ -21,6 +21,8 @@ app.use('/api/b2b', require('./routes/b2b'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/store', require('./routes/store'));
 app.use('/api/shipping', require('./routes/shipping'));
+app.use('/api/wishlist', require('./routes/wishlist'));
+app.use('/api/coupons', require('./routes/coupons'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', platform: 'Giftsity' }));

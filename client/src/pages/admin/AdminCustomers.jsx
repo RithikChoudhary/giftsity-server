@@ -13,7 +13,7 @@ export default function AdminCustomers() {
 
   const loadCustomers = async () => {
     try {
-      const { data } = await API.get('/api/admin/customers');
+      const { data } = await API.get('/admin/customers');
       setCustomers(Array.isArray(data) ? data : data.customers || []);
     } catch (e) { console.error(e); }
     setLoading(false);

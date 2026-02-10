@@ -15,7 +15,7 @@ export default function SellerDashboard() {
 
   const loadDashboard = async () => {
     try {
-      const { data } = await API.get('/api/seller/dashboard');
+      const { data } = await API.get('/seller/dashboard');
       setStats(data.stats || data);
       setRecentOrders(data.recentOrders || []);
     } catch (e) { console.error(e); }
@@ -114,7 +114,7 @@ export default function SellerDashboard() {
               <div key={o._id} className="flex items-center justify-between py-2 border-b border-edge/30 last:border-0">
                 <div>
                   <p className="text-sm font-medium text-theme-primary">{o.orderNumber}</p>
-                  <p className="text-xs text-theme-muted">{o.productSnapshot?.title} &middot; Qty: {o.quantity}</p>
+                  <p className="text-xs text-theme-muted">{o.items?.[0]?.title || 'Product'}{o.items?.length > 1 ? ` +${o.items.length - 1}` : ''} &middot; Qty: {o.items?.reduce((s, i) => s + (i.quantity || 1), 0) || 1}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-medium text-theme-primary">Rs. {o.totalAmount?.toLocaleString('en-IN')}</p>

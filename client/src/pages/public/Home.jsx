@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Gift, ArrowRight, Sparkles, Store, Star, TrendingUp, ShoppingBag, Truck, Shield, Heart } from 'lucide-react';
 import ProductCard from '../../components/ProductCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import SEO from '../../components/SEO';
 import API from '../../api';
 
 export default function Home() {
@@ -19,15 +20,15 @@ export default function Home() {
   const loadData = async () => {
     try {
       const [featRes, recRes, sellerRes, catRes] = await Promise.all([
-        API.get('/api/products?featured=true&limit=4').catch(() => ({ data: { products: [] } })),
-        API.get('/api/products?limit=8&sort=newest').catch(() => ({ data: { products: [] } })),
-        API.get('/api/store/top-sellers').catch(() => ({ data: [] })),
-        API.get('/api/products/categories').catch(() => ({ data: [] }))
+        API.get('/products?featured=true&limit=4').catch(() => ({ data: { products: [] } })),
+        API.get('/products?limit=8&sort=newest').catch(() => ({ data: { products: [] } })),
+        API.get('/store/featured/top-sellers').catch(() => ({ data: { sellers: [] } })),
+        API.get('/products/categories').catch(() => ({ data: { categories: [] } }))
       ]);
       setFeatured(featRes.data.products || []);
       setRecent(recRes.data.products || []);
-      setTopSellers(Array.isArray(sellerRes.data) ? sellerRes.data : []);
-      setCategories(Array.isArray(catRes.data) ? catRes.data : []);
+      setTopSellers(sellerRes.data?.sellers || []);
+      setCategories(catRes.data?.categories || (Array.isArray(catRes.data) ? catRes.data : []));
     } catch (err) { console.error(err); }
     setLoading(false);
   };
@@ -36,6 +37,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
+      <SEO />
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-br from-surface via-card to-surface">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-amber-500/5 via-transparent to-transparent" />
@@ -105,22 +107,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* Featured */}
-      {featured.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-theme-primary flex items-center gap-2">
-              <Star className="w-5 h-5 text-amber-400" /> Featured Gifts
-            </h2>
-            <Link to="/shop" className="text-sm text-amber-400 hover:text-amber-300 flex items-center gap-1">View All <ArrowRight className="w-3 h-3" /></Link>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {featured.map(p => <ProductCard key={p._id} product={p} />)}
-          </div>
-        </section>
-      )}
-
-      {/* Recent */}
+      {/* New Arrivals */}
       {recent.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
           <div className="flex items-center justify-between mb-8">
@@ -142,30 +129,46 @@ export default function Home() {
             <h2 className="text-2xl font-bold text-theme-primary flex items-center gap-2">
               <Store className="w-5 h-5 text-amber-400" /> Top Sellers
             </h2>
+            <Link to="/sellers" className="text-sm text-amber-400 hover:text-amber-300 flex items-center gap-1">View All <ArrowRight className="w-3 h-3" /></Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {topSellers.map(s => (
-              <Link key={s._id} to={`/store/${s.sellerProfile?.slug || s._id}`} className="bg-card border border-edge/50 rounded-xl p-4 hover:border-amber-500/30 transition-all group">
+              <Link key={s._id} to={`/store/${s.businessSlug || s._id}`} className="bg-card border border-edge/50 rounded-xl p-4 hover:border-amber-500/30 transition-all group">
                 <div className="flex items-center gap-3">
-                  {s.sellerProfile?.profilePhoto ? (
-                    <img src={s.sellerProfile.profilePhoto} alt="" className="w-12 h-12 rounded-full object-cover" />
+                  {s.avatar?.url ? (
+                    <img src={s.avatar.url} alt="" className="w-12 h-12 rounded-full object-cover" />
                   ) : (
                     <div className="w-12 h-12 bg-amber-500/10 rounded-full flex items-center justify-center">
                       <Store className="w-6 h-6 text-amber-400" />
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-theme-primary group-hover:text-amber-400 transition-colors truncate">{s.sellerProfile?.businessName}</p>
-                    <p className="text-xs text-theme-muted">{s.sellerProfile?.totalOrders || 0} sales</p>
+                    <p className="font-semibold text-theme-primary group-hover:text-amber-400 transition-colors truncate">{s.businessName}</p>
+                    <p className="text-xs text-theme-muted">{s.totalOrders || 0} sales</p>
                   </div>
-                  {s.sellerProfile?.rating > 0 && (
+                  {s.rating > 0 && (
                     <div className="flex items-center gap-1 text-xs text-amber-400">
-                      <Star className="w-3 h-3 fill-current" /> {s.sellerProfile.rating.toFixed(1)}
+                      <Star className="w-3 h-3 fill-current" /> {s.rating.toFixed(1)}
                     </div>
                   )}
                 </div>
               </Link>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* Featured Gifts */}
+      {featured.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-bold text-theme-primary flex items-center gap-2">
+              <Star className="w-5 h-5 text-amber-400" /> Featured Gifts
+            </h2>
+            <Link to="/shop" className="text-sm text-amber-400 hover:text-amber-300 flex items-center gap-1">View All <ArrowRight className="w-3 h-3" /></Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {featured.map(p => <ProductCard key={p._id} product={p} />)}
           </div>
         </section>
       )}

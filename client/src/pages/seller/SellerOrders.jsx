@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Package, Truck, CheckCircle, Clock, XCircle, ChevronDown, Loader } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, XCircle, Loader, ChevronDown, ChevronUp, MapPin, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import API from '../../api';
@@ -7,6 +7,7 @@ import API from '../../api';
 const statusConfig = {
   pending: { color: 'text-yellow-400 bg-yellow-400/10', icon: Clock },
   confirmed: { color: 'text-blue-400 bg-blue-400/10', icon: Package },
+  processing: { color: 'text-indigo-400 bg-indigo-400/10', icon: Package },
   shipped: { color: 'text-purple-400 bg-purple-400/10', icon: Truck },
   delivered: { color: 'text-green-400 bg-green-400/10', icon: CheckCircle },
   cancelled: { color: 'text-red-400 bg-red-400/10', icon: XCircle },
@@ -17,13 +18,32 @@ export default function SellerOrders() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [updating, setUpdating] = useState(null);
+  const [expandedOrder, setExpandedOrder] = useState(null);
+  // Shipping state
+  const [couriers, setCouriers] = useState([]);
+  const [courierLoading, setCourierLoading] = useState(false);
+  const [shipmentInfo, setShipmentInfo] = useState({});
+  const [trackingData, setTrackingData] = useState({});
 
   useEffect(() => { loadOrders(); }, []);
 
   const loadOrders = async () => {
     try {
-      const { data } = await API.get('/api/seller/orders');
-      setOrders(Array.isArray(data) ? data : data.orders || []);
+      const { data } = await API.get('/seller/orders');
+      const orderList = Array.isArray(data) ? data : data.orders || [];
+      setOrders(orderList);
+
+      // Load shipment info for orders that might have shipments
+      const shippableStatuses = ['processing', 'shipped', 'delivered'];
+      const shippableOrders = orderList.filter(o => shippableStatuses.includes(o.status));
+      for (const order of shippableOrders) {
+        try {
+          const { data: trackData } = await API.get(`/seller/shipping/${order._id}/track`);
+          if (trackData.shipment) {
+            setShipmentInfo(prev => ({ ...prev, [order._id]: trackData.shipment }));
+          }
+        } catch { /* no shipment yet */ }
+      }
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -31,11 +51,97 @@ export default function SellerOrders() {
   const updateStatus = async (orderId, newStatus) => {
     setUpdating(orderId);
     try {
-      await API.put(`/api/seller/orders/${orderId}/status`, { status: newStatus });
+      await API.put(`/seller/orders/${orderId}/status`, { status: newStatus });
       toast.success(`Order ${newStatus}`);
       loadOrders();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
     setUpdating(null);
+  };
+
+  // Shipping actions
+  const checkServiceability = async (orderId) => {
+    setCourierLoading(true);
+    setCouriers([]);
+    try {
+      const { data } = await API.post('/seller/shipping/serviceability', { orderId });
+      setCouriers(data.couriers || []);
+      if (!data.couriers?.length) toast.error('No couriers available for this route');
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to check serviceability'); }
+    setCourierLoading(false);
+  };
+
+  const createShipment = async (orderId) => {
+    setUpdating(orderId);
+    try {
+      const { data } = await API.post(`/seller/shipping/${orderId}/create`);
+      setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
+      toast.success('Shipment created on Shiprocket!');
+      loadOrders();
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to create shipment'); }
+    setUpdating(null);
+  };
+
+  const createShipmentWithCourier = async (orderId, courierId) => {
+    setUpdating(orderId);
+    try {
+      // Step 1: Create shipment on Shiprocket
+      const { data } = await API.post(`/seller/shipping/${orderId}/create`);
+      setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
+      toast.success('Shipment created!');
+
+      // Step 2: Immediately assign the selected courier
+      const { data: assignData } = await API.post(`/seller/shipping/${orderId}/assign-courier`, { courierId });
+      setShipmentInfo(prev => ({ ...prev, [orderId]: assignData.shipment }));
+      toast.success(`Courier assigned: ${assignData.shipment?.courierName}`);
+      setCouriers([]);
+      loadOrders();
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to create shipment'); }
+    setUpdating(null);
+  };
+
+  const assignCourier = async (orderId, courierId) => {
+    setUpdating(orderId);
+    try {
+      const { data } = await API.post(`/seller/shipping/${orderId}/assign-courier`, { courierId });
+      setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
+      toast.success(`Courier assigned: ${data.shipment?.courierName}`);
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to assign courier'); }
+    setUpdating(null);
+  };
+
+  const schedulePickup = async (orderId) => {
+    setUpdating(orderId);
+    try {
+      const { data } = await API.post(`/seller/shipping/${orderId}/pickup`);
+      setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
+      toast.success('Pickup scheduled! Order marked as shipped.');
+      loadOrders();
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to schedule pickup'); }
+    setUpdating(null);
+  };
+
+  const getTracking = async (orderId) => {
+    try {
+      const { data } = await API.get(`/seller/shipping/${orderId}/track`);
+      setTrackingData(prev => ({ ...prev, [orderId]: data }));
+    } catch (err) { console.error(err); }
+  };
+
+  const getLabel = async (orderId) => {
+    try {
+      const { data } = await API.get(`/seller/shipping/${orderId}/label`);
+      if (data.labelUrl) window.open(data.labelUrl, '_blank');
+      else toast.error('Label not available yet');
+    } catch (err) { toast.error('Failed to get label'); }
+  };
+
+  const toggleExpand = (orderId) => {
+    if (expandedOrder === orderId) { setExpandedOrder(null); return; }
+    setExpandedOrder(orderId);
+    // Only fetch tracking if there's an existing shipment
+    if (shipmentInfo[orderId]?.shiprocketOrderId) {
+      getTracking(orderId);
+    }
   };
 
   const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter);
@@ -48,7 +154,7 @@ export default function SellerOrders() {
 
       {/* Filter tabs */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-        {['all', 'pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].map(f => (
+        {['all', 'pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'].map(f => (
           <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${filter === f ? 'bg-amber-500 text-zinc-950' : 'bg-inset text-theme-muted hover:text-theme-primary'}`}>
             {f === 'all' ? `All (${orders.length})` : `${f} (${orders.filter(o => o.status === f).length})`}
           </button>
@@ -65,57 +171,198 @@ export default function SellerOrders() {
           {filtered.map(order => {
             const st = statusConfig[order.status] || statusConfig.pending;
             const StatusIcon = st.icon;
+            const isExpanded = expandedOrder === order._id;
+            const shipment = shipmentInfo[order._id];
+            const tracking = trackingData[order._id];
+
             return (
-              <div key={order._id} className="bg-card border border-edge/50 rounded-xl p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="text-sm font-semibold text-theme-primary">{order.orderNumber}</p>
-                    <p className="text-xs text-theme-muted">{new Date(order.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
+              <div key={order._id} className="bg-card border border-edge/50 rounded-xl overflow-hidden">
+                <div className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="text-sm font-semibold text-theme-primary">{order.orderNumber}</p>
+                      <p className="text-xs text-theme-muted">{new Date(order.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>
+                      <StatusIcon className="w-3 h-3" /> {order.status}
+                    </span>
                   </div>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${st.color}`}>
-                    <StatusIcon className="w-3 h-3" /> {order.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 bg-inset rounded-lg overflow-hidden shrink-0">
-                    {order.productSnapshot?.image ? <img src={order.productSnapshot.image} alt="" className="w-full h-full object-cover" /> : <Package className="w-5 h-5 text-theme-dim m-auto mt-3.5" />}
+
+                  <div className="flex items-center gap-3 mb-3">
+                    {(() => { const item = order.items?.[0]; return (
+                      <>
+                        <div className="w-12 h-12 bg-inset rounded-lg overflow-hidden shrink-0">
+                          {item?.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <Package className="w-5 h-5 text-theme-dim m-auto mt-3.5" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-theme-primary truncate">{item?.title || 'Product'}{order.items?.length > 1 ? ` +${order.items.length - 1} more` : ''}</p>
+                          <p className="text-xs text-theme-muted">Qty: {order.items?.reduce((s, i) => s + (i.quantity || 1), 0) || 1} &middot; Rs. {order.totalAmount?.toLocaleString('en-IN')}</p>
+                        </div>
+                      </>
+                    ); })()}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-theme-primary truncate">{order.productSnapshot?.title}</p>
-                    <p className="text-xs text-theme-muted">Qty: {order.quantity} &middot; Rs. {order.totalAmount?.toLocaleString('en-IN')}</p>
+
+                  {/* Customer & shipping */}
+                  <div className="text-xs text-theme-muted mb-3 flex items-start gap-1">
+                    <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
+                    <span>Ship to: {order.shippingAddress?.name}, {order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.pincode}</span>
                   </div>
-                </div>
-                {/* Customer & shipping */}
-                <div className="text-xs text-theme-muted mb-3">
-                  <p>Ship to: {order.shippingAddress?.name}, {order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.pincode}</p>
-                </div>
-                {/* Earnings */}
-                <div className="flex items-center gap-4 text-xs text-theme-muted bg-inset/50 rounded-lg px-3 py-2 mb-3">
-                  <span>Sale: Rs. {order.totalAmount?.toLocaleString('en-IN')}</span>
-                  <span>Commission: Rs. {(order.commissionAmount || 0).toLocaleString('en-IN')}</span>
-                  <span className="text-green-400">You get: Rs. {(order.sellerAmount || 0).toLocaleString('en-IN')}</span>
-                </div>
-                {/* Actions */}
-                <div className="flex gap-2">
-                  {order.status === 'pending' && (
-                    <>
-                      <button onClick={() => updateStatus(order._id, 'confirmed')} disabled={updating === order._id} className="px-3 py-1.5 bg-blue-500/10 text-blue-400 rounded-lg text-xs font-medium hover:bg-blue-500/20">
-                        {updating === order._id ? <Loader className="w-3 h-3 animate-spin" /> : 'Confirm'}
+
+                  {/* Earnings */}
+                  <div className="flex items-center gap-4 text-xs text-theme-muted bg-inset/50 rounded-lg px-3 py-2 mb-3">
+                    <span>Sale: Rs. {order.totalAmount?.toLocaleString('en-IN')}</span>
+                    <span>Commission: Rs. {(order.commissionAmount || 0).toLocaleString('en-IN')}</span>
+                    <span className="text-green-400">You get: Rs. {(order.sellerAmount || 0).toLocaleString('en-IN')}</span>
+                  </div>
+
+                  {/* Tracking info if shipped */}
+                  {order.trackingInfo?.trackingNumber && (
+                    <div className="text-xs text-theme-muted bg-purple-500/5 border border-purple-500/10 rounded-lg px-3 py-2 mb-3">
+                      <span className="text-purple-400 font-medium">Tracking:</span> {order.trackingInfo.courierName} - {order.trackingInfo.trackingNumber}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex gap-2 flex-wrap">
+                    {order.status === 'pending' && (
+                      <>
+                        <button onClick={() => updateStatus(order._id, 'confirmed')} disabled={updating === order._id} className="px-3 py-1.5 bg-blue-500/10 text-blue-400 rounded-lg text-xs font-medium hover:bg-blue-500/20">
+                          {updating === order._id ? <Loader className="w-3 h-3 animate-spin" /> : 'Confirm Order'}
+                        </button>
+                        <button onClick={() => updateStatus(order._id, 'cancelled')} className="px-3 py-1.5 bg-red-500/10 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/20">Cancel</button>
+                      </>
+                    )}
+                    {(order.status === 'confirmed' || order.status === 'processing') && (
+                      <button onClick={() => toggleExpand(order._id)} className="px-3 py-1.5 bg-purple-500/10 text-purple-400 rounded-lg text-xs font-medium hover:bg-purple-500/20 flex items-center gap-1">
+                        <Truck className="w-3 h-3" /> Ship Order {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                       </button>
-                      <button onClick={() => updateStatus(order._id, 'cancelled')} className="px-3 py-1.5 bg-red-500/10 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/20">Cancel</button>
-                    </>
-                  )}
-                  {order.status === 'confirmed' && (
-                    <button onClick={() => updateStatus(order._id, 'shipped')} disabled={updating === order._id} className="px-3 py-1.5 bg-purple-500/10 text-purple-400 rounded-lg text-xs font-medium hover:bg-purple-500/20">
-                      {updating === order._id ? <Loader className="w-3 h-3 animate-spin" /> : 'Mark Shipped'}
-                    </button>
-                  )}
-                  {order.status === 'shipped' && (
-                    <button onClick={() => updateStatus(order._id, 'delivered')} disabled={updating === order._id} className="px-3 py-1.5 bg-green-500/10 text-green-400 rounded-lg text-xs font-medium hover:bg-green-500/20">
-                      {updating === order._id ? <Loader className="w-3 h-3 animate-spin" /> : 'Mark Delivered'}
-                    </button>
-                  )}
+                    )}
+                    {order.status === 'shipped' && (
+                      <>
+                        <button onClick={() => updateStatus(order._id, 'delivered')} disabled={updating === order._id} className="px-3 py-1.5 bg-green-500/10 text-green-400 rounded-lg text-xs font-medium hover:bg-green-500/20">
+                          {updating === order._id ? <Loader className="w-3 h-3 animate-spin" /> : 'Mark Delivered'}
+                        </button>
+                        <button onClick={() => toggleExpand(order._id)} className="px-3 py-1.5 bg-inset text-theme-muted rounded-lg text-xs font-medium hover:text-theme-primary flex items-center gap-1">
+                          Track {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
+
+                {/* Expanded shipping panel */}
+                {isExpanded && (
+                  <div className="border-t border-edge/50 p-4 bg-inset/30 animate-fade-in">
+                    <h4 className="text-sm font-semibold text-theme-primary mb-3 flex items-center gap-2"><Truck className="w-4 h-4 text-amber-400" /> Shipping Management</h4>
+
+                    {/* Step 1: Create shipment on Shiprocket & check couriers */}
+                    {(order.status === 'confirmed' || order.status === 'processing') && !shipment?.shiprocketOrderId && (
+                      <div className="mb-4">
+                        <p className="text-xs text-theme-muted mb-2">Step 1: Check available delivery partners</p>
+                        {couriers.length === 0 && (
+                          <button onClick={() => checkServiceability(order._id)} disabled={courierLoading} className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-lg text-sm font-semibold flex items-center gap-2">
+                            {courierLoading ? <Loader className="w-4 h-4 animate-spin" /> : <><Truck className="w-4 h-4" /> Check Available Couriers</>}
+                          </button>
+                        )}
+                        {couriers.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs text-amber-400 font-medium mb-2">{couriers.length} courier{couriers.length > 1 ? 's' : ''} available — select one to create shipment:</p>
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                              {couriers.map(c => (
+                                <button key={c.courierId} onClick={() => createShipmentWithCourier(order._id, c.courierId)} disabled={updating === order._id} className="w-full flex items-center justify-between p-3 bg-card border border-edge rounded-lg text-sm hover:border-amber-500/30 transition-colors">
+                                  <div className="text-left">
+                                    <p className="font-medium text-theme-primary">{c.courierName}</p>
+                                    <p className="text-xs text-theme-muted">Est. {c.estimatedDays} days &middot; Rating: {c.rating}/5</p>
+                                  </div>
+                                  <span className="text-amber-400 font-bold whitespace-nowrap ml-3">Rs. {c.rate}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Step 2: Assign courier (if shipment created but no AWB yet) */}
+                    {shipment?.shiprocketOrderId && !shipment?.awbCode && (
+                      <div className="mb-4">
+                        <div className="text-xs text-green-400 bg-green-500/5 border border-green-500/10 rounded-lg px-3 py-2 mb-3">
+                          Shiprocket Order #{shipment.shiprocketOrderId} created
+                        </div>
+                        <p className="text-xs text-theme-muted mb-2">Step 2: Select a delivery partner</p>
+                        {couriers.length === 0 && (
+                          <button onClick={() => checkServiceability(order._id)} disabled={courierLoading} className="px-4 py-2 bg-card border border-edge hover:border-edge-strong text-theme-primary rounded-lg text-sm font-medium mb-3 flex items-center gap-2">
+                            {courierLoading ? <Loader className="w-4 h-4 animate-spin" /> : 'Check Available Couriers'}
+                          </button>
+                        )}
+                        {couriers.length > 0 && (
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {couriers.map(c => (
+                              <button key={c.courierId} onClick={() => assignCourier(order._id, c.courierId)} disabled={updating === order._id} className="w-full flex items-center justify-between p-3 bg-card border border-edge rounded-lg text-sm hover:border-amber-500/30 transition-colors">
+                                <div className="text-left">
+                                  <p className="font-medium text-theme-primary">{c.courierName}</p>
+                                  <p className="text-xs text-theme-muted">Est. {c.estimatedDays} days &middot; Rating: {c.rating}/5</p>
+                                </div>
+                                <span className="text-amber-400 font-bold whitespace-nowrap ml-3">Rs. {c.rate}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Step 3: Schedule pickup */}
+                    {shipment?.awbCode && order.status !== 'shipped' && order.status !== 'delivered' && (
+                      <div className="mb-4">
+                        <div className="text-xs text-green-400 bg-green-500/5 border border-green-500/10 rounded-lg px-3 py-2 mb-3">
+                          {shipment.courierName && <span>Courier: {shipment.courierName} &middot; </span>}AWB: {shipment.awbCode}
+                        </div>
+                        <p className="text-xs text-theme-muted mb-2">Step 3: Schedule pickup</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => schedulePickup(order._id)} disabled={updating === order._id} className="px-4 py-2 bg-green-500 hover:bg-green-400 text-zinc-950 rounded-lg text-sm font-semibold flex items-center gap-2">
+                            {updating === order._id ? <Loader className="w-4 h-4 animate-spin" /> : 'Schedule Pickup'}
+                          </button>
+                          <button onClick={() => getLabel(order._id)} className="px-4 py-2 bg-card border border-edge rounded-lg text-sm text-theme-secondary hover:border-edge-strong flex items-center gap-1">
+                            <ExternalLink className="w-3 h-3" /> Print Label
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Or manual ship without Shiprocket */}
+                    {(order.status === 'confirmed' || order.status === 'processing') && (
+                      <div className="mt-4 pt-4 border-t border-edge/50">
+                        <p className="text-xs text-theme-dim mb-2">Or ship manually (without Shiprocket):</p>
+                        <button onClick={() => updateStatus(order._id, 'shipped')} disabled={updating === order._id} className="px-3 py-1.5 bg-inset text-theme-muted rounded-lg text-xs font-medium hover:text-theme-primary">
+                          Mark as Shipped (Manual)
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Tracking display */}
+                    {tracking?.shipment && (
+                      <div className="mt-4 pt-4 border-t border-edge/50">
+                        <h5 className="text-xs font-semibold text-theme-primary mb-2">Shipment Details</h5>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-theme-muted">
+                          <div>Status: <span className="text-theme-secondary">{tracking.shipment.status}</span></div>
+                          {tracking.shipment.awbCode && <div>AWB: <span className="text-theme-secondary">{tracking.shipment.awbCode}</span></div>}
+                          {tracking.shipment.courierName && <div>Courier: <span className="text-theme-secondary">{tracking.shipment.courierName}</span></div>}
+                        </div>
+                        {tracking.shipment.statusHistory?.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {tracking.shipment.statusHistory.map((sh, i) => (
+                              <div key={i} className="text-xs text-theme-dim flex items-center gap-2">
+                                <span className="w-1 h-1 rounded-full bg-theme-dim shrink-0" />
+                                <span>{sh.description}</span>
+                                <span className="ml-auto">{new Date(sh.timestamp).toLocaleDateString()}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

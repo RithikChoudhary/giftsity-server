@@ -241,6 +241,38 @@ async function runAllCrons() {
   }
 }
 
+// ==================== REVIEW REQUEST EMAILS ====================
+async function sendReviewRequestEmails() {
+  try {
+    const { sendReviewRequestEmail } = require('../utils/email');
+    // Find orders delivered ~2 days ago that haven't been reviewed
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+
+    const orders = await Order.find({
+      status: 'delivered',
+      deliveredAt: { $gte: threeDaysAgo, $lte: twoDaysAgo },
+      customerEmail: { $ne: '' }
+    }).limit(50);
+
+    const Review = require('../models/Review');
+    let sent = 0;
+    for (const order of orders) {
+      // Check if any item has been reviewed
+      const existingReview = await Review.findOne({ orderId: order._id });
+      if (existingReview) continue;
+
+      try {
+        await sendReviewRequestEmail(order.customerEmail, order);
+        sent++;
+      } catch (e) { /* skip failed emails */ }
+    }
+    if (sent > 0) console.log(`[Cron] Sent ${sent} review request emails`);
+  } catch (err) {
+    console.error('[Cron] Review request email error:', err.message);
+  }
+}
+
 // ==================== SCHEDULE ====================
 function startCronJobs() {
   // Run auto-cancel every hour
@@ -251,6 +283,9 @@ function startCronJobs() {
     await calculateSellerMetrics();
     await autoSuspendBadSellers();
   }, 6 * 60 * 60 * 1000);
+
+  // Send review request emails every 12 hours
+  setInterval(sendReviewRequestEmails, 12 * 60 * 60 * 1000);
 
   // Run initial check after 30 seconds (let server start)
   setTimeout(runAllCrons, 30 * 1000);

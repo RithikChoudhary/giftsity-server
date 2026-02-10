@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, Filter, X, ChevronDown } from 'lucide-react';
 import ProductCard from '../../components/ProductCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import SEO from '../../components/SEO';
 import API from '../../api';
 
 export default function Shop() {
@@ -23,8 +24,8 @@ export default function Shop() {
 
   const loadCategories = async () => {
     try {
-      const { data } = await API.get('/api/products/categories');
-      setCategories(Array.isArray(data) ? data : []);
+      const { data } = await API.get('/products/categories');
+      setCategories(Array.isArray(data) ? data : data.categories || []);
     } catch (e) { console.error(e); }
   };
 
@@ -39,7 +40,7 @@ export default function Shop() {
       if (search) params.set('search', search);
       if (priceRange[0] > 0) params.set('minPrice', priceRange[0]);
       if (priceRange[1] < 50000) params.set('maxPrice', priceRange[1]);
-      const { data } = await API.get(`/api/products?${params}`);
+      const { data } = await API.get(`/products?${params}`);
       setProducts(data.products || []);
       setTotal(data.total || 0);
     } catch (e) { console.error(e); }
@@ -56,6 +57,7 @@ export default function Shop() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <SEO title="Shop Gifts" description="Browse unique gifts from verified sellers across India. Filter by category, price, and more." />
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-theme-primary mb-2">Gift Shop</h1>

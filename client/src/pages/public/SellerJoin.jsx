@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Gift, ArrowRight, Check, Loader, Upload, Instagram, Mail, Phone, Store, Camera } from 'lucide-react';
 import toast from 'react-hot-toast';
+import SEO from '../../components/SEO';
 import API from '../../api';
 
 export default function SellerJoin() {
@@ -35,7 +36,7 @@ export default function SellerJoin() {
     if (!email || !name || !phone) return toast.error('Fill all required fields');
     setLoading(true);
     try {
-      await API.post('/api/auth/send-otp', { email });
+      await API.post('/auth/send-otp', { email });
       setOtpSent(true);
       setStep('otp');
       toast.success('OTP sent to your email!');
@@ -48,7 +49,7 @@ export default function SellerJoin() {
     if (!otp) return toast.error('Enter OTP');
     setLoading(true);
     try {
-      const { data } = await API.post('/api/auth/verify-otp', { email, otp, name, phone, userType: 'seller' });
+      const { data } = await API.post('/auth/verify-otp', { email, otp, name, phone, userType: 'seller' });
       login(data.token, data.user);
       setStep('details');
       toast.success('Email verified!');
@@ -70,14 +71,25 @@ export default function SellerJoin() {
     if (!instagramUsername) return toast.error('Instagram username is required');
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('businessName', businessName);
-      formData.append('businessType', businessType);
-      formData.append('instagramUsername', instagramUsername);
-      if (gstNumber) formData.append('gstNumber', gstNumber);
-      if (profilePhoto) formData.append('profilePhoto', profilePhoto);
+      // Step 1: Upload avatar if provided
+      let avatarUrl = '';
+      let avatarPublicId = '';
+      if (profilePhoto) {
+        const avatarForm = new FormData();
+        avatarForm.append('avatar', profilePhoto);
+        const uploadRes = await API.post('/auth/upload-avatar', avatarForm, { headers: { 'Content-Type': 'multipart/form-data' } });
+        avatarUrl = uploadRes.data.url || '';
+        avatarPublicId = uploadRes.data.publicId || '';
+      }
 
-      const { data } = await API.post('/api/auth/register-seller', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      // Step 2: Register seller with JSON body
+      const { data } = await API.post('/auth/register-seller', {
+        email, name, phone,
+        businessName, businessType, instagramUsername,
+        gstNumber: gstNumber || undefined,
+        avatarUrl, avatarPublicId,
+        referralCode: new URLSearchParams(window.location.search).get('ref') || undefined
+      });
       login(data.token, data.user);
       toast.success('Registration submitted! Awaiting admin approval.');
       navigate('/seller');
@@ -87,6 +99,7 @@ export default function SellerJoin() {
 
   return (
     <div className="min-h-screen">
+      <SEO title="Sell on Giftsity" description="Start selling gifts online with 0% platform fee. Keep 97% of every sale. Join India's fastest growing gift marketplace for free." keywords="sell gifts online, gift marketplace seller, sell on Giftsity, 0% commission, start selling online India" />
       {/* Hero */}
       <section className="bg-gradient-to-br from-surface via-card to-surface py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">

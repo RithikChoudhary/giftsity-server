@@ -9,8 +9,13 @@ const router = express.Router();
 // GET /api/reviews/product/:productId
 router.get('/product/:productId', async (req, res) => {
   try {
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(req.params.productId)) {
+      return res.json({ reviews: [], total: 0, page: 1, pages: 0, ratingBreakdown: {} });
+    }
     const { page = 1, limit = 10 } = req.query;
-    const filter = { productId: req.params.productId, isHidden: false };
+    const productObjId = new mongoose.Types.ObjectId(req.params.productId);
+    const filter = { productId: productObjId, isHidden: false };
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     const reviews = await Review.find(filter)
@@ -20,7 +25,16 @@ router.get('/product/:productId', async (req, res) => {
       .populate('customerId', 'name');
     const total = await Review.countDocuments(filter);
 
-    res.json({ reviews, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+    // Rating breakdown aggregation
+    const breakdownAgg = await Review.aggregate([
+      { $match: { productId: productObjId, isHidden: false } },
+      { $group: { _id: '$rating', count: { $sum: 1 } } }
+    ]);
+    const ratingBreakdown = {};
+    for (let i = 1; i <= 5; i++) ratingBreakdown[i] = 0;
+    breakdownAgg.forEach(b => { ratingBreakdown[b._id] = b.count; });
+
+    res.json({ reviews, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)), ratingBreakdown });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }

@@ -238,6 +238,17 @@ router.put('/products/:id/toggle', async (req, res) => {
   }
 });
 
+// Delete product (admin)
+router.delete('/products/:id', async (req, res) => {
+  try {
+    const product = await Product.findByIdAndDelete(req.params.id);
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+    res.json({ message: 'Product deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // ---- ORDERS ----
 router.get('/orders', async (req, res) => {
   try {

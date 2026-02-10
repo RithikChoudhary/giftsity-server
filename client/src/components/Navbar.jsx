@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
-import { ShoppingBag, User, Menu, X, LogOut, Package, Sun, Moon, Gift, Search } from 'lucide-react';
+import { ShoppingBag, User, Menu, X, LogOut, Package, Sun, Moon, Gift, Search, Heart } from 'lucide-react';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -12,6 +12,23 @@ export default function Navbar() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    if (searchOpen && searchRef.current) searchRef.current.focus();
+  }, [searchOpen]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchOpen(false);
+      setSearchQuery('');
+      setMenuOpen(false);
+    }
+  };
 
   const isCustomer = !user || user.userType === 'customer';
   const isSeller = user?.userType === 'seller';
@@ -30,7 +47,9 @@ export default function Navbar() {
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-6">
             <Link to="/shop" className="text-sm text-theme-muted hover:text-theme-primary transition-colors">Shop</Link>
-            {!isCustomer && !isSeller && (
+            <Link to="/sellers" className="text-sm text-theme-muted hover:text-theme-primary transition-colors">Sellers</Link>
+            <Link to="/about" className="text-sm text-theme-muted hover:text-theme-primary transition-colors">About</Link>
+            {(!user || isAdmin) && (
               <Link to="/b2b" className="text-sm text-theme-muted hover:text-theme-primary transition-colors">Corporate</Link>
             )}
             {isAdmin && (
@@ -39,17 +58,48 @@ export default function Navbar() {
             {isSeller && (
               <Link to="/seller" className="text-sm text-theme-muted hover:text-theme-primary transition-colors">Dashboard</Link>
             )}
-            {!isCustomer || isAdmin ? (
+            {(!user || isAdmin) && (
               <Link to="/seller/join" className="text-sm text-amber-400 hover:text-amber-300 transition-colors font-medium">Sell on Giftsity</Link>
-            ) : null}
+            )}
           </div>
 
           {/* Right side */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            {/* Search */}
+            <div className="relative hidden md:block">
+              {searchOpen ? (
+                <form onSubmit={handleSearch} className="flex items-center">
+                  <input
+                    ref={searchRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    onBlur={() => { if (!searchQuery) setSearchOpen(false); }}
+                    placeholder="Search gifts..."
+                    className="w-48 px-3 py-1.5 bg-inset border border-edge rounded-lg text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50 transition-all"
+                  />
+                  <button type="button" onClick={() => { setSearchOpen(false); setSearchQuery(''); }} className="p-1.5 text-theme-dim hover:text-theme-primary ml-1">
+                    <X className="w-4 h-4" />
+                  </button>
+                </form>
+              ) : (
+                <button onClick={() => setSearchOpen(true)} className="p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all" title="Search">
+                  <Search className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
             {/* Theme toggle */}
             <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all" title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
+
+            {/* Wishlist */}
+            {user && (
+              <Link to="/wishlist" className="p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all" title="Wishlist">
+                <Heart className="w-4 h-4" />
+              </Link>
+            )}
 
             {/* Cart */}
             <Link to="/cart" className="relative p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all">
@@ -96,8 +146,15 @@ export default function Navbar() {
       {menuOpen && (
         <div className="md:hidden border-t border-edge bg-card animate-fade-in">
           <div className="px-4 py-3 space-y-2">
+            <form onSubmit={handleSearch} className="flex gap-2 mb-2">
+              <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search gifts..." className="flex-1 px-3 py-2 bg-inset border border-edge rounded-lg text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
+              <button type="submit" className="px-3 py-2 bg-amber-500 text-zinc-950 rounded-lg"><Search className="w-4 h-4" /></button>
+            </form>
             <Link to="/shop" className="block py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>Shop</Link>
-            {!isCustomer && (
+            <Link to="/sellers" className="block py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>Sellers</Link>
+            <Link to="/about" className="block py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>About</Link>
+            <Link to="/contact" className="block py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>Contact</Link>
+            {(!user || isAdmin) && (
               <>
                 <Link to="/b2b" className="block py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>Corporate</Link>
                 <Link to="/seller/join" className="block py-2 text-sm text-amber-400" onClick={() => setMenuOpen(false)}>Sell on Giftsity</Link>

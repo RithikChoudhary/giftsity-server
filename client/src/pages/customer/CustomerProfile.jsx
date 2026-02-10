@@ -27,7 +27,7 @@ export default function CustomerProfile() {
   const handleSaveProfile = async () => {
     setLoading(true);
     try {
-      const { data } = await API.put('/api/auth/profile', { name, phone });
+      const { data } = await API.put('/auth/profile', { name, phone });
       login(null, data.user || data);
       toast.success('Profile updated');
       setEditing(false);
@@ -46,38 +46,41 @@ export default function CustomerProfile() {
     setShowAddressForm(true);
   };
 
+  const saveAddresses = async (newAddresses) => {
+    try {
+      const { data } = await API.put('/auth/addresses', { addresses: newAddresses });
+      const updated = data.user?.shippingAddresses || data.shippingAddresses || newAddresses;
+      login(null, data.user || data);
+      setAddresses(updated);
+      return updated;
+    } catch (err) { toast.error('Failed to save'); return null; }
+  };
+
   const saveAddress = async () => {
     if (!addrForm.name || !addrForm.street || !addrForm.city || !addrForm.state || !addrForm.pincode) return toast.error('Fill all fields');
     setLoading(true);
-    try {
-      const url = editingAddr ? `/api/auth/address/${editingAddr}` : '/api/auth/address';
-      const method = editingAddr ? 'put' : 'post';
-      const { data } = await API[method](url, addrForm);
-      login(null, data.user || data);
-      setAddresses(data.user?.shippingAddresses || data.shippingAddresses || []);
-      setShowAddressForm(false);
-      toast.success(editingAddr ? 'Address updated' : 'Address added');
-    } catch (err) { toast.error('Failed to save address'); }
+    let newAddresses;
+    if (editingAddr) {
+      newAddresses = addresses.map(a => a._id === editingAddr ? { ...a, ...addrForm } : a);
+    } else {
+      newAddresses = [...addresses, { ...addrForm, _id: Date.now().toString() }];
+    }
+    const result = await saveAddresses(newAddresses);
+    if (result) { setShowAddressForm(false); toast.success(editingAddr ? 'Address updated' : 'Address added'); }
     setLoading(false);
   };
 
   const deleteAddress = async (addrId) => {
     if (!confirm('Remove this address?')) return;
-    try {
-      const { data } = await API.delete(`/api/auth/address/${addrId}`);
-      login(null, data.user || data);
-      setAddresses(data.user?.shippingAddresses || data.shippingAddresses || []);
-      toast.success('Address removed');
-    } catch (err) { toast.error('Failed to remove'); }
+    const newAddresses = addresses.filter(a => a._id !== addrId);
+    const result = await saveAddresses(newAddresses);
+    if (result) toast.success('Address removed');
   };
 
   const setDefault = async (addrId) => {
-    try {
-      const { data } = await API.put(`/api/auth/address/${addrId}/default`);
-      login(null, data.user || data);
-      setAddresses(data.user?.shippingAddresses || data.shippingAddresses || []);
-      toast.success('Default address set');
-    } catch (err) { toast.error('Failed to update'); }
+    const newAddresses = addresses.map(a => ({ ...a, isDefault: a._id === addrId }));
+    const result = await saveAddresses(newAddresses);
+    if (result) toast.success('Default address set');
   };
 
   return (

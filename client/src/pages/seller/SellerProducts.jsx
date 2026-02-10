@@ -12,7 +12,7 @@ export default function SellerProducts() {
   const [editing, setEditing] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const emptyForm = { title: '', description: '', price: '', category: '', stock: '', weight: '', images: [] };
+  const emptyForm = { title: '', description: '', price: '', category: '', stock: '', weight: '', images: [], isCustomizable: false, customizationOptions: [] };
   const [form, setForm] = useState(emptyForm);
   const [imageFiles, setImageFiles] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
@@ -21,7 +21,7 @@ export default function SellerProducts() {
 
   const loadProducts = async () => {
     try {
-      const { data } = await API.get('/api/seller/products');
+      const { data } = await API.get('/seller/products');
       setProducts(Array.isArray(data) ? data : data.products || []);
     } catch (e) { console.error(e); }
     setLoading(false);
@@ -29,15 +29,15 @@ export default function SellerProducts() {
 
   const loadCategories = async () => {
     try {
-      const { data } = await API.get('/api/products/categories');
-      setCategories(Array.isArray(data) ? data : []);
+      const { data } = await API.get('/products/categories');
+      setCategories(Array.isArray(data) ? data : data.categories || []);
     } catch (e) { console.error(e); }
   };
 
   const openForm = (product = null) => {
     if (product) {
       setEditing(product._id);
-      setForm({ title: product.title, description: product.description, price: product.price, category: product.category, stock: product.stock, weight: product.weight || '', images: product.images || [] });
+      setForm({ title: product.title, description: product.description, price: product.price, category: product.category, stock: product.stock, weight: product.weight || '', images: product.images || [], isCustomizable: product.isCustomizable || false, customizationOptions: product.customizationOptions || [] });
       setImagePreviews(product.images?.map(i => i.url) || []);
     } else {
       setEditing(null);
@@ -76,14 +76,18 @@ export default function SellerProducts() {
       formData.append('category', form.category);
       formData.append('stock', form.stock);
       if (form.weight) formData.append('weight', form.weight);
+      formData.append('isCustomizable', form.isCustomizable ? 'true' : 'false');
+      if (form.isCustomizable && form.customizationOptions.length > 0) {
+        formData.append('customizationOptions', JSON.stringify(form.customizationOptions));
+      }
       if (form.images) formData.append('existingImages', JSON.stringify(form.images));
       imageFiles.forEach(f => formData.append('images', f));
 
       if (editing) {
-        await API.put(`/api/seller/products/${editing}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        await API.put(`/seller/products/${editing}`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         toast.success('Product updated');
       } else {
-        await API.post('/api/seller/products', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        await API.post('/seller/products', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         toast.success('Product created');
       }
       setShowForm(false);
@@ -94,7 +98,7 @@ export default function SellerProducts() {
 
   const toggleActive = async (id, isActive) => {
     try {
-      await API.put(`/api/seller/products/${id}`, { isActive: !isActive });
+      await API.put(`/seller/products/${id}`, { isActive: !isActive });
       loadProducts();
       toast.success(isActive ? 'Product hidden' : 'Product visible');
     } catch (e) { toast.error('Failed'); }
@@ -103,7 +107,7 @@ export default function SellerProducts() {
   const deleteProduct = async (id) => {
     if (!confirm('Delete this product?')) return;
     try {
-      await API.delete(`/api/seller/products/${id}`);
+      await API.delete(`/seller/products/${id}`);
       loadProducts();
       toast.success('Deleted');
     } catch (e) { toast.error('Failed'); }
@@ -159,6 +163,51 @@ export default function SellerProducts() {
                   <label className="text-xs text-theme-muted font-medium mb-1 block">Weight (grams)</label>
                   <input type="number" value={form.weight} onChange={e => setForm(f => ({ ...f, weight: e.target.value }))} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
                 </div>
+              </div>
+              {/* Customization */}
+              <div className="bg-inset/50 border border-edge/50 rounded-xl p-4 space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.isCustomizable} onChange={e => setForm(f => ({ ...f, isCustomizable: e.target.checked, customizationOptions: e.target.checked ? f.customizationOptions : [] }))} className="rounded border-edge text-amber-500 focus:ring-amber-500" />
+                  <span className="text-xs font-medium text-theme-primary">Customizable Product</span>
+                  <span className="text-[10px] text-theme-dim">(name, photos, color, etc.)</span>
+                </label>
+                {form.isCustomizable && (
+                  <div className="space-y-3">
+                    {form.customizationOptions.map((opt, idx) => (
+                      <div key={idx} className="bg-card border border-edge/50 rounded-lg p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-medium text-theme-dim">Option {idx + 1}</span>
+                          <button type="button" onClick={() => setForm(f => ({ ...f, customizationOptions: f.customizationOptions.filter((_, i) => i !== idx) }))} className="text-red-400 hover:text-red-300"><X className="w-3.5 h-3.5" /></button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input type="text" placeholder="Label (e.g. Name on bag)" value={opt.label} onChange={e => setForm(f => ({ ...f, customizationOptions: f.customizationOptions.map((o, i) => i === idx ? { ...o, label: e.target.value } : o) }))} className="px-3 py-1.5 bg-inset border border-edge rounded-lg text-xs text-theme-primary focus:outline-none focus:border-amber-500/50" />
+                          <select value={opt.type} onChange={e => setForm(f => ({ ...f, customizationOptions: f.customizationOptions.map((o, i) => i === idx ? { ...o, type: e.target.value } : o) }))} className="px-3 py-1.5 bg-inset border border-edge rounded-lg text-xs text-theme-primary focus:outline-none focus:border-amber-500/50">
+                            <option value="text">Text Input</option>
+                            <option value="image">Image Upload</option>
+                            <option value="select">Dropdown</option>
+                          </select>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <input type="text" placeholder="Placeholder text" value={opt.placeholder || ''} onChange={e => setForm(f => ({ ...f, customizationOptions: f.customizationOptions.map((o, i) => i === idx ? { ...o, placeholder: e.target.value } : o) }))} className="px-3 py-1.5 bg-inset border border-edge rounded-lg text-xs text-theme-primary focus:outline-none col-span-2" />
+                          <input type="number" placeholder="Extra Rs." value={opt.extraPrice || ''} onChange={e => setForm(f => ({ ...f, customizationOptions: f.customizationOptions.map((o, i) => i === idx ? { ...o, extraPrice: Number(e.target.value) || 0 } : o) }))} className="px-3 py-1.5 bg-inset border border-edge rounded-lg text-xs text-theme-primary focus:outline-none" />
+                        </div>
+                        {opt.type === 'select' && (
+                          <input type="text" placeholder="Options (comma separated, e.g. Red,Blue,Green)" value={(opt.selectOptions || []).join(',')} onChange={e => setForm(f => ({ ...f, customizationOptions: f.customizationOptions.map((o, i) => i === idx ? { ...o, selectOptions: e.target.value.split(',').map(s => s.trim()).filter(Boolean) } : o) }))} className="w-full px-3 py-1.5 bg-inset border border-edge rounded-lg text-xs text-theme-primary focus:outline-none" />
+                        )}
+                        {opt.type === 'image' && (
+                          <input type="number" placeholder="Max files (default 5)" value={opt.maxFiles || ''} onChange={e => setForm(f => ({ ...f, customizationOptions: f.customizationOptions.map((o, i) => i === idx ? { ...o, maxFiles: Number(e.target.value) || 5 } : o) }))} className="w-full px-3 py-1.5 bg-inset border border-edge rounded-lg text-xs text-theme-primary focus:outline-none" />
+                        )}
+                        <label className="flex items-center gap-1.5">
+                          <input type="checkbox" checked={opt.required || false} onChange={e => setForm(f => ({ ...f, customizationOptions: f.customizationOptions.map((o, i) => i === idx ? { ...o, required: e.target.checked } : o) }))} className="rounded border-edge text-amber-500 focus:ring-amber-500" />
+                          <span className="text-[10px] text-theme-muted">Required</span>
+                        </label>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setForm(f => ({ ...f, customizationOptions: [...f.customizationOptions, { label: '', type: 'text', required: false, placeholder: '', maxLength: 100, maxFiles: 5, selectOptions: [], extraPrice: 0 }] }))} className="w-full py-2 border-2 border-dashed border-edge hover:border-amber-500/50 rounded-lg text-xs text-theme-muted hover:text-amber-400 transition-colors">
+                      + Add Customization Option
+                    </button>
+                  </div>
+                )}
               </div>
               {/* Images */}
               <div>

@@ -27,7 +27,7 @@ export default function AdminSettings() {
 
   const loadSettings = async () => {
     try {
-      const { data } = await API.get('/api/admin/settings');
+      const { data } = await API.get('/admin/settings');
       setSettings(data);
       setForm(f => ({ ...f, ...data }));
     } catch (e) { console.error(e); }
@@ -37,7 +37,7 @@ export default function AdminSettings() {
   const saveSettings = async () => {
     setSaving(true);
     try {
-      await API.put('/api/admin/settings', form);
+      await API.put('/admin/settings', form);
       toast.success('Settings saved');
       loadSettings();
     } catch (err) { toast.error('Failed to save'); }

@@ -11,9 +11,14 @@ API.interceptors.request.use((config) => {
 API.interceptors.response.use(
   (res) => res,
   (err) => {
+    // Only clear auth on 401 from protected endpoints (not login/register/otp routes)
     if (err.response?.status === 401) {
-      localStorage.removeItem('giftsity_token');
-      localStorage.removeItem('giftsity_user');
+      const url = err.config?.url || '';
+      const isAuthRoute = url.includes('/auth/send-otp') || url.includes('/auth/verify-otp') || url.includes('/auth/register');
+      if (!isAuthRoute) {
+        localStorage.removeItem('giftsity_token');
+        localStorage.removeItem('giftsity_user');
+      }
     }
     return Promise.reject(err);
   }
@@ -104,6 +109,7 @@ export const b2bAPI = {
 
 export const storeAPI = {
   getTopSellers: () => API.get('/store/featured/top-sellers'),
+  getAllSellers: (params) => API.get('/store/sellers', { params }),
   getStore: (slug) => API.get(`/store/${slug}`),
   getProducts: (slug, params) => API.get(`/store/${slug}/products`, { params }),
   getReviews: (slug, params) => API.get(`/store/${slug}/reviews`, { params }),

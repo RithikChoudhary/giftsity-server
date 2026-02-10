@@ -1,9 +1,39 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Product = require('../models/Product');
 const Review = require('../models/Review');
 const Order = require('../models/Order');
+const PlatformSettings = require('../models/PlatformSettings');
 const router = express.Router();
+
+// Helper: find seller by businessSlug OR ObjectId
+function sellerQuery(slug, requireActive = true) {
+  const base = { userType: 'seller' };
+  if (requireActive) base.status = 'active';
+  if (mongoose.Types.ObjectId.isValid(slug) && slug.length === 24) {
+    return { ...base, $or: [{ _id: slug }, { 'sellerProfile.businessSlug': slug }] };
+  }
+  return { ...base, 'sellerProfile.businessSlug': slug };
+}
+
+// GET /api/store/info - public platform info (social links, contact)
+router.get('/info', async (req, res) => {
+  try {
+    const settings = await PlatformSettings.getSettings();
+    res.json({
+      platformName: settings.platformName || 'Giftsity',
+      tagline: settings.tagline || '',
+      supportEmail: settings.supportEmail || '',
+      supportPhone: settings.supportPhone || '',
+      instagramUrl: settings.instagramUrl || '',
+      facebookUrl: settings.facebookUrl || '',
+      whatsappNumber: settings.whatsappNumber || ''
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 // GET /api/store/top-sellers - featured sellers for homepage
 router.get('/featured/top-sellers', async (req, res) => {
@@ -40,14 +70,63 @@ router.get('/featured/top-sellers', async (req, res) => {
   }
 });
 
+// GET /api/store/sellers - all active sellers (public, paginated)
+router.get('/sellers', async (req, res) => {
+  try {
+    const { page = 1, limit = 24, sort = 'orders' } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+
+    const filter = {
+      userType: 'seller',
+      status: 'active',
+      'sellerProfile.businessSlug': { $ne: '' }
+    };
+
+    let sortObj;
+    switch (sort) {
+      case 'rating': sortObj = { 'sellerProfile.rating': -1 }; break;
+      case 'newest': sortObj = { createdAt: -1 }; break;
+      case 'orders':
+      default: sortObj = { 'sellerProfile.totalOrders': -1 }; break;
+    }
+
+    const total = await User.countDocuments(filter);
+    const sellers = await User.find(filter)
+      .sort(sortObj)
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum)
+      .select('name sellerProfile.businessName sellerProfile.businessSlug sellerProfile.avatar sellerProfile.bio sellerProfile.rating sellerProfile.isVerified sellerProfile.totalOrders sellerProfile.businessAddress.city createdAt');
+
+    const formatted = await Promise.all(sellers.map(async s => {
+      const productCount = await Product.countDocuments({ sellerId: s._id, isActive: true });
+      return {
+        _id: s._id,
+        name: s.name,
+        businessName: s.sellerProfile.businessName,
+        businessSlug: s.sellerProfile.businessSlug,
+        avatar: s.sellerProfile.avatar,
+        bio: s.sellerProfile.bio,
+        rating: s.sellerProfile.rating,
+        isVerified: s.sellerProfile.isVerified,
+        totalOrders: s.sellerProfile.totalOrders,
+        city: s.sellerProfile.businessAddress?.city,
+        productCount,
+        joinedAt: s.createdAt
+      };
+    }));
+
+    res.json({ sellers: formatted, total, page: pageNum, pages: Math.ceil(total / limitNum) });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // GET /api/store/:slug - public seller store page
 router.get('/:slug', async (req, res) => {
   try {
-    const seller = await User.findOne({
-      'sellerProfile.businessSlug': req.params.slug,
-      userType: 'seller',
-      status: 'active'
-    }).select('-otp -otpExpiry -sellerProfile.bankDetails');
+    const seller = await User.findOne(sellerQuery(req.params.slug))
+      .select('-otp -otpExpiry -sellerProfile.bankDetails');
 
     if (!seller) return res.status(404).json({ message: 'Store not found' });
 
@@ -55,24 +134,29 @@ router.get('/:slug', async (req, res) => {
     const productCount = await Product.countDocuments({ sellerId: seller._id, isActive: true });
 
     // Get order stats
-    const deliveredOrders = seller.sellerProfile.deliveredOrders || 0;
-    const failedOrders = seller.sellerProfile.failedOrders || 0;
+    const sp = seller.sellerProfile || {};
+    const deliveredOrders = sp.deliveredOrders || 0;
+    const failedOrders = sp.failedOrders || 0;
 
     res.json({
       store: {
         _id: seller._id,
         name: seller.name,
-        businessName: seller.sellerProfile.businessName,
-        businessSlug: seller.sellerProfile.businessSlug,
-        bio: seller.sellerProfile.bio,
-        avatar: seller.sellerProfile.avatar,
-        coverImage: seller.sellerProfile.coverImage,
-        city: seller.sellerProfile.businessAddress?.city || '',
-        state: seller.sellerProfile.businessAddress?.state || '',
-        rating: seller.sellerProfile.rating,
-        isVerified: seller.sellerProfile.isVerified,
-        totalOrders: seller.sellerProfile.totalOrders,
-        totalSales: seller.sellerProfile.totalSales,
+        businessName: sp.businessName,
+        businessSlug: sp.businessSlug,
+        businessType: sp.businessType || 'Individual',
+        bio: sp.bio,
+        avatar: sp.avatar,
+        profilePhoto: sp.profilePhoto || sp.avatar?.url || '',
+        coverImage: sp.coverImage,
+        instagramUsername: sp.instagramUsername || '',
+        city: sp.businessAddress?.city || '',
+        state: sp.businessAddress?.state || '',
+        gstNumber: sp.gstNumber || '',
+        rating: sp.rating,
+        isVerified: sp.isVerified,
+        totalOrders: sp.totalOrders,
+        totalSales: sp.totalSales,
         deliveredOrders,
         failedOrders,
         productCount,
@@ -88,7 +172,7 @@ router.get('/:slug', async (req, res) => {
 router.get('/:slug/products', async (req, res) => {
   try {
     const { page = 1, limit = 24 } = req.query;
-    const seller = await User.findOne({ 'sellerProfile.businessSlug': req.params.slug, userType: 'seller' });
+    const seller = await User.findOne(sellerQuery(req.params.slug, false));
     if (!seller) return res.status(404).json({ message: 'Store not found' });
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -110,7 +194,7 @@ router.get('/:slug/products', async (req, res) => {
 router.get('/:slug/reviews', async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
-    const seller = await User.findOne({ 'sellerProfile.businessSlug': req.params.slug, userType: 'seller' });
+    const seller = await User.findOne(sellerQuery(req.params.slug, false));
     if (!seller) return res.status(404).json({ message: 'Store not found' });
 
     const skip = (parseInt(page) - 1) * parseInt(limit);

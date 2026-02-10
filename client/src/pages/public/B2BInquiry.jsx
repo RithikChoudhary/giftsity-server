@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Briefcase, Send, CheckCircle, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
+import SEO from '../../components/SEO';
 import API from '../../api';
 
 export default function B2BInquiry() {
@@ -15,7 +16,7 @@ export default function B2BInquiry() {
     if (!form.companyName || !form.contactPerson || !form.email || !form.phone) return toast.error('Fill all required fields');
     setLoading(true);
     try {
-      await API.post('/api/b2b/inquiries', form);
+      await API.post('/b2b/inquiries', form);
       setSubmitted(true);
       toast.success('Inquiry submitted!');
     } catch (err) { toast.error(err.response?.data?.message || 'Failed to submit'); }
@@ -32,6 +33,7 @@ export default function B2BInquiry() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
+      <SEO title="Corporate Gifting" description="Get custom quotes for bulk corporate gifting. Employee rewards, client gifts, event gifts and more. Tailored solutions for Indian businesses." />
       <div className="text-center mb-10">
         <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-500/10 rounded-2xl mb-4"><Briefcase className="w-7 h-7 text-amber-400" /></div>
         <h1 className="text-3xl font-bold text-theme-primary">Corporate Gifting</h1>

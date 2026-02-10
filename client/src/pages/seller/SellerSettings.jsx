@@ -6,44 +6,40 @@ import API from '../../api';
 
 export default function SellerSettings() {
   const { user, login } = useAuth();
-  const sp = user?.sellerProfile || {};
   const [tab, setTab] = useState('store');
   const [loading, setLoading] = useState(false);
   const [suspendMsg, setSuspendMsg] = useState('');
 
-  const [storeForm, setStoreForm] = useState({
-    businessName: sp.businessName || '',
-    businessType: sp.businessType || 'individual',
-    gstNumber: sp.gstNumber || '',
-    instagramUsername: sp.instagramUsername || ''
-  });
+  const [storeForm, setStoreForm] = useState({ businessName: '', businessType: 'individual', gstNumber: '', instagramUsername: '' });
+  const [bankForm, setBankForm] = useState({ accountHolderName: '', accountNumber: '', ifscCode: '', bankName: '' });
+  const [addressForm, setAddressForm] = useState({ street: '', city: '', state: '', pincode: '' });
+  const [pickupForm, setPickupForm] = useState({ street: '', city: '', state: '', pincode: '', phone: '' });
 
-  const [bankForm, setBankForm] = useState({
-    accountHolderName: sp.bankDetails?.accountHolderName || '',
-    accountNumber: sp.bankDetails?.accountNumber || '',
-    ifscCode: sp.bankDetails?.ifscCode || '',
-    bankName: sp.bankDetails?.bankName || ''
-  });
-
-  const [addressForm, setAddressForm] = useState({
-    street: sp.businessAddress?.street || '',
-    city: sp.businessAddress?.city || '',
-    state: sp.businessAddress?.state || '',
-    pincode: sp.businessAddress?.pincode || ''
-  });
-
-  const [pickupForm, setPickupForm] = useState({
-    street: sp.pickupAddress?.street || '',
-    city: sp.pickupAddress?.city || '',
-    state: sp.pickupAddress?.state || '',
-    pincode: sp.pickupAddress?.pincode || '',
-    phone: sp.pickupAddress?.phone || ''
-  });
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const { data } = await API.get('/seller/settings');
+        const sp = data.sellerProfile || data;
+        setStoreForm({ businessName: sp.businessName || '', businessType: sp.businessType || 'individual', gstNumber: sp.gstNumber || '', instagramUsername: sp.instagramUsername || '' });
+        setBankForm({ accountHolderName: sp.bankDetails?.accountHolderName || '', accountNumber: sp.bankDetails?.accountNumber || '', ifscCode: sp.bankDetails?.ifscCode || '', bankName: sp.bankDetails?.bankName || '' });
+        setAddressForm({ street: sp.businessAddress?.street || '', city: sp.businessAddress?.city || '', state: sp.businessAddress?.state || '', pincode: sp.businessAddress?.pincode || '' });
+        setPickupForm({ street: sp.pickupAddress?.street || '', city: sp.pickupAddress?.city || '', state: sp.pickupAddress?.state || '', pincode: sp.pickupAddress?.pincode || '', phone: sp.pickupAddress?.phone || '' });
+      } catch {
+        // Fallback to auth context
+        const sp = user?.sellerProfile || {};
+        setStoreForm({ businessName: sp.businessName || '', businessType: sp.businessType || 'individual', gstNumber: sp.gstNumber || '', instagramUsername: sp.instagramUsername || '' });
+        setBankForm({ accountHolderName: sp.bankDetails?.accountHolderName || '', accountNumber: sp.bankDetails?.accountNumber || '', ifscCode: sp.bankDetails?.ifscCode || '', bankName: sp.bankDetails?.bankName || '' });
+        setAddressForm({ street: sp.businessAddress?.street || '', city: sp.businessAddress?.city || '', state: sp.businessAddress?.state || '', pincode: sp.businessAddress?.pincode || '' });
+        setPickupForm({ street: sp.pickupAddress?.street || '', city: sp.pickupAddress?.city || '', state: sp.pickupAddress?.state || '', pincode: sp.pickupAddress?.pincode || '', phone: sp.pickupAddress?.phone || '' });
+      }
+    };
+    loadSettings();
+  }, []);
 
   const saveStore = async () => {
     setLoading(true);
     try {
-      const { data } = await API.put('/api/seller/settings/store', storeForm);
+      const { data } = await API.put('/seller/settings', { businessName: storeForm.businessName, businessType: storeForm.businessType, gstNumber: storeForm.gstNumber, instagramUsername: storeForm.instagramUsername });
       login(data.token, data.user);
       toast.success('Store settings saved');
     } catch (err) { toast.error('Failed to save'); }
@@ -53,7 +49,7 @@ export default function SellerSettings() {
   const saveBank = async () => {
     setLoading(true);
     try {
-      const { data } = await API.put('/api/seller/settings/bank', bankForm);
+      const { data } = await API.put('/seller/settings', { bankDetails: bankForm });
       login(data.token, data.user);
       toast.success('Bank details saved');
     } catch (err) { toast.error('Failed to save'); }
@@ -63,7 +59,7 @@ export default function SellerSettings() {
   const saveAddress = async () => {
     setLoading(true);
     try {
-      const { data } = await API.put('/api/seller/settings/address', { businessAddress: addressForm, pickupAddress: pickupForm });
+      const { data } = await API.put('/seller/settings', { businessAddress: addressForm, pickupAddress: pickupForm });
       login(data.token, data.user);
       toast.success('Address saved');
     } catch (err) { toast.error('Failed to save'); }
@@ -74,7 +70,7 @@ export default function SellerSettings() {
     if (!suspendMsg) return toast.error('Please provide a reason');
     setLoading(true);
     try {
-      await API.post('/api/seller/request-reactivation', { message: suspendMsg });
+      await API.post('/seller/request-unsuspend', { reason: suspendMsg });
       toast.success('Reactivation request sent to admin');
       setSuspendMsg('');
     } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }

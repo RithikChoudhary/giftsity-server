@@ -11,7 +11,7 @@ export default function SellerPayouts() {
 
   const loadPayouts = async () => {
     try {
-      const { data } = await API.get('/api/seller/payouts');
+      const { data } = await API.get('/seller/payouts');
       setPayouts(Array.isArray(data) ? data : data.payouts || []);
     } catch (e) { console.error(e); }
     setLoading(false);

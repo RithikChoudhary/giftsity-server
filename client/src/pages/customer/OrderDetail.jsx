@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Package, Truck, CheckCircle, Clock, XCircle, MapPin, Star, ArrowLeft, Loader } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, XCircle, MapPin, Star, ArrowLeft, Loader, Camera, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import API from '../../api';
@@ -26,10 +26,11 @@ export default function OrderDetail() {
   const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showReview, setShowReview] = useState(false);
-  const [reviewForm, setReviewForm] = useState({ rating: 5, reviewText: '' });
-  const [existingReview, setExistingReview] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
+  // Per-item review state: { [productId]: { rating, reviewText, images[], existingReview, showForm, submitting } }
+  const [itemReviews, setItemReviews] = useState({});
+  const [showCancel, setShowCancel] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (!user) return navigate('/auth');
@@ -38,33 +39,71 @@ export default function OrderDetail() {
 
   const loadOrder = async () => {
     try {
-      const { data } = await API.get(`/api/orders/${id}`);
-      setOrder(data);
-      // Check existing review
-      try {
-        const revRes = await API.get(`/api/reviews/product/${data.productId?._id || data.productId}`);
-        const myReview = (revRes.data.reviews || []).find(r => r.customerId?._id === user._id || r.orderId === id);
-        if (myReview) setExistingReview(myReview);
-      } catch (e) {}
+      const { data } = await API.get(`/orders/${id}`);
+      const ord = data.order || data;
+      setOrder(ord);
+      // Check existing reviews for each item
+      const reviewState = {};
+      for (const item of (ord.items || [])) {
+        const pid = item.productId;
+        reviewState[pid] = { rating: 5, reviewText: '', images: [], existingReview: null, showForm: false, submitting: false };
+        try {
+          if (pid) {
+            const revRes = await API.get(`/reviews/product/${pid}`);
+            const myReview = (revRes.data.reviews || []).find(r => (r.customerId?._id === user._id || r.customerId === user._id) && r.orderId === id);
+            if (myReview) reviewState[pid].existingReview = myReview;
+          }
+        } catch (e) {}
+      }
+      setItemReviews(reviewState);
     } catch (e) { console.error(e); }
     setLoading(false);
   };
 
-  const submitReview = async () => {
-    if (!reviewForm.rating) return toast.error('Select a rating');
-    setSubmitting(true);
+  const handleReviewImageAdd = (productId, files) => {
+    setItemReviews(prev => {
+      const cur = prev[productId];
+      const newImgs = [...cur.images];
+      Array.from(files).slice(0, 3 - newImgs.length).forEach(f => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          setItemReviews(p => ({
+            ...p,
+            [productId]: { ...p[productId], images: [...p[productId].images, { preview: URL.createObjectURL(f), base64: reader.result }] }
+          }));
+        };
+        reader.readAsDataURL(f);
+      });
+      return prev;
+    });
+  };
+
+  const removeReviewImage = (productId, idx) => {
+    setItemReviews(prev => ({
+      ...prev,
+      [productId]: { ...prev[productId], images: prev[productId].images.filter((_, i) => i !== idx) }
+    }));
+  };
+
+  const submitReview = async (productId) => {
+    const rev = itemReviews[productId];
+    if (!rev.rating) return toast.error('Select a rating');
+    setItemReviews(prev => ({ ...prev, [productId]: { ...prev[productId], submitting: true } }));
     try {
-      await API.post('/api/reviews', {
-        productId: order.productId?._id || order.productId,
+      await API.post('/reviews', {
+        productId,
         orderId: order._id,
-        rating: reviewForm.rating,
-        reviewText: reviewForm.reviewText
+        rating: rev.rating,
+        reviewText: rev.reviewText,
+        images: rev.images.map(i => i.base64)
       });
       toast.success('Review submitted!');
-      setShowReview(false);
+      setItemReviews(prev => ({ ...prev, [productId]: { ...prev[productId], showForm: false, submitting: false } }));
       loadOrder();
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed to submit review'); }
-    setSubmitting(false);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to submit review');
+      setItemReviews(prev => ({ ...prev, [productId]: { ...prev[productId], submitting: false } }));
+    }
   };
 
   if (loading) return <LoadingSpinner />;
@@ -81,8 +120,37 @@ export default function OrderDetail() {
           <h1 className="text-xl font-bold text-theme-primary">{order.orderNumber}</h1>
           <p className="text-sm text-theme-muted">{new Date(order.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${order.status === 'delivered' ? 'bg-green-400/10 text-green-400' : order.status === 'cancelled' ? 'bg-red-400/10 text-red-400' : 'bg-amber-400/10 text-amber-400'}`}>{order.status}</span>
+        <div className="flex items-center gap-2">
+          {['pending', 'confirmed'].includes(order.status) && (
+            <button onClick={() => setShowCancel(true)} className="px-3 py-1 rounded-full text-xs font-medium bg-red-400/10 text-red-400 hover:bg-red-400/20 transition-colors">Cancel Order</button>
+          )}
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${order.status === 'delivered' ? 'bg-green-400/10 text-green-400' : order.status === 'cancelled' ? 'bg-red-400/10 text-red-400' : 'bg-amber-400/10 text-amber-400'}`}>{order.status}</span>
+        </div>
       </div>
+
+      {/* Cancel confirmation */}
+      {showCancel && (
+        <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-5 mb-6">
+          <h3 className="font-semibold text-red-400 mb-2">Cancel this order?</h3>
+          <p className="text-sm text-theme-muted mb-3">This action cannot be undone. If you've already paid, a refund will be initiated.</p>
+          <textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)} rows={2} placeholder="Reason for cancellation (optional)" className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-red-500/50 resize-none mb-3" />
+          <div className="flex gap-3">
+            <button onClick={async () => {
+              setCancelling(true);
+              try {
+                await API.post(`/orders/${order._id}/cancel`, { reason: cancelReason });
+                toast.success('Order cancelled');
+                setShowCancel(false);
+                loadOrder();
+              } catch (err) { toast.error(err.response?.data?.message || 'Failed to cancel'); }
+              setCancelling(false);
+            }} disabled={cancelling} className="px-4 py-2 bg-red-500 hover:bg-red-400 disabled:opacity-50 text-white rounded-lg text-sm font-semibold flex items-center gap-2">
+              {cancelling ? <Loader className="w-4 h-4 animate-spin" /> : 'Yes, Cancel Order'}
+            </button>
+            <button onClick={() => setShowCancel(false)} className="px-4 py-2 bg-inset text-theme-muted rounded-lg text-sm">Keep Order</button>
+          </div>
+        </div>
+      )}
 
       {/* Status timeline */}
       {order.status !== 'cancelled' && order.status !== 'refunded' && (
@@ -108,18 +176,22 @@ export default function OrderDetail() {
       )}
 
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Product */}
+        {/* Products */}
         <div className="bg-card border border-edge/50 rounded-xl p-5">
-          <h3 className="font-semibold text-theme-primary mb-3">Product</h3>
-          <div className="flex gap-4">
-            <div className="w-20 h-20 bg-inset rounded-lg overflow-hidden shrink-0">
-              {order.productSnapshot?.image ? <img src={order.productSnapshot.image} alt="" className="w-full h-full object-cover" /> : <Package className="w-8 h-8 text-theme-dim m-auto mt-6" />}
-            </div>
-            <div>
-              <p className="font-medium text-sm text-theme-primary">{order.productSnapshot?.title}</p>
-              <p className="text-xs text-theme-muted mt-1">Qty: {order.quantity}</p>
-              <p className="text-sm font-bold text-theme-primary mt-1">Rs. {order.totalAmount?.toLocaleString('en-IN')}</p>
-            </div>
+          <h3 className="font-semibold text-theme-primary mb-3">Products</h3>
+          <div className="space-y-3">
+            {(order.items || []).map((item, idx) => (
+              <div key={idx} className="flex gap-4">
+                <div className="w-16 h-16 bg-inset rounded-lg overflow-hidden shrink-0">
+                  {item.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-theme-dim m-auto mt-5" />}
+                </div>
+                <div>
+                  <p className="font-medium text-sm text-theme-primary">{item.title}</p>
+                  <p className="text-xs text-theme-muted mt-1">Qty: {item.quantity || 1}</p>
+                  <p className="text-sm font-bold text-theme-primary mt-0.5">Rs. {((item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -158,32 +230,73 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      {/* Review section */}
-      {order.status === 'delivered' && (
-        <div className="mt-6 bg-card border border-edge/50 rounded-xl p-5">
-          {existingReview ? (
-            <div>
-              <h3 className="font-semibold text-theme-primary mb-3">Your Review</h3>
-              <StarRating rating={existingReview.rating} />
-              {existingReview.reviewText && <p className="text-sm text-theme-secondary mt-2">{existingReview.reviewText}</p>}
-            </div>
-          ) : showReview ? (
-            <div>
-              <h3 className="font-semibold text-theme-primary mb-3">Write a Review</h3>
-              <StarRating rating={reviewForm.rating} onRate={r => setReviewForm(f => ({ ...f, rating: r }))} interactive />
-              <textarea value={reviewForm.reviewText} onChange={e => setReviewForm(f => ({ ...f, reviewText: e.target.value }))} rows={3} placeholder="Share your experience..." className="w-full mt-3 px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50 resize-none" />
-              <div className="flex gap-3 mt-3">
-                <button onClick={submitReview} disabled={submitting} className="px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-lg text-sm font-semibold flex items-center gap-2">
-                  {submitting ? <Loader className="w-4 h-4 animate-spin" /> : 'Submit Review'}
-                </button>
-                <button onClick={() => setShowReview(false)} className="px-4 py-2 bg-inset text-theme-muted rounded-lg text-sm">Cancel</button>
+      {/* Review section -- per item */}
+      {order.status === 'delivered' && (order.items || []).length > 0 && (
+        <div className="mt-6 space-y-4">
+          <h3 className="font-semibold text-theme-primary">Reviews</h3>
+          {(order.items || []).map((item) => {
+            const rev = itemReviews[item.productId];
+            if (!rev) return null;
+            return (
+              <div key={item.productId} className="bg-card border border-edge/50 rounded-xl p-5">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 bg-inset rounded-lg overflow-hidden shrink-0">
+                    {item.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <Package className="w-4 h-4 text-theme-dim m-auto mt-3" />}
+                  </div>
+                  <p className="text-sm font-medium text-theme-primary truncate">{item.title}</p>
+                </div>
+                {rev.existingReview ? (
+                  <div>
+                    <StarRating rating={rev.existingReview.rating} />
+                    {rev.existingReview.reviewText && <p className="text-sm text-theme-secondary mt-2">{rev.existingReview.reviewText}</p>}
+                    {rev.existingReview.images?.length > 0 && (
+                      <div className="flex gap-2 mt-2">
+                        {rev.existingReview.images.map((img, i) => (
+                          <div key={i} className="w-14 h-14 rounded-lg overflow-hidden bg-inset"><img src={img.url} alt="" className="w-full h-full object-cover" /></div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : rev.showForm ? (
+                  <div>
+                    <StarRating rating={rev.rating} onRate={r => setItemReviews(prev => ({ ...prev, [item.productId]: { ...prev[item.productId], rating: r } }))} interactive />
+                    <textarea
+                      value={rev.reviewText}
+                      onChange={e => setItemReviews(prev => ({ ...prev, [item.productId]: { ...prev[item.productId], reviewText: e.target.value } }))}
+                      rows={3} placeholder="Share your experience..."
+                      className="w-full mt-3 px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50 resize-none"
+                    />
+                    {/* Photo upload */}
+                    <div className="flex items-center gap-2 mt-3">
+                      {rev.images.map((img, i) => (
+                        <div key={i} className="relative w-14 h-14 rounded-lg overflow-hidden bg-inset border border-edge">
+                          <img src={img.preview} alt="" className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => removeReviewImage(item.productId, i)} className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"><X className="w-2.5 h-2.5 text-white" /></button>
+                        </div>
+                      ))}
+                      {rev.images.length < 3 && (
+                        <label className="w-14 h-14 rounded-lg border-2 border-dashed border-edge hover:border-amber-500/50 flex items-center justify-center cursor-pointer transition-colors">
+                          <Camera className="w-4 h-4 text-theme-dim" />
+                          <input type="file" accept="image/*" multiple onChange={e => handleReviewImageAdd(item.productId, e.target.files)} className="hidden" />
+                        </label>
+                      )}
+                      <span className="text-[10px] text-theme-dim">Up to 3 photos</span>
+                    </div>
+                    <div className="flex gap-3 mt-3">
+                      <button onClick={() => submitReview(item.productId)} disabled={rev.submitting} className="px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-lg text-sm font-semibold flex items-center gap-2">
+                        {rev.submitting ? <Loader className="w-4 h-4 animate-spin" /> : 'Submit Review'}
+                      </button>
+                      <button onClick={() => setItemReviews(prev => ({ ...prev, [item.productId]: { ...prev[item.productId], showForm: false } }))} className="px-4 py-2 bg-inset text-theme-muted rounded-lg text-sm">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setItemReviews(prev => ({ ...prev, [item.productId]: { ...prev[item.productId], showForm: true } }))} className="flex items-center gap-2 text-sm text-amber-400 hover:text-amber-300">
+                    <Star className="w-4 h-4" /> Write a Review
+                  </button>
+                )}
               </div>
-            </div>
-          ) : (
-            <button onClick={() => setShowReview(true)} className="flex items-center gap-2 text-sm text-amber-400 hover:text-amber-300">
-              <Star className="w-4 h-4" /> Write a Review
-            </button>
-          )}
+            );
+          })}
         </div>
       )}
     </div>

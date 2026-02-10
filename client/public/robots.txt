@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /seller
+Disallow: /profile
+Disallow: /orders
+
+Sitemap: https://giftsity.com/sitemap.xml

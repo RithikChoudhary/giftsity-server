@@ -1,41 +1,58 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { WishlistProvider } from './context/WishlistContext';
+import LoadingSpinner from './components/LoadingSpinner';
 
+// Layouts (always loaded)
 import Layout from './components/Layout';
 import SellerLayout from './components/SellerLayout';
 import AdminLayout from './components/AdminLayout';
 
-import Home from './pages/public/Home';
-import Shop from './pages/public/Shop';
-import ProductDetail from './pages/public/ProductDetail';
-import Auth from './pages/public/Auth';
-import B2BInquiry from './pages/public/B2BInquiry';
-import SellerJoin from './pages/public/SellerJoin';
-import Cart from './pages/public/Cart';
-import SellerStore from './pages/public/SellerStore';
+// Public pages (lazy loaded)
+const Home = lazy(() => import('./pages/public/Home'));
+const Shop = lazy(() => import('./pages/public/Shop'));
+const ProductDetail = lazy(() => import('./pages/public/ProductDetail'));
+const Auth = lazy(() => import('./pages/public/Auth'));
+const B2BInquiry = lazy(() => import('./pages/public/B2BInquiry'));
+const SellerJoin = lazy(() => import('./pages/public/SellerJoin'));
+const Cart = lazy(() => import('./pages/public/Cart'));
+const SellerStore = lazy(() => import('./pages/public/SellerStore'));
+const AllSellers = lazy(() => import('./pages/public/AllSellers'));
+const Terms = lazy(() => import('./pages/public/Terms'));
+const Privacy = lazy(() => import('./pages/public/Privacy'));
+const About = lazy(() => import('./pages/public/About'));
+const Contact = lazy(() => import('./pages/public/Contact'));
 
-import CustomerOrders from './pages/customer/CustomerOrders';
-import OrderDetail from './pages/customer/OrderDetail';
-import CustomerProfile from './pages/customer/CustomerProfile';
+// Customer pages
+const CustomerOrders = lazy(() => import('./pages/customer/CustomerOrders'));
+const OrderDetail = lazy(() => import('./pages/customer/OrderDetail'));
+const CustomerProfile = lazy(() => import('./pages/customer/CustomerProfile'));
+const WishlistPage = lazy(() => import('./pages/customer/Wishlist'));
 
-import SellerDashboard from './pages/seller/SellerDashboard';
-import SellerProducts from './pages/seller/SellerProducts';
-import SellerOrders from './pages/seller/SellerOrders';
-import SellerPayouts from './pages/seller/SellerPayouts';
-import SellerMarketing from './pages/seller/SellerMarketing';
-import SellerSettings from './pages/seller/SellerSettings';
+// Seller pages
+const SellerDashboard = lazy(() => import('./pages/seller/SellerDashboard'));
+const SellerProducts = lazy(() => import('./pages/seller/SellerProducts'));
+const SellerOrders = lazy(() => import('./pages/seller/SellerOrders'));
+const SellerPayouts = lazy(() => import('./pages/seller/SellerPayouts'));
+const SellerMarketing = lazy(() => import('./pages/seller/SellerMarketing'));
+const SellerSettings = lazy(() => import('./pages/seller/SellerSettings'));
 
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminSellers from './pages/admin/AdminSellers';
-import AdminProducts from './pages/admin/AdminProducts';
-import AdminOrders from './pages/admin/AdminOrders';
-import AdminSettings from './pages/admin/AdminSettings';
-import AdminPayouts from './pages/admin/AdminPayouts';
-import AdminB2B from './pages/admin/AdminB2B';
-import AdminCustomers from './pages/admin/AdminCustomers';
+// Admin pages
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminSellers = lazy(() => import('./pages/admin/AdminSellers'));
+const AdminProducts = lazy(() => import('./pages/admin/AdminProducts'));
+const AdminOrders = lazy(() => import('./pages/admin/AdminOrders'));
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'));
+const AdminPayouts = lazy(() => import('./pages/admin/AdminPayouts'));
+const AdminB2B = lazy(() => import('./pages/admin/AdminB2B'));
+const AdminCategories = lazy(() => import('./pages/admin/AdminCategories'));
+const AdminCustomers = lazy(() => import('./pages/admin/AdminCustomers'));
+const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'));
+const NotFound = lazy(() => import('./components/NotFound'));
 
 export default function App() {
   return (
@@ -43,6 +60,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <CartProvider>
+        <WishlistProvider>
           <Toaster
             position="top-center"
             toastOptions={{
@@ -50,6 +68,7 @@ export default function App() {
               success: { iconTheme: { primary: '#f59e0b', secondary: '#000' } },
             }}
           />
+          <Suspense fallback={<LoadingSpinner />}>
           <Routes>
             <Route element={<Layout />}>
               <Route path="/" element={<Home />} />
@@ -58,11 +77,17 @@ export default function App() {
               <Route path="/auth" element={<Auth />} />
               <Route path="/b2b" element={<B2BInquiry />} />
               <Route path="/seller/join" element={<SellerJoin />} />
+              <Route path="/sellers" element={<AllSellers />} />
               <Route path="/store/:slug" element={<SellerStore />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/orders" element={<CustomerOrders />} />
               <Route path="/orders/:id" element={<OrderDetail />} />
               <Route path="/profile" element={<CustomerProfile />} />
+              <Route path="/wishlist" element={<WishlistPage />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/contact" element={<Contact />} />
             </Route>
             <Route element={<SellerLayout />}>
               <Route path="/seller" element={<SellerDashboard />} />
@@ -81,8 +106,15 @@ export default function App() {
               <Route path="/admin/settings" element={<AdminSettings />} />
               <Route path="/admin/payouts" element={<AdminPayouts />} />
               <Route path="/admin/b2b" element={<AdminB2B />} />
+              <Route path="/admin/categories" element={<AdminCategories />} />
+              <Route path="/admin/coupons" element={<AdminCoupons />} />
+            </Route>
+            <Route element={<Layout />}>
+              <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
+          </Suspense>
+        </WishlistProvider>
         </CartProvider>
       </AuthProvider>
     </BrowserRouter>

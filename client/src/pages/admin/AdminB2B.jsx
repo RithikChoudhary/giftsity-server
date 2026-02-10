@@ -23,7 +23,7 @@ export default function AdminB2B() {
 
   const loadInquiries = async () => {
     try {
-      const { data } = await API.get('/api/admin/b2b');
+      const { data } = await API.get('/b2b/inquiries');
       setInquiries(Array.isArray(data) ? data : data.inquiries || []);
     } catch (e) { console.error(e); }
     setLoading(false);
@@ -31,7 +31,7 @@ export default function AdminB2B() {
 
   const updateStatus = async (id, status) => {
     try {
-      await API.put(`/api/admin/b2b/${id}`, { status });
+      await API.put(`/b2b/inquiries/${id}`, { status });
       toast.success(`Status updated to ${status}`);
       loadInquiries();
     } catch (err) { toast.error('Failed'); }
@@ -40,7 +40,7 @@ export default function AdminB2B() {
   const addNote = async (id) => {
     if (!noteText.trim()) return;
     try {
-      await API.put(`/api/admin/b2b/${id}`, { adminNotes: noteText });
+      await API.put(`/b2b/inquiries/${id}`, { adminNotes: noteText });
       toast.success('Note added');
       setNoteText('');
       loadInquiries();

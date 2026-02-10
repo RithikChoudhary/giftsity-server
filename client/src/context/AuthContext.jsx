@@ -35,6 +35,16 @@ export function AuthProvider({ children }) {
     return res.data;
   };
 
+  const login = (token, userData) => {
+    if (token) {
+      localStorage.setItem('giftsity_token', token);
+    }
+    if (userData) {
+      localStorage.setItem('giftsity_user', JSON.stringify(userData));
+      setUser(userData);
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem('giftsity_token');
     localStorage.removeItem('giftsity_user');
@@ -58,7 +68,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, sendOtp, verifyOtp, logout, updateProfile, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, sendOtp, verifyOtp, logout, updateProfile, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
