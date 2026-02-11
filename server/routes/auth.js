@@ -128,8 +128,17 @@ router.post('/verify-otp', verifyLimiter, async (req, res) => {
   }
 });
 
+// Rate limiter for avatar upload (no auth, so limit by IP)
+const avatarUploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { message: 'Too many upload attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 // POST /api/auth/upload-avatar - upload profile photo (no auth needed for registration)
-router.post('/upload-avatar', upload.single('avatar'), async (req, res) => {
+router.post('/upload-avatar', avatarUploadLimiter, upload.single('avatar'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 

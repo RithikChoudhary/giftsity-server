@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Package, Plus, Edit3, Trash2, Eye, EyeOff, Loader, X, Upload, Image, Film } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Package, Plus, Edit3, Trash2, Eye, EyeOff, Loader, X, Upload, Image, Film, FileSpreadsheet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import API, { SellerAPI } from '../../api';
+import API, { SellerAPI, sellerAPI } from '../../api';
 
 export default function SellerProducts() {
   const [products, setProducts] = useState([]);
@@ -16,6 +16,9 @@ export default function SellerProducts() {
   const [form, setForm] = useState(emptyForm);
   const [mediaFiles, setMediaFiles] = useState([]); // { file, type: 'image'|'video' }
   const [mediaPreviews, setMediaPreviews] = useState([]); // { url, type: 'image'|'video', isExisting: bool }
+  const [csvUploading, setCsvUploading] = useState(false);
+  const [csvResult, setCsvResult] = useState(null);
+  const csvRef = useRef(null);
 
   useEffect(() => { loadProducts(); loadCategories(); }, []);
 
@@ -32,6 +35,27 @@ export default function SellerProducts() {
       const { data } = await API.get('/products/categories');
       setCategories(Array.isArray(data) ? data : data.categories || []);
     } catch (e) { console.error(e); }
+  };
+
+  const handleCsvUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.endsWith('.csv')) { toast.error('Please select a CSV file'); return; }
+    setCsvUploading(true);
+    setCsvResult(null);
+    try {
+      const fd = new FormData();
+      fd.append('csv', file);
+      const { data } = await sellerAPI.bulkCsvUpload(fd);
+      setCsvResult(data);
+      toast.success(data.message);
+      loadProducts();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'CSV upload failed');
+    } finally {
+      setCsvUploading(false);
+      if (csvRef.current) csvRef.current.value = '';
+    }
   };
 
   const openForm = (product = null) => {
@@ -132,10 +156,36 @@ export default function SellerProducts() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-theme-primary">Products</h1>
-        <button onClick={() => openForm()} className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-xl text-sm font-semibold transition-colors">
-          <Plus className="w-4 h-4" /> Add Product
-        </button>
+        <div className="flex items-center gap-2">
+          <input type="file" accept=".csv" ref={csvRef} onChange={handleCsvUpload} className="hidden" />
+          <button onClick={() => csvRef.current?.click()} disabled={csvUploading}
+            className="flex items-center gap-2 px-4 py-2 border border-edge/30 text-theme-muted hover:text-theme-primary rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
+            {csvUploading ? <Loader className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
+            Import CSV
+          </button>
+          <button onClick={() => openForm()} className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-xl text-sm font-semibold transition-colors">
+            <Plus className="w-4 h-4" /> Add Product
+          </button>
+        </div>
       </div>
+
+      {/* CSV Import Result */}
+      {csvResult && (
+        <div className="p-4 rounded-xl bg-inset/50 border border-edge/30 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">{csvResult.message}</p>
+            <button onClick={() => setCsvResult(null)} className="text-theme-dim hover:text-theme-primary"><X className="w-4 h-4" /></button>
+          </div>
+          {csvResult.errors?.length > 0 && (
+            <div className="max-h-32 overflow-y-auto space-y-1">
+              {csvResult.errors.map((e, i) => (
+                <p key={i} className="text-xs text-red-400">Row {e.row}: {e.error}</p>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-theme-dim">CSV format: title, description, price, stock, category, sku, tags (semicolon-separated), compareatprice</p>
+        </div>
+      )}
 
       {/* Product Form Modal */}
       {showForm && (

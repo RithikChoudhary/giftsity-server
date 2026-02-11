@@ -1,8 +1,9 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { LayoutDashboard, Store, Package, ShoppingCart, Settings, CreditCard, Briefcase, Users, LogOut, Gift, Sun, Moon, ArrowLeft, FolderTree, Building2, ShoppingBag, FileText } from 'lucide-react';
-import { useEffect } from 'react';
+import { authAPI } from '../api';
+import { LayoutDashboard, Store, Package, ShoppingCart, Settings, CreditCard, Briefcase, Users, LogOut, Gift, Sun, Moon, ArrowLeft, FolderTree, Building2, ShoppingBag, FileText, ScrollText, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 const navItems = [
   { path: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
@@ -17,6 +18,7 @@ const navItems = [
   { path: '/admin/corporate/users', icon: Building2, label: 'Corp Users' },
   { path: '/admin/corporate/catalog', icon: ShoppingBag, label: 'Corp Catalog' },
   { path: '/admin/corporate/quotes', icon: FileText, label: 'Corp Quotes' },
+  { path: '/admin/logs', icon: ScrollText, label: 'Audit Logs' },
   { path: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 
@@ -25,13 +27,32 @@ export default function AdminLayout() {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
+  const [verified, setVerified] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (!user) navigate('/auth');
-    else if (user.userType !== 'admin') navigate('/');
+    let cancelled = false;
+    const verify = async () => {
+      if (!user) { navigate('/auth'); return; }
+      if (user.userType !== 'admin') { navigate('/'); return; }
+      try {
+        const { data } = await authAPI.me();
+        if (cancelled) return;
+        if (data.user?.userType === 'admin') { setVerified(true); }
+        else { logout(); navigate('/auth'); }
+      } catch {
+        if (!cancelled) { logout(); navigate('/auth'); }
+      } finally { if (!cancelled) setChecking(false); }
+    };
+    verify();
+    return () => { cancelled = true; };
   }, [user]);
 
-  if (!user || user.userType !== 'admin') return null;
+  if (checking || !verified) return (
+    <div className="flex items-center justify-center min-h-screen bg-surface">
+      <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
+    </div>
+  );
 
   return (
     <div className="flex min-h-screen bg-surface text-theme-primary">

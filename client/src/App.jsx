@@ -18,6 +18,7 @@ import CorporateLayout from './components/CorporateLayout';
 const Home = lazy(() => import('./pages/public/Home'));
 const Shop = lazy(() => import('./pages/public/Shop'));
 const ProductDetail = lazy(() => import('./pages/public/ProductDetail'));
+const TrackOrder = lazy(() => import('./pages/public/TrackOrder'));
 const Auth = lazy(() => import('./pages/public/Auth'));
 const B2BInquiry = lazy(() => import('./pages/public/B2BInquiry'));
 const SellerJoin = lazy(() => import('./pages/public/SellerJoin'));
@@ -58,6 +59,7 @@ const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'));
 const AdminCorporateUsers = lazy(() => import('./pages/admin/AdminCorporateUsers'));
 const AdminCorporateCatalog = lazy(() => import('./pages/admin/AdminCorporateCatalog'));
 const AdminCorporateQuotes = lazy(() => import('./pages/admin/AdminCorporateQuotes'));
+const AdminLogs = lazy(() => import('./pages/admin/AdminLogs'));
 
 // Corporate pages
 const CorporateLogin = lazy(() => import('./pages/corporate/CorporateLogin'));
@@ -100,6 +102,7 @@ export default function App() {
               <Route path="/" element={<Home />} />
               <Route path="/shop" element={<Shop />} />
               <Route path="/product/:slug" element={<ProductDetail />} />
+              <Route path="/track" element={<TrackOrder />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/b2b" element={<B2BInquiry />} />
               <Route path="/seller/join" element={<SellerJoin />} />
@@ -138,6 +141,7 @@ export default function App() {
               <Route path="/admin/corporate/users" element={<AdminCorporateUsers />} />
               <Route path="/admin/corporate/catalog" element={<AdminCorporateCatalog />} />
               <Route path="/admin/corporate/quotes" element={<AdminCorporateQuotes />} />
+              <Route path="/admin/logs" element={<AdminLogs />} />
             </Route>
             <Route path="/corporate/login" element={<CorporateLogin />} />
             <Route element={<CorporateLayout />}>

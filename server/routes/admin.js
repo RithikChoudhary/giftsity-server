@@ -948,4 +948,81 @@ router.put('/corporate/quotes/:id', async (req, res) => {
   }
 });
 
+// =================== AUDIT LOGS ===================
+const ActivityLog = require('../models/ActivityLog');
+const AuthAuditLog = require('../models/AuthAuditLog');
+const OtpLog = require('../models/OtpLog');
+
+// GET /api/admin/logs/activity
+router.get('/logs/activity', async (req, res) => {
+  try {
+    const { domain, action, actorRole, page = 1, limit = 50, from, to } = req.query;
+    const filter = {};
+    if (domain) filter.domain = domain;
+    if (action) filter.action = { $regex: action, $options: 'i' };
+    if (actorRole) filter.actorRole = actorRole;
+    if (from || to) {
+      filter.createdAt = {};
+      if (from) filter.createdAt.$gte = new Date(from);
+      if (to) filter.createdAt.$lte = new Date(to);
+    }
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const [logs, total] = await Promise.all([
+      ActivityLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)).lean(),
+      ActivityLog.countDocuments(filter)
+    ]);
+    res.json({ logs, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/admin/logs/auth
+router.get('/logs/auth', async (req, res) => {
+  try {
+    const { action, email, role, page = 1, limit = 50, from, to } = req.query;
+    const filter = {};
+    if (action) filter.action = action;
+    if (email) filter.email = { $regex: email, $options: 'i' };
+    if (role) filter.role = role;
+    if (from || to) {
+      filter.createdAt = {};
+      if (from) filter.createdAt.$gte = new Date(from);
+      if (to) filter.createdAt.$lte = new Date(to);
+    }
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const [logs, total] = await Promise.all([
+      AuthAuditLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)).lean(),
+      AuthAuditLog.countDocuments(filter)
+    ]);
+    res.json({ logs, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/admin/logs/otp
+router.get('/logs/otp', async (req, res) => {
+  try {
+    const { email, event, role, page = 1, limit = 50, from, to } = req.query;
+    const filter = {};
+    if (email) filter.email = { $regex: email, $options: 'i' };
+    if (event) filter.event = event;
+    if (role) filter.role = role;
+    if (from || to) {
+      filter.createdAt = {};
+      if (from) filter.createdAt.$gte = new Date(from);
+      if (to) filter.createdAt.$lte = new Date(to);
+    }
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const [logs, total] = await Promise.all([
+      OtpLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)).lean(),
+      OtpLog.countDocuments(filter)
+    ]);
+    res.json({ logs, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

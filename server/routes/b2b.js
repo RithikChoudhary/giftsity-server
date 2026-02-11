@@ -1,11 +1,13 @@
 const express = require('express');
 const B2BInquiry = require('../models/B2BInquiry');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { sanitizeBody } = require('../middleware/sanitize');
+const { validateB2BInquiry } = require('../middleware/validators');
 const { sendB2BInquiryNotification } = require('../utils/email');
 const router = express.Router();
 
 // POST /api/b2b/inquiries - public (no auth required)
-router.post('/inquiries', async (req, res) => {
+router.post('/inquiries', sanitizeBody, validateB2BInquiry, async (req, res) => {
   try {
     const { companyName, contactPerson, email, phone, numberOfEmployees, budgetPerGift, quantityNeeded, occasion, specialRequirements } = req.body;
 

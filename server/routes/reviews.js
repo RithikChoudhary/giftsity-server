@@ -5,6 +5,7 @@ const Order = require('../models/Order');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadImage } = require('../config/cloudinary');
 const { sanitizeBody } = require('../middleware/sanitize');
+const { validateReviewCreation } = require('../middleware/validators');
 const router = express.Router();
 
 // GET /api/reviews/product/:productId
@@ -42,7 +43,7 @@ router.get('/product/:productId', async (req, res) => {
 });
 
 // POST /api/reviews
-router.post('/', requireAuth, sanitizeBody, async (req, res) => {
+router.post('/', requireAuth, sanitizeBody, validateReviewCreation, async (req, res) => {
   try {
     if ((req.user.userType || req.user.role) !== 'customer') {
       return res.status(403).json({ message: 'Customer access required' });

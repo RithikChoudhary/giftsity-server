@@ -92,6 +92,7 @@ export const sellerAPI = {
   updateSettings: (data) => SellerAPI.put('/settings', data),
   getMarketing: () => SellerAPI.get('/marketing'),
   requestUnsuspend: (reason) => SellerAPI.post('/request-unsuspend', { reason }),
+  bulkCsvUpload: (formData) => SellerAPI.post('/products/bulk-csv', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
 };
 
 export const shippingAPI = {
@@ -129,6 +130,10 @@ export const adminAPI = {
   getSellerHealth: (id) => API.get(`/admin/sellers/${id}/health`),
   runCron: () => API.post('/admin/cron/run'),
   createCorporateUserFromInquiry: (inquiryId) => API.post('/admin/corporate/users/from-inquiry', { inquiryId }),
+  // Audit logs
+  getActivityLogs: (params) => API.get('/admin/logs/activity', { params }),
+  getAuthLogs: (params) => API.get('/admin/logs/auth', { params }),
+  getOtpLogs: (params) => API.get('/admin/logs/otp', { params }),
 };
 
 export const b2bAPI = {
@@ -170,10 +175,11 @@ export const corporateAPI = {
   approveQuote: (id, data) => CorporateAPI.post(`/quotes/${id}/approve`, data),
   rejectQuote: (id, data) => CorporateAPI.post(`/quotes/${id}/reject`, data),
   submitInquiry: (data) => CorporateAPI.post('/inquiries', data),
-  // PDF & CSV downloads
-  getInvoiceUrl: (orderId) => `${CorporateAPI.defaults.baseURL}/orders/${orderId}/invoice`,
-  getExportCsvUrl: () => `${CorporateAPI.defaults.baseURL}/orders/export/csv`,
-  getQuotePdfUrl: (quoteId) => `${CorporateAPI.defaults.baseURL}/quotes/${quoteId}/pdf`,
+  // Download token + PDF/CSV downloads
+  getDownloadToken: () => CorporateAPI.post('/orders/download-token'),
+  getInvoiceUrl: (orderId, downloadToken) => `${CorporateAPI.defaults.baseURL}/orders/${orderId}/invoice?downloadToken=${downloadToken}`,
+  getExportCsvUrl: (downloadToken) => `${CorporateAPI.defaults.baseURL}/orders/export/csv?downloadToken=${downloadToken}`,
+  getQuotePdfUrl: (quoteId, downloadToken) => `${CorporateAPI.defaults.baseURL}/quotes/${quoteId}/pdf?downloadToken=${downloadToken}`,
 };
 
 export { SellerAPI, CorporateAPI };

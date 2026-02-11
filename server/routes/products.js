@@ -7,10 +7,16 @@ const { uploadImage } = require('../config/cloudinary');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB per customization image
 
+// Allowed image MIME types for customization uploads
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
 // POST /api/products/upload-customization - upload customization image
 router.post('/upload-customization', requireAuth, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No image file provided' });
+    if (!ALLOWED_IMAGE_TYPES.includes(req.file.mimetype)) {
+      return res.status(400).json({ message: 'Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.' });
+    }
 
     const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
     const result = await uploadImage(base64, {

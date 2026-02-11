@@ -8,6 +8,7 @@ const { requireAuth } = require('../middleware/auth');
 const { getCommissionRate, calculateOrderFinancials } = require('../utils/commission');
 const { sendOrderConfirmation } = require('../utils/email');
 const { logActivity } = require('../utils/audit');
+const { validateOrderCreation, validatePaymentVerification } = require('../middleware/validators');
 const router = express.Router();
 
 // Generate order number: GFT-YYYYMMDD-XXXX
@@ -19,7 +20,7 @@ const generateOrderNumber = () => {
 };
 
 // POST /api/orders - create order + Cashfree payment session
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, validateOrderCreation, async (req, res) => {
   try {
     if ((req.user.userType || req.user.role) !== 'customer') {
       return res.status(403).json({ message: 'Customer access required' });
@@ -199,7 +200,7 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // POST /api/orders/verify-payment - verify Cashfree payment
-router.post('/verify-payment', requireAuth, async (req, res) => {
+router.post('/verify-payment', requireAuth, validatePaymentVerification, async (req, res) => {
   try {
     if ((req.user.userType || req.user.role) !== 'customer') {
       return res.status(403).json({ message: 'Customer access required' });
@@ -217,8 +218,8 @@ router.post('/verify-payment', requireAuth, async (req, res) => {
     const payments = await getCashfreePayments(orderId);
     const successPayment = payments.find(p => p.payment_status === 'SUCCESS');
 
-    // Update all orders with this cashfree order ID
-    const orders = await Order.find({ cashfreeOrderId: orderId });
+    // Update all orders with this cashfree order ID (ownership check)
+    const orders = await Order.find({ cashfreeOrderId: orderId, customerId: req.user._id });
     for (const order of orders) {
       if (order.paymentStatus === 'paid') continue; // Already processed
 
@@ -287,6 +288,48 @@ router.get('/my-orders', requireAuth, async (req, res) => {
       .sort({ createdAt: -1 })
       .populate('sellerId', 'sellerProfile.businessName');
     res.json({ orders });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/orders/track/:orderNumber - public order tracking (no auth)
+router.get('/track/:orderNumber', async (req, res) => {
+  try {
+    const order = await Order.findOne({ orderNumber: req.params.orderNumber })
+      .select('orderNumber status paymentStatus createdAt paidAt trackingInfo items.title items.quantity items.price items.image')
+      .populate('sellerId', 'sellerProfile.businessName')
+      .lean();
+    if (!order) return res.status(404).json({ message: 'Order not found. Please check your order number.' });
+
+    // Build a timeline from order data
+    const timeline = [{ status: 'placed', date: order.createdAt, label: 'Order Placed' }];
+    if (order.paidAt) timeline.push({ status: 'paid', date: order.paidAt, label: 'Payment Confirmed' });
+    if (['confirmed', 'shipped', 'delivered'].includes(order.status)) {
+      timeline.push({ status: 'confirmed', date: order.paidAt || order.createdAt, label: 'Order Confirmed' });
+    }
+    if (order.trackingInfo?.shippedAt || order.status === 'shipped' || order.status === 'delivered') {
+      timeline.push({ status: 'shipped', date: order.trackingInfo?.shippedAt || null, label: 'Shipped' });
+    }
+    if (order.status === 'delivered') {
+      timeline.push({ status: 'delivered', date: order.trackingInfo?.deliveredAt || null, label: 'Delivered' });
+    }
+    if (order.status === 'cancelled') {
+      timeline.push({ status: 'cancelled', date: null, label: 'Cancelled' });
+    }
+
+    res.json({
+      orderNumber: order.orderNumber,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      items: order.items?.map(i => ({ title: i.title, quantity: i.quantity, price: i.price, image: i.image })),
+      tracking: order.trackingInfo ? {
+        courierName: order.trackingInfo.courierName,
+        trackingNumber: order.trackingInfo.trackingNumber
+      } : null,
+      sellerName: order.sellerId?.sellerProfile?.businessName || null,
+      timeline
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }

@@ -135,9 +135,11 @@ export default function CorporateQuotes() {
                   )}
 
                   {/* Download Quote PDF */}
-                  <button onClick={() => {
-                    const token = localStorage.getItem('giftsity_corporate_token');
-                    window.open(`${corporateAPI.getQuotePdfUrl(quote._id)}?token=${token}`, '_blank');
+                  <button onClick={async () => {
+                    try {
+                      const { data } = await corporateAPI.getDownloadToken();
+                      window.open(corporateAPI.getQuotePdfUrl(quote._id, data.downloadToken), '_blank');
+                    } catch { alert('Failed to generate download link'); }
                   }}
                     className="flex items-center gap-2 px-4 py-2 border border-amber-400/30 text-amber-400 rounded-lg text-sm hover:bg-amber-500/10 transition-colors w-fit">
                     <Download className="w-4 h-4" /> Download Quote PDF

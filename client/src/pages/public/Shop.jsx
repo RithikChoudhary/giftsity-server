@@ -87,8 +87,8 @@ export default function Shop() {
         <div className="flex gap-3">
           <select value={sort} onChange={e => { setSort(e.target.value); setPage(1); }} className="px-3 py-2.5 bg-card border border-edge rounded-xl text-sm text-theme-secondary focus:outline-none focus:border-amber-500/50">
             <option value="newest">Newest</option>
-            <option value="price_low">Price: Low to High</option>
-            <option value="price_high">Price: High to Low</option>
+            <option value="price_asc">Price: Low to High</option>
+            <option value="price_desc">Price: High to Low</option>
             <option value="popular">Most Popular</option>
             <option value="rating">Top Rated</option>
           </select>

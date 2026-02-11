@@ -55,9 +55,11 @@ export default function CorporateOrders() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">My Orders</h1>
         {orders.length > 0 && (
-          <button onClick={() => {
-            const token = localStorage.getItem('giftsity_corporate_token');
-            window.open(`${corporateAPI.getExportCsvUrl()}?token=${token}`, '_blank');
+          <button onClick={async () => {
+            try {
+              const { data } = await corporateAPI.getDownloadToken();
+              window.open(corporateAPI.getExportCsvUrl(data.downloadToken), '_blank');
+            } catch { alert('Failed to generate download link'); }
           }}
             className="flex items-center gap-2 px-4 py-2 border border-amber-400/30 text-amber-400 rounded-lg text-sm hover:bg-amber-500/10 transition-colors">
             <Download className="w-4 h-4" /> Export CSV

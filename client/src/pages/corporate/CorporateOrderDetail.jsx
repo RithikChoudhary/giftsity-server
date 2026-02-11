@@ -60,9 +60,11 @@ export default function CorporateOrderDetail() {
         </span>
         <div className="ml-auto flex items-center gap-2">
           {order.paymentStatus === 'paid' && (
-            <button onClick={() => {
-              const token = localStorage.getItem('giftsity_corporate_token');
-              window.open(`${corporateAPI.getInvoiceUrl(order._id)}?token=${token}`, '_blank');
+            <button onClick={async () => {
+              try {
+                const { data } = await corporateAPI.getDownloadToken();
+                window.open(corporateAPI.getInvoiceUrl(order._id, data.downloadToken), '_blank');
+              } catch { alert('Failed to generate download link'); }
             }}
               className="flex items-center gap-2 px-4 py-1.5 border border-amber-400/30 text-amber-400 rounded-lg text-sm hover:bg-amber-500/10 transition-colors">
               <Download className="w-3 h-3" /> Download Invoice

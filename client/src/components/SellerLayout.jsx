@@ -1,8 +1,9 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { LayoutDashboard, Package, ShoppingCart, CreditCard, Megaphone, Settings, LogOut, Gift, Sun, Moon, ArrowLeft } from 'lucide-react';
-import { useEffect } from 'react';
+import { authAPI } from '../api';
+import { LayoutDashboard, Package, ShoppingCart, CreditCard, Megaphone, Settings, LogOut, Gift, Sun, Moon, ArrowLeft, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 const navItems = [
   { path: '/seller', icon: LayoutDashboard, label: 'Dashboard' },
@@ -18,13 +19,32 @@ export default function SellerLayout() {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
+  const [verified, setVerified] = useState(false);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (!user) navigate('/auth');
-    else if (user.userType !== 'seller') navigate('/');
+    let cancelled = false;
+    const verify = async () => {
+      if (!user) { navigate('/auth'); return; }
+      if (user.userType !== 'seller') { navigate('/'); return; }
+      try {
+        const { data } = await authAPI.me();
+        if (cancelled) return;
+        if (data.user?.userType === 'seller') { setVerified(true); }
+        else { logout(); navigate('/auth'); }
+      } catch {
+        if (!cancelled) { logout(); navigate('/auth'); }
+      } finally { if (!cancelled) setChecking(false); }
+    };
+    verify();
+    return () => { cancelled = true; };
   }, [user]);
 
-  if (!user || user.userType !== 'seller') return null;
+  if (checking || !verified) return (
+    <div className="flex items-center justify-center min-h-screen bg-surface">
+      <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
+    </div>
+  );
 
   const isPending = user.status === 'pending';
   const isSuspended = user.status === 'suspended';
