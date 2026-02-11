@@ -13,7 +13,7 @@ const CorporateCatalog = require('../models/CorporateCatalog');
 const CorporateQuote = require('../models/CorporateQuote');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadImage, deleteImage } = require('../config/cloudinary');
-const { sendCommissionChangeNotification, sendPayoutNotification, sendCorporateWelcomeEmail } = require('../utils/email');
+const { sendCommissionChangeNotification, sendPayoutNotification, sendCorporateWelcomeEmail, sendCorporateQuoteNotification } = require('../utils/email');
 const { logActivity } = require('../utils/audit');
 const router = express.Router();
 
@@ -901,6 +901,11 @@ router.post('/corporate/quotes', async (req, res) => {
     });
     await quote.save();
 
+    // Send quote notification email
+    try {
+      await sendCorporateQuoteNotification(contactEmail, quote, 'created');
+    } catch (e) { console.error('Quote notification email error:', e.message); }
+
     logActivity({ domain: 'admin', action: 'corporate_quote_created', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'CorporateQuote', targetId: quote._id, message: `Quote ${quoteNumber} created for ${companyName}`, metadata: { quoteNumber, finalAmount } });
     res.status(201).json({ quote, message: 'Quote created and sent' });
   } catch (err) {
@@ -930,6 +935,12 @@ router.put('/corporate/quotes/:id', async (req, res) => {
     if (status) quote.status = status;
 
     await quote.save();
+
+    // Send quote update notification email
+    try {
+      await sendCorporateQuoteNotification(quote.contactEmail, quote, 'updated');
+    } catch (e) { console.error('Quote update notification email error:', e.message); }
+
     logActivity({ domain: 'admin', action: 'corporate_quote_updated', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'CorporateQuote', targetId: quote._id, message: `Quote ${quote.quoteNumber} updated` });
     res.json({ quote, message: 'Quote updated' });
   } catch (err) {

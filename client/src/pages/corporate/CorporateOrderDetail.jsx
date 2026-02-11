@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { corporateAPI } from '../../api';
-import { ArrowLeft, Loader2, Package, XCircle, CheckCircle, Clock, Truck, MapPin } from 'lucide-react';
+import { ArrowLeft, Loader2, Package, XCircle, CheckCircle, Clock, Truck, MapPin, Download } from 'lucide-react';
 
 export default function CorporateOrderDetail() {
   const { id } = useParams();
@@ -58,12 +58,23 @@ export default function CorporateOrderDetail() {
         <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${order.paymentStatus === 'paid' ? 'text-green-400 bg-green-500/10' : 'text-amber-400 bg-amber-500/10'}`}>
           Payment: {order.paymentStatus}
         </span>
-        {['pending', 'confirmed'].includes(order.status) && (
-          <button onClick={handleCancel} disabled={cancelling}
-            className="ml-auto flex items-center gap-2 px-4 py-1.5 border border-red-400/30 text-red-400 rounded-lg text-sm hover:bg-red-500/10 transition-colors disabled:opacity-50">
-            {cancelling ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />} Cancel Order
-          </button>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {order.paymentStatus === 'paid' && (
+            <button onClick={() => {
+              const token = localStorage.getItem('giftsity_corporate_token');
+              window.open(`${corporateAPI.getInvoiceUrl(order._id)}?token=${token}`, '_blank');
+            }}
+              className="flex items-center gap-2 px-4 py-1.5 border border-amber-400/30 text-amber-400 rounded-lg text-sm hover:bg-amber-500/10 transition-colors">
+              <Download className="w-3 h-3" /> Download Invoice
+            </button>
+          )}
+          {['pending', 'confirmed'].includes(order.status) && (
+            <button onClick={handleCancel} disabled={cancelling}
+              className="flex items-center gap-2 px-4 py-1.5 border border-red-400/30 text-red-400 rounded-lg text-sm hover:bg-red-500/10 transition-colors disabled:opacity-50">
+              {cancelling ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />} Cancel Order
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Items */}

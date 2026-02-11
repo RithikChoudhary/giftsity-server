@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { corporateAPI } from '../../api';
-import { FileText, Loader2, CheckCircle, XCircle, Clock, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, Loader2, CheckCircle, XCircle, Clock, AlertTriangle, ChevronDown, ChevronUp, Download } from 'lucide-react';
 
 export default function CorporateQuotes() {
   const [quotes, setQuotes] = useState([]);
@@ -133,6 +133,15 @@ export default function CorporateQuotes() {
                       <p className="text-sm text-theme-muted">{quote.adminNotes}</p>
                     </div>
                   )}
+
+                  {/* Download Quote PDF */}
+                  <button onClick={() => {
+                    const token = localStorage.getItem('giftsity_corporate_token');
+                    window.open(`${corporateAPI.getQuotePdfUrl(quote._id)}?token=${token}`, '_blank');
+                  }}
+                    className="flex items-center gap-2 px-4 py-2 border border-amber-400/30 text-amber-400 rounded-lg text-sm hover:bg-amber-500/10 transition-colors w-fit">
+                    <Download className="w-4 h-4" /> Download Quote PDF
+                  </button>
 
                   {/* Actions */}
                   {quote.status === 'sent' && (

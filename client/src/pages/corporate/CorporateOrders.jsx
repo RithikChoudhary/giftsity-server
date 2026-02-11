@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { corporateAPI } from '../../api';
-import { Package, Loader2, CheckCircle, XCircle, Clock, Truck, Eye } from 'lucide-react';
+import { Package, Loader2, CheckCircle, XCircle, Clock, Truck, Eye, Download } from 'lucide-react';
 
 export default function CorporateOrders() {
   const [searchParams] = useSearchParams();
@@ -52,7 +52,18 @@ export default function CorporateOrders() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">My Orders</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">My Orders</h1>
+        {orders.length > 0 && (
+          <button onClick={() => {
+            const token = localStorage.getItem('giftsity_corporate_token');
+            window.open(`${corporateAPI.getExportCsvUrl()}?token=${token}`, '_blank');
+          }}
+            className="flex items-center gap-2 px-4 py-2 border border-amber-400/30 text-amber-400 rounded-lg text-sm hover:bg-amber-500/10 transition-colors">
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+        )}
+      </div>
 
       {verifyMsg && (
         <div className={`p-3 rounded-lg text-sm ${verifyMsg.includes('success') ? 'bg-green-500/10 text-green-400' : 'bg-yellow-500/10 text-yellow-400'}`}>{verifyMsg}</div>

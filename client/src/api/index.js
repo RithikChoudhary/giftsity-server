@@ -170,6 +170,10 @@ export const corporateAPI = {
   approveQuote: (id, data) => CorporateAPI.post(`/quotes/${id}/approve`, data),
   rejectQuote: (id, data) => CorporateAPI.post(`/quotes/${id}/reject`, data),
   submitInquiry: (data) => CorporateAPI.post('/inquiries', data),
+  // PDF & CSV downloads
+  getInvoiceUrl: (orderId) => `${CorporateAPI.defaults.baseURL}/orders/${orderId}/invoice`,
+  getExportCsvUrl: () => `${CorporateAPI.defaults.baseURL}/orders/export/csv`,
+  getQuotePdfUrl: (quoteId) => `${CorporateAPI.defaults.baseURL}/quotes/${quoteId}/pdf`,
 };
 
 export { SellerAPI, CorporateAPI };

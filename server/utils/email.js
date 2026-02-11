@@ -313,6 +313,100 @@ const sendCorporateWelcomeEmail = async (email, companyName, contactPerson) => {
   }
 };
 
+// Corporate order status change notification
+const sendCorporateOrderStatusEmail = async (email, order, newStatus) => {
+  if (!resend) { console.log(`[Email] Skipping corporate order status email to ${email} (no API key)`); return; }
+
+  const statusLabels = {
+    shipped: { label: 'Shipped', color: '#4da6ff', icon: '📦' },
+    delivered: { label: 'Delivered', color: '#66cc66', icon: '✅' },
+    cancelled: { label: 'Cancelled', color: '#ff6666', icon: '❌' }
+  };
+  const s = statusLabels[newStatus] || { label: newStatus, color: '#f5c518', icon: '📋' };
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: `Order #${order.orderNumber} Status: ${s.label}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a2e;border-radius:16px;">
+          <h1 style="color:#f5c518;margin:0 0 8px;font-size:24px;">Giftsity Corporate</h1>
+          <h2 style="color:#eee;margin:0 0 20px;">Order Status Update</h2>
+          <div style="background:#2a2a4a;border-radius:8px;padding:20px;margin:0 0 16px;text-align:center;">
+            <p style="font-size:36px;margin:0 0 8px;">${s.icon}</p>
+            <p style="color:${s.color};font-size:20px;font-weight:bold;margin:0;">Order ${s.label}</p>
+          </div>
+          <div style="background:#2a2a4a;border-radius:8px;padding:16px;margin:0 0 16px;">
+            <p style="color:#ccc;margin:4px 0;">Order: <strong style="color:#eee;">#${order.orderNumber}</strong></p>
+            <p style="color:#ccc;margin:4px 0;">Amount: <strong style="color:#eee;">₹${(order.totalAmount || 0).toLocaleString()}</strong></p>
+            <p style="color:#ccc;margin:4px 0;">Items: ${(order.items || []).length} product(s)</p>
+          </div>
+          ${newStatus === 'shipped' && order.trackingInfo?.trackingNumber ? `
+            <div style="background:#1a2e3a;border-radius:8px;padding:16px;margin:0 0 16px;">
+              <p style="color:#4da6ff;margin:0 0 4px;font-weight:bold;">Tracking Info</p>
+              ${order.trackingInfo.courierName ? `<p style="color:#ccc;margin:4px 0;">Courier: ${order.trackingInfo.courierName}</p>` : ''}
+              <p style="color:#ccc;margin:4px 0;">Tracking: <strong style="color:#f5c518;">${order.trackingInfo.trackingNumber}</strong></p>
+            </div>
+          ` : ''}
+          <p style="color:#888;font-size:13px;margin-top:16px;">Log in to your corporate portal to view full order details.</p>
+        </div>
+      `
+    });
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'corporate', template: 'corporate_order_status', subject: `Order #${order.orderNumber} ${s.label}`, status: 'sent', provider: 'resend', metadata: { orderNumber: order.orderNumber, newStatus } });
+  } catch (err) {
+    console.error(`[Email] Failed to send corporate order status to ${email}:`, err.message);
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'corporate', template: 'corporate_order_status', subject: `Order Status Update`, status: 'failed', provider: 'resend', errorMessage: err.message });
+  }
+};
+
+// Corporate quote notification (new or updated)
+const sendCorporateQuoteNotification = async (email, quote, action = 'created') => {
+  if (!resend) { console.log(`[Email] Skipping corporate quote notification to ${email} (no API key)`); return; }
+
+  const isNew = action === 'created';
+  const subject = isNew
+    ? `New Quote #${quote.quoteNumber} from Giftsity`
+    : `Quote #${quote.quoteNumber} Updated`;
+
+  try {
+    const itemsList = (quote.items || []).map(i =>
+      `<li style="color:#ccc;margin:4px 0;">${i.title} × ${i.quantity} — ₹${((i.unitPrice || 0) * (i.quantity || 1)).toLocaleString()}</li>`
+    ).join('');
+
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a2e;border-radius:16px;">
+          <h1 style="color:#f5c518;margin:0 0 8px;font-size:24px;">Giftsity Corporate</h1>
+          <h2 style="color:#eee;margin:0 0 20px;">${isNew ? 'You Have a New Quote!' : 'Your Quote Has Been Updated'}</h2>
+          <div style="background:#2a2a4a;border-radius:8px;padding:16px;margin:0 0 16px;">
+            <p style="color:#ccc;margin:4px 0;">Quote: <strong style="color:#eee;">#${quote.quoteNumber}</strong></p>
+            ${quote.validUntil ? `<p style="color:#ccc;margin:4px 0;">Valid Until: <strong style="color:#f5c518;">${new Date(quote.validUntil).toLocaleDateString('en-IN')}</strong></p>` : ''}
+          </div>
+          <div style="margin:0 0 16px;">
+            <p style="color:#eee;font-weight:bold;margin:0 0 8px;">Items:</p>
+            <ul style="padding-left:20px;margin:0;">${itemsList}</ul>
+          </div>
+          <div style="background:#1a2e1a;border-radius:8px;padding:16px;margin:0 0 16px;">
+            ${quote.discountPercent ? `<p style="color:#ccc;margin:4px 0;">Discount: ${quote.discountPercent}%</p>` : ''}
+            <p style="color:#8f8;font-size:18px;font-weight:bold;margin:8px 0 0;">Total: ₹${(quote.finalAmount || quote.totalAmount || 0).toLocaleString()}</p>
+          </div>
+          ${quote.adminNotes ? `<p style="color:#aaa;font-size:13px;margin:0 0 16px;">Note: "${quote.adminNotes}"</p>` : ''}
+          <a href="${(process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim()}/corporate/quotes" style="display:block;background:#f5c518;color:#1a1a2e;text-align:center;padding:14px 24px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:16px;margin:16px 0;">View Quote</a>
+          <p style="color:#888;font-size:13px;">Log in to approve or discuss this quote.</p>
+        </div>
+      `
+    });
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'corporate', template: 'corporate_quote', subject, status: 'sent', provider: 'resend', metadata: { quoteNumber: quote.quoteNumber, action } });
+  } catch (err) {
+    console.error(`[Email] Failed to send corporate quote notification to ${email}:`, err.message);
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'corporate', template: 'corporate_quote', subject, status: 'failed', provider: 'resend', errorMessage: err.message });
+  }
+};
+
 module.exports = {
   sendOTP,
   sendOrderConfirmation,
@@ -322,5 +416,7 @@ module.exports = {
   sendCorporateWelcomeEmail,
   sendShippedEmail,
   sendDeliveredEmail,
-  sendReviewRequestEmail
+  sendReviewRequestEmail,
+  sendCorporateOrderStatusEmail,
+  sendCorporateQuoteNotification
 };
