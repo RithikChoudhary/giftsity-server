@@ -281,7 +281,7 @@ const sendCorporateWelcomeEmail = async (email, companyName, contactPerson) => {
     return;
   }
 
-  const portalUrl = (process.env.CLIENT_URL || 'http://localhost:5173') + '/corporate/login';
+  const portalUrl = (process.env.CLIENT_URL || 'http://localhost:5173').split(',')[0].trim() + '/corporate/login';
 
   try {
     await resend.emails.send({
