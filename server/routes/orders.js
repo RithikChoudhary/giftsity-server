@@ -8,6 +8,7 @@ const { requireAuth } = require('../middleware/auth');
 const { getCommissionRate, calculateOrderFinancials } = require('../utils/commission');
 const { sendOrderConfirmation } = require('../utils/email');
 const { logActivity } = require('../utils/audit');
+const { sanitizeBody } = require('../middleware/sanitize');
 const { validateOrderCreation, validatePaymentVerification } = require('../middleware/validators');
 const router = express.Router();
 
@@ -367,7 +368,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 });
 
 // POST /api/orders/:id/cancel - customer cancels own order (pending/confirmed only)
-router.post('/:id/cancel', requireAuth, async (req, res) => {
+router.post('/:id/cancel', requireAuth, sanitizeBody, async (req, res) => {
   try {
     const order = await Order.findOne({ _id: req.params.id, customerId: req.user._id });
     if (!order) return res.status(404).json({ message: 'Order not found' });
