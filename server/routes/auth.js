@@ -8,6 +8,7 @@ const { sendOTP } = require('../utils/email');
 const { requireAuth } = require('../middleware/auth');
 const { cloudinary } = require('../config/cloudinary');
 const { findIdentityByEmail, signIdentityToken, createAuthSession } = require('../utils/identity');
+const { sanitizeBody } = require('../middleware/sanitize');
 const { logOtpEvent, logAuthEvent } = require('../utils/audit');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -263,7 +264,7 @@ router.get('/me', requireAuth, async (req, res) => {
 });
 
 // PUT /api/auth/profile
-router.put('/profile', requireAuth, async (req, res) => {
+router.put('/profile', requireAuth, sanitizeBody, async (req, res) => {
   try {
     const { name, phone } = req.body;
     const user = req.user;
@@ -302,7 +303,7 @@ router.put('/profile', requireAuth, async (req, res) => {
 });
 
 // PUT /api/auth/addresses
-router.put('/addresses', requireAuth, async (req, res) => {
+router.put('/addresses', requireAuth, sanitizeBody, async (req, res) => {
   try {
     if ((req.user.userType || req.user.role) !== 'customer') {
       return res.status(403).json({ message: 'Addresses can only be updated for customer accounts' });
