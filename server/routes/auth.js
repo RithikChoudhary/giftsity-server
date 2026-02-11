@@ -268,9 +268,31 @@ router.put('/profile', requireAuth, async (req, res) => {
     const { name, phone } = req.body;
     const user = req.user;
 
-    if (name) user.name = name;
-    if (phone) user.phone = phone;
-    if (name && phone && user.isProfileComplete !== undefined) user.isProfileComplete = true;
+    // Validate name
+    if (name !== undefined) {
+      const trimmed = (name || '').trim();
+      if (!trimmed || trimmed.length < 2) {
+        return res.status(400).json({ message: 'Name must be at least 2 characters' });
+      }
+      if (trimmed.length > 50) {
+        return res.status(400).json({ message: 'Name cannot exceed 50 characters' });
+      }
+      if (!/^[a-zA-Z\s'.()-]+$/.test(trimmed)) {
+        return res.status(400).json({ message: 'Name can only contain letters, spaces, and basic punctuation' });
+      }
+      user.name = trimmed;
+    }
+
+    // Validate phone
+    if (phone !== undefined) {
+      const digits = (phone || '').replace(/\D/g, '');
+      if (!digits || digits.length !== 10) {
+        return res.status(400).json({ message: 'Phone must be exactly 10 digits' });
+      }
+      user.phone = digits;
+    }
+
+    if (user.name && user.phone && user.isProfileComplete !== undefined) user.isProfileComplete = true;
     await user.save();
 
     res.json({ message: 'Profile updated', user: { _id: user._id, email: user.email, name: user.name, phone: user.phone, userType: user.userType || user.role, isProfileComplete: user.isProfileComplete !== undefined ? user.isProfileComplete : true } });
