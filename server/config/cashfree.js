@@ -51,4 +51,14 @@ async function getCashfreePayments(orderId) {
   return res.data;
 }
 
-module.exports = { createCashfreeOrder, getCashfreeOrder, getCashfreePayments, BASE_URL, cashfreeHeaders };
+// Create refund for an order
+async function createRefund({ orderId, refundAmount, refundId, refundNote }) {
+  const res = await axios.post(`${BASE_URL}/orders/${orderId}/refunds`, {
+    refund_amount: refundAmount,
+    refund_id: refundId,
+    refund_note: refundNote || 'Order cancelled by customer'
+  }, { headers: cashfreeHeaders() });
+  return res.data;
+}
+
+module.exports = { createCashfreeOrder, getCashfreeOrder, getCashfreePayments, createRefund, BASE_URL, cashfreeHeaders };

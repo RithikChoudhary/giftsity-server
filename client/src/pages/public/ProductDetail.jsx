@@ -228,16 +228,13 @@ export default function ProductDetail() {
                             <input type="file" accept="image/*" multiple className="hidden" onChange={e => {
                               const files = Array.from(e.target.files);
                               files.forEach(f => {
-                                const reader = new FileReader();
-                                reader.onload = () => {
-                                  // Upload to cloudinary via API
-                                  API.post('/auth/upload-avatar', (() => { const fd = new FormData(); fd.append('avatar', f); return fd; })(), { headers: { 'Content-Type': 'multipart/form-data' } })
-                                    .then(res => {
-                                      setCustomizations(prev => ({ ...prev, [idx]: [...(prev[idx] || []), res.data.url] }));
-                                    })
-                                    .catch(() => toast.error('Image upload failed'));
-                                };
-                                reader.readAsDataURL(f);
+                                const fd = new FormData();
+                                fd.append('image', f);
+                                API.post('/products/upload-customization', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+                                  .then(res => {
+                                    setCustomizations(prev => ({ ...prev, [idx]: [...(prev[idx] || []), res.data.url] }));
+                                  })
+                                  .catch(() => toast.error('Image upload failed'));
                               });
                             }} />
                           </label>

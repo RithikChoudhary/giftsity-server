@@ -5,8 +5,9 @@
 // ============================================================
 
 const { Resend } = require('resend');
+const { logNotification } = require('./audit');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'Giftsity <no-reply@no-reply.giftsity.com>';
 
 // ============================================================
@@ -27,6 +28,11 @@ const FROM_EMAIL = process.env.FROM_EMAIL || 'Giftsity <no-reply@no-reply.giftsi
 // CRITICAL: OTP must throw on failure so caller knows email wasn't sent
 const sendOTP = async (email, otp) => {
   console.log(`[Email] Sending OTP to: ${email}`);
+  if (!resend) {
+    console.log(`[Email] RESEND_API_KEY not set -- OTP for ${email}: ${otp}`);
+    logNotification({ channel: 'email', recipient: email, template: 'otp', subject: 'Login Code', status: 'sent', provider: 'console' });
+    return;
+  }
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
@@ -45,14 +51,17 @@ const sendOTP = async (email, otp) => {
       `
     });
     console.log(`[Email] OTP sent successfully to: ${email}`);
+    logNotification({ channel: 'email', recipient: email, template: 'otp', subject: 'Login Code', status: 'sent', provider: 'resend' });
   } catch (err) {
     console.error(`[Email] Failed to send OTP to ${email}:`, err.message);
+    logNotification({ channel: 'email', recipient: email, template: 'otp', subject: 'Login Code', status: 'failed', provider: 'resend', errorMessage: err.message });
     throw new Error('Failed to send OTP email');
   }
 };
 
 // NON-CRITICAL: Notifications log errors but don't throw (don't break order flow)
 const sendOrderConfirmation = async (email, order, type = 'customer') => {
+  if (!resend) { console.log(`[Email] Skipping order confirmation to ${email} (no API key)`); return; }
   try {
     const subject = type === 'seller'
       ? `New Order #${order.orderNumber} - ₹${order.sellerAmount} earning`
@@ -85,12 +94,15 @@ const sendOrderConfirmation = async (email, order, type = 'customer') => {
         </div>
       `
     });
+    logNotification({ channel: 'email', recipient: email, recipientRole: type, template: 'order_confirmation', subject, status: 'sent', provider: 'resend', metadata: { orderNumber: order.orderNumber } });
   } catch (err) {
     console.error(`[Email] Failed to send order confirmation to ${email}:`, err.message);
+    logNotification({ channel: 'email', recipient: email, recipientRole: type, template: 'order_confirmation', subject: `Order Confirmation`, status: 'failed', provider: 'resend', errorMessage: err.message });
   }
 };
 
 const sendPayoutNotification = async (email, payout) => {
+  if (!resend) { console.log(`[Email] Skipping payout notification to ${email} (no API key)`); return; }
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
@@ -110,12 +122,15 @@ const sendPayoutNotification = async (email, payout) => {
         </div>
       `
     });
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'seller', template: 'payout', subject: `Payout Processed`, status: 'sent', provider: 'resend', metadata: { amount: payout.netPayout } });
   } catch (err) {
     console.error(`[Email] Failed to send payout notification to ${email}:`, err.message);
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'seller', template: 'payout', subject: `Payout Processed`, status: 'failed', provider: 'resend', errorMessage: err.message });
   }
 };
 
 const sendCommissionChangeNotification = async (email, sellerName, oldRate, newRate) => {
+  if (!resend) { console.log(`[Email] Skipping commission change to ${email} (no API key)`); return; }
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
@@ -134,14 +149,16 @@ const sendCommissionChangeNotification = async (email, sellerName, oldRate, newR
         </div>
       `
     });
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'seller', template: 'commission_change', subject: 'Platform Fee Update', status: 'sent', provider: 'resend', metadata: { oldRate, newRate } });
   } catch (err) {
     console.error(`[Email] Failed to send commission change notification to ${email}:`, err.message);
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'seller', template: 'commission_change', subject: 'Platform Fee Update', status: 'failed', provider: 'resend', errorMessage: err.message });
   }
 };
 
 const sendB2BInquiryNotification = async (inquiry) => {
   const adminEmail = process.env.ADMIN_EMAIL;
-  if (!adminEmail) return;
+  if (!adminEmail || !resend) return;
 
   try {
     await resend.emails.send({
@@ -166,12 +183,15 @@ const sendB2BInquiryNotification = async (inquiry) => {
         </div>
       `
     });
+    logNotification({ channel: 'email', recipient: adminEmail, recipientRole: 'admin', template: 'b2b_inquiry', subject: `New B2B Inquiry from ${inquiry.companyName}`, status: 'sent', provider: 'resend', metadata: { companyName: inquiry.companyName } });
   } catch (err) {
     console.error(`[Email] Failed to send B2B inquiry notification:`, err.message);
+    logNotification({ channel: 'email', recipient: adminEmail, recipientRole: 'admin', template: 'b2b_inquiry', subject: `New B2B Inquiry`, status: 'failed', provider: 'resend', errorMessage: err.message });
   }
 };
 
 const sendShippedEmail = async (email, order) => {
+  if (!resend) { console.log(`[Email] Skipping shipped email to ${email} (no API key)`); return; }
   try {
     const tracking = order.trackingInfo || {};
     await resend.emails.send({
@@ -192,12 +212,15 @@ const sendShippedEmail = async (email, order) => {
         </div>
       `
     });
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'customer', template: 'shipped', subject: `Order #${order.orderNumber} Shipped`, status: 'sent', provider: 'resend', metadata: { orderNumber: order.orderNumber } });
   } catch (err) {
     console.error(`[Email] Failed to send shipped email to ${email}:`, err.message);
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'customer', template: 'shipped', subject: `Order Shipped`, status: 'failed', provider: 'resend', errorMessage: err.message });
   }
 };
 
 const sendDeliveredEmail = async (email, order) => {
+  if (!resend) { console.log(`[Email] Skipping delivered email to ${email} (no API key)`); return; }
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
@@ -216,12 +239,15 @@ const sendDeliveredEmail = async (email, order) => {
         </div>
       `
     });
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'customer', template: 'delivered', subject: `Order #${order.orderNumber} Delivered`, status: 'sent', provider: 'resend', metadata: { orderNumber: order.orderNumber } });
   } catch (err) {
     console.error(`[Email] Failed to send delivered email to ${email}:`, err.message);
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'customer', template: 'delivered', subject: `Order Delivered`, status: 'failed', provider: 'resend', errorMessage: err.message });
   }
 };
 
 const sendReviewRequestEmail = async (email, order) => {
+  if (!resend) { console.log(`[Email] Skipping review request to ${email} (no API key)`); return; }
   try {
     await resend.emails.send({
       from: FROM_EMAIL,
@@ -240,8 +266,10 @@ const sendReviewRequestEmail = async (email, order) => {
         </div>
       `
     });
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'customer', template: 'review_request', subject: `Review Order #${order.orderNumber}`, status: 'sent', provider: 'resend', metadata: { orderNumber: order.orderNumber } });
   } catch (err) {
     console.error(`[Email] Failed to send review request to ${email}:`, err.message);
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'customer', template: 'review_request', subject: `Review Request`, status: 'failed', provider: 'resend', errorMessage: err.message });
   }
 };
 

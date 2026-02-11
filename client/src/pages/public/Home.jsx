@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Gift, ArrowRight, Sparkles, Store, Star, TrendingUp, ShoppingBag, Truck, Shield, Heart } from 'lucide-react';
 import ProductCard from '../../components/ProductCard';
-import LoadingSpinner from '../../components/LoadingSpinner';
+import { SkeletonProductGrid, SkeletonSellerCard } from '../../components/SkeletonCard';
 import SEO from '../../components/SEO';
 import API from '../../api';
 
@@ -33,7 +33,21 @@ export default function Home() {
     setLoading(false);
   };
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) return (
+    <div className="min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 space-y-12">
+        <div className="space-y-3 animate-pulse">
+          <div className="h-8 bg-inset rounded-full w-48" />
+          <div className="h-4 bg-inset rounded-full w-64" />
+        </div>
+        <SkeletonProductGrid count={4} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => <SkeletonSellerCard key={i} />)}
+        </div>
+        <SkeletonProductGrid count={8} />
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen">

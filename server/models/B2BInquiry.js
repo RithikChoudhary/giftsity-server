@@ -27,7 +27,7 @@ const b2bInquirySchema = new mongoose.Schema({
   activityLog: [{
     action: { type: String, default: '' },
     timestamp: { type: Date, default: Date.now },
-    by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
+    by: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null }
   }],
 
   createdAt: { type: Date, default: Date.now },

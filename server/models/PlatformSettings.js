@@ -34,7 +34,7 @@ const platformSettingsSchema = new mongoose.Schema({
   tagline: { type: String, default: 'The Gift Marketplace' },
 
   updatedAt: { type: Date, default: Date.now },
-  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
+  updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null }
 });
 
 // Ensure only one settings document exists

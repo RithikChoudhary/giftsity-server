@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const sellerPayoutSchema = new mongoose.Schema({
-  sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Seller', required: true },
 
   periodStart: { type: Date, required: true },
   periodEnd: { type: Date, required: true },
@@ -24,7 +24,7 @@ const sellerPayoutSchema = new mongoose.Schema({
 
   transactionId: { type: String, default: '' },
   paidAt: { type: Date, default: null },
-  paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
 
   bankDetailsSnapshot: {
     accountHolderName: { type: String, default: '' },

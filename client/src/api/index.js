@@ -10,6 +10,11 @@ const SellerAPI = axios.create({
   baseURL: import.meta.env.VITE_SELLER_API_URL || '/api/seller'
 });
 
+// Corporate API (corporate portal) — separate server on port 5002
+const CorporateAPI = axios.create({
+  baseURL: import.meta.env.VITE_CORPORATE_API_URL || '/api/corporate'
+});
+
 // Shared interceptors for both instances
 function attachAuth(config) {
   const token = localStorage.getItem('giftsity_token');
@@ -34,6 +39,19 @@ API.interceptors.response.use((res) => res, handleAuthError);
 
 SellerAPI.interceptors.request.use(attachAuth);
 SellerAPI.interceptors.response.use((res) => res, handleAuthError);
+
+CorporateAPI.interceptors.request.use((config) => {
+  const token = localStorage.getItem('giftsity_corporate_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+CorporateAPI.interceptors.response.use((res) => res, (err) => {
+  if (err.response?.status === 401) {
+    localStorage.removeItem('giftsity_corporate_token');
+    localStorage.removeItem('giftsity_corporate_user');
+  }
+  return Promise.reject(err);
+});
 
 // --- API exports ---
 
@@ -134,5 +152,24 @@ export const reviewAPI = {
   hide: (id, reason) => API.put(`/reviews/${id}/hide`, { reason }),
 };
 
-export { SellerAPI };
+export const corporateAPI = {
+  sendOtp: (email) => CorporateAPI.post('/auth/send-otp', { email }),
+  verifyOtp: (data) => CorporateAPI.post('/auth/verify-otp', data),
+  me: () => CorporateAPI.get('/auth/me'),
+  updateProfile: (data) => CorporateAPI.put('/auth/profile', data),
+  getCatalog: (params) => CorporateAPI.get('/catalog', { params }),
+  getCatalogProduct: (id) => CorporateAPI.get(`/catalog/${id}`),
+  createOrder: (data) => CorporateAPI.post('/orders', data),
+  verifyPayment: (data) => CorporateAPI.post('/orders/verify-payment', data),
+  getOrders: (params) => CorporateAPI.get('/orders', { params }),
+  getOrder: (id) => CorporateAPI.get(`/orders/${id}`),
+  cancelOrder: (id, data) => CorporateAPI.post(`/orders/${id}/cancel`, data),
+  getQuotes: () => CorporateAPI.get('/quotes'),
+  getQuote: (id) => CorporateAPI.get(`/quotes/${id}`),
+  approveQuote: (id, data) => CorporateAPI.post(`/quotes/${id}/approve`, data),
+  rejectQuote: (id, data) => CorporateAPI.post(`/quotes/${id}/reject`, data),
+  submitInquiry: (data) => CorporateAPI.post('/inquiries', data),
+};
+
+export { SellerAPI, CorporateAPI };
 export default API;

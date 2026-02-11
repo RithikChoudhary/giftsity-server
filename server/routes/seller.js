@@ -7,6 +7,7 @@ const { requireAuth, requireSeller } = require('../middleware/auth');
 const { uploadImage, uploadVideo, deleteImage, deleteVideo, deleteMedia } = require('../config/cloudinary');
 const { slugify } = require('../utils/slugify');
 const { getCommissionRate } = require('../utils/commission');
+const { sanitizeBody } = require('../middleware/sanitize');
 const router = express.Router();
 
 router.use(requireAuth, requireSeller);
@@ -71,7 +72,7 @@ router.get('/products', async (req, res) => {
 });
 
 // POST /api/seller/products
-router.post('/products', async (req, res) => {
+router.post('/products', sanitizeBody, async (req, res) => {
   try {
     const sellerId = req.user._id;
     const data = { ...req.body, sellerId };
@@ -116,7 +117,7 @@ router.post('/products', async (req, res) => {
 });
 
 // PUT /api/seller/products/:id
-router.put('/products/:id', async (req, res) => {
+router.put('/products/:id', sanitizeBody, async (req, res) => {
   try {
     const sellerId = req.user._id;
     const product = await Product.findOne({ _id: req.params.id, sellerId });
@@ -260,7 +261,7 @@ router.get('/payouts', async (req, res) => {
 // GET /api/seller/settings
 router.get('/settings', async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await Seller.findById(req.user._id);
     res.json({
       sellerProfile: user.sellerProfile,
       name: user.name,
@@ -273,7 +274,7 @@ router.get('/settings', async (req, res) => {
 });
 
 // PUT /api/seller/settings
-router.put('/settings', async (req, res) => {
+router.put('/settings', sanitizeBody, async (req, res) => {
   try {
     const { businessName, businessAddress, pickupAddress, bankDetails, phone } = req.body;
     const user = req.user;
@@ -310,8 +311,8 @@ router.get('/marketing', async (req, res) => {
   }
 });
 
-// Need User model for settings route
-const User = require('../models/User');
+// Need Seller model for settings route
+const Seller = require('../models/Seller');
 
 // POST /api/seller/request-unsuspend - request suspension removal
 router.post('/request-unsuspend', async (req, res) => {

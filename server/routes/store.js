@@ -1,6 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const User = require('../models/User');
+const Seller = require('../models/Seller');
 const Product = require('../models/Product');
 const Review = require('../models/Review');
 const Order = require('../models/Order');
@@ -9,7 +9,7 @@ const router = express.Router();
 
 // Helper: find seller by businessSlug OR ObjectId
 function sellerQuery(slug, requireActive = true) {
-  const base = { userType: 'seller' };
+  const base = {};
   if (requireActive) base.status = 'active';
   if (mongoose.Types.ObjectId.isValid(slug) && slug.length === 24) {
     return { ...base, $or: [{ _id: slug }, { 'sellerProfile.businessSlug': slug }] };
@@ -38,8 +38,7 @@ router.get('/info', async (req, res) => {
 // GET /api/store/top-sellers - featured sellers for homepage
 router.get('/featured/top-sellers', async (req, res) => {
   try {
-    const sellers = await User.find({
-      userType: 'seller',
+    const sellers = await Seller.find({
       status: 'active',
       'sellerProfile.businessSlug': { $ne: '' }
     })
@@ -78,7 +77,6 @@ router.get('/sellers', async (req, res) => {
     const limitNum = parseInt(limit);
 
     const filter = {
-      userType: 'seller',
       status: 'active',
       'sellerProfile.businessSlug': { $ne: '' }
     };
@@ -91,8 +89,8 @@ router.get('/sellers', async (req, res) => {
       default: sortObj = { 'sellerProfile.totalOrders': -1 }; break;
     }
 
-    const total = await User.countDocuments(filter);
-    const sellers = await User.find(filter)
+    const total = await Seller.countDocuments(filter);
+    const sellers = await Seller.find(filter)
       .sort(sortObj)
       .skip((pageNum - 1) * limitNum)
       .limit(limitNum)
@@ -125,7 +123,7 @@ router.get('/sellers', async (req, res) => {
 // GET /api/store/:slug - public seller store page
 router.get('/:slug', async (req, res) => {
   try {
-    const seller = await User.findOne(sellerQuery(req.params.slug))
+    const seller = await Seller.findOne(sellerQuery(req.params.slug))
       .select('-otp -otpExpiry -sellerProfile.bankDetails');
 
     if (!seller) return res.status(404).json({ message: 'Store not found' });
@@ -172,7 +170,7 @@ router.get('/:slug', async (req, res) => {
 router.get('/:slug/products', async (req, res) => {
   try {
     const { page = 1, limit = 24 } = req.query;
-    const seller = await User.findOne(sellerQuery(req.params.slug, false));
+    const seller = await Seller.findOne(sellerQuery(req.params.slug, false));
     if (!seller) return res.status(404).json({ message: 'Store not found' });
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -194,7 +192,7 @@ router.get('/:slug/products', async (req, res) => {
 router.get('/:slug/reviews', async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
-    const seller = await User.findOne(sellerQuery(req.params.slug, false));
+    const seller = await Seller.findOne(sellerQuery(req.params.slug, false));
     if (!seller) return res.status(404).json({ message: 'Store not found' });
 
     const skip = (parseInt(page) - 1) * parseInt(limit);

@@ -1,14 +1,20 @@
 const express = require('express');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
-const User = require('../models/User');
+const Customer = require('../models/Customer');
+const Seller = require('../models/Seller');
+const Admin = require('../models/Admin');
 const Category = require('../models/Category');
 const SellerPayout = require('../models/SellerPayout');
 const B2BInquiry = require('../models/B2BInquiry');
 const PlatformSettings = require('../models/PlatformSettings');
+const CorporateUser = require('../models/CorporateUser');
+const CorporateCatalog = require('../models/CorporateCatalog');
+const CorporateQuote = require('../models/CorporateQuote');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadImage, deleteImage } = require('../config/cloudinary');
 const { sendCommissionChangeNotification, sendPayoutNotification } = require('../utils/email');
+const { logActivity } = require('../utils/audit');
 const router = express.Router();
 
 router.use(requireAuth, requireAdmin);
@@ -17,11 +23,11 @@ router.use(requireAuth, requireAdmin);
 router.get('/dashboard', async (req, res) => {
   try {
     const settings = await PlatformSettings.getSettings();
-    const totalSellers = await User.countDocuments({ userType: 'seller' });
-    const activeSellers = await User.countDocuments({ userType: 'seller', status: 'active' });
-    const pendingSellers = await User.countDocuments({ userType: 'seller', status: 'pending' });
+    const totalSellers = await Seller.countDocuments();
+    const activeSellers = await Seller.countDocuments({ status: 'active' });
+    const pendingSellers = await Seller.countDocuments({ status: 'pending' });
     const totalProducts = await Product.countDocuments();
-    const totalCustomers = await User.countDocuments({ userType: 'customer' });
+    const totalCustomers = await Customer.countDocuments();
 
     const b2cAgg = await Order.aggregate([
       { $match: { orderType: 'b2c_marketplace', paymentStatus: 'paid' } },
@@ -77,7 +83,7 @@ router.put('/settings', async (req, res) => {
 
     // If commission rate changed, notify sellers
     if (req.body.globalCommissionRate !== undefined && req.body.globalCommissionRate !== oldRate) {
-      const sellers = await User.find({ userType: 'seller', status: 'active', 'sellerProfile.commissionRate': null });
+      const sellers = await Seller.find({ status: 'active', 'sellerProfile.commissionRate': null });
       for (const seller of sellers) {
         try {
           await sendCommissionChangeNotification(seller.email, seller.name, oldRate, req.body.globalCommissionRate);
@@ -95,13 +101,13 @@ router.put('/settings', async (req, res) => {
 router.get('/sellers', async (req, res) => {
   try {
     const { status, search, page = 1, limit = 20 } = req.query;
-    const filter = { userType: 'seller' };
+    const filter = {};
     if (status) filter.status = status;
     if (search) filter['sellerProfile.businessName'] = { $regex: search, $options: 'i' };
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    const sellers = await User.find(filter).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)).select('-otp -otpExpiry');
-    const total = await User.countDocuments(filter);
+    const sellers = await Seller.find(filter).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)).select('-otp -otpExpiry');
+    const total = await Seller.countDocuments(filter);
 
     res.json({ sellers, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
   } catch (err) {
@@ -111,7 +117,7 @@ router.get('/sellers', async (req, res) => {
 
 router.get('/sellers/:id', async (req, res) => {
   try {
-    const seller = await User.findOne({ _id: req.params.id, userType: 'seller' }).select('-otp -otpExpiry');
+    const seller = await Seller.findById(req.params.id).select('-otp -otpExpiry');
     if (!seller) return res.status(404).json({ message: 'Seller not found' });
 
     const productCount = await Product.countDocuments({ sellerId: seller._id });
@@ -125,7 +131,7 @@ router.get('/sellers/:id', async (req, res) => {
 
 router.put('/sellers/:id/approve', async (req, res) => {
   try {
-    const seller = await User.findOne({ _id: req.params.id, userType: 'seller' });
+    const seller = await Seller.findById(req.params.id);
     if (!seller) return res.status(404).json({ message: 'Seller not found' });
 
     const wasSuspended = seller.status === 'suspended';
@@ -141,6 +147,7 @@ router.put('/sellers/:id/approve', async (req, res) => {
       await Product.updateMany({ sellerId: seller._id }, { isActive: true });
     }
 
+    logActivity({ domain: 'admin', action: wasSuspended ? 'seller_unsuspended' : 'seller_approved', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Seller', targetId: seller._id, message: wasSuspended ? `Seller ${seller.name} unsuspended` : `Seller ${seller.name} approved` });
     res.json({ message: wasSuspended ? 'Seller unsuspended. Products restored.' : 'Seller approved', seller });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -150,7 +157,7 @@ router.put('/sellers/:id/approve', async (req, res) => {
 router.put('/sellers/:id/suspend', async (req, res) => {
   try {
     const { reason } = req.body;
-    const seller = await User.findById(req.params.id);
+    const seller = await Seller.findById(req.params.id);
     if (!seller) return res.status(404).json({ message: 'Seller not found' });
 
     seller.status = 'suspended';
@@ -163,6 +170,7 @@ router.put('/sellers/:id/suspend', async (req, res) => {
     // Hide all seller products
     await Product.updateMany({ sellerId: seller._id }, { isActive: false });
 
+    logActivity({ domain: 'admin', action: 'seller_suspended', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Seller', targetId: seller._id, message: `Seller ${seller.name} suspended: ${reason || 'No reason'}` });
     res.json({ message: 'Seller suspended. Products hidden.', seller });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -172,7 +180,7 @@ router.put('/sellers/:id/suspend', async (req, res) => {
 router.put('/sellers/:id/commission', async (req, res) => {
   try {
     const { commissionRate } = req.body;
-    const seller = await User.findOne({ _id: req.params.id, userType: 'seller' });
+    const seller = await Seller.findById(req.params.id);
     if (!seller) return res.status(404).json({ message: 'Seller not found' });
 
     const oldRate = seller.sellerProfile.commissionRate;
@@ -188,6 +196,7 @@ router.put('/sellers/:id/commission', async (req, res) => {
       } catch (e) { /* skip */ }
     }
 
+    logActivity({ domain: 'admin', action: 'commission_changed', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Seller', targetId: seller._id, message: `Commission changed from ${oldRate} to ${commissionRate}`, metadata: { oldRate, newRate: commissionRate } });
     res.json({ message: 'Commission updated', seller });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -311,6 +320,7 @@ router.post('/categories', async (req, res) => {
     }
 
     await category.save();
+    logActivity({ domain: 'admin', action: 'category_created', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Category', targetId: category._id, message: `Category "${name}" created` });
     res.status(201).json({ category, message: 'Category created' });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -321,6 +331,7 @@ router.put('/categories/:id', async (req, res) => {
   try {
     const category = await Category.findByIdAndUpdate(req.params.id, { ...req.body }, { new: true });
     if (!category) return res.status(404).json({ message: 'Category not found' });
+    logActivity({ domain: 'admin', action: 'category_updated', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Category', targetId: category._id, message: `Category "${category.name}" updated` });
     res.json({ category, message: 'Category updated' });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -329,7 +340,8 @@ router.put('/categories/:id', async (req, res) => {
 
 router.delete('/categories/:id', async (req, res) => {
   try {
-    await Category.findByIdAndDelete(req.params.id);
+    const category = await Category.findByIdAndDelete(req.params.id);
+    logActivity({ domain: 'admin', action: 'category_deleted', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Category', targetId: req.params.id, message: `Category deleted` });
     res.json({ message: 'Category deleted' });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -377,7 +389,7 @@ router.post('/payouts/calculate', async (req, res) => {
 
     const payouts = [];
     for (const [sellerId, sellerOrders] of Object.entries(sellerMap)) {
-      const seller = await User.findById(sellerId);
+      const seller = await Seller.findById(sellerId);
       const totalSales = sellerOrders.reduce((s, o) => s + o.totalAmount, 0);
       const commissionDeducted = sellerOrders.reduce((s, o) => s + o.commissionAmount, 0);
       const gatewayFeesDeducted = sellerOrders.reduce((s, o) => s + o.paymentGatewayFee, 0);
@@ -434,6 +446,7 @@ router.put('/payouts/:id/mark-paid', async (req, res) => {
       try { await sendPayoutNotification(payout.sellerId.email, payout); } catch (e) { /* skip */ }
     }
 
+    logActivity({ domain: 'admin', action: 'payout_paid', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'SellerPayout', targetId: payout._id, message: `Payout ${payout._id} marked paid for seller`, metadata: { amount: payout.netPayout, transactionId } });
     res.json({ message: 'Payout marked as paid', payout });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -443,7 +456,7 @@ router.put('/payouts/:id/mark-paid', async (req, res) => {
 // ---- USERS ----
 router.get('/users', async (req, res) => {
   try {
-    const users = await User.find({ userType: 'customer' }).sort({ createdAt: -1 }).select('-otp -otpExpiry');
+    const users = await Customer.find().sort({ createdAt: -1 }).select('-otp -otpExpiry');
     res.json({ users });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -458,7 +471,7 @@ router.get('/customers', async (req, res) => {
 
     // Aggregate customers with order stats
     const pipeline = [
-      { $match: { userType: 'customer' } },
+      { $match: {} },
       {
         $lookup: {
           from: 'orders',
@@ -510,7 +523,7 @@ router.get('/customers', async (req, res) => {
 
     // Get total before pagination
     const countPipeline = [...pipeline, { $count: 'total' }];
-    const countResult = await User.aggregate(countPipeline);
+    const countResult = await Customer.aggregate(countPipeline);
     const total = countResult[0]?.total || 0;
 
     // Sort by highest spender, then paginate
@@ -518,11 +531,11 @@ router.get('/customers', async (req, res) => {
     pipeline.push({ $skip: skip });
     pipeline.push({ $limit: parseInt(limit) });
 
-    const customers = await User.aggregate(pipeline);
+    const customers = await Customer.aggregate(pipeline);
 
     // Summary stats
     const summaryPipeline = [
-      { $match: { userType: 'customer' } },
+      { $match: {} },
       {
         $lookup: {
           from: 'orders',
@@ -542,7 +555,7 @@ router.get('/customers', async (req, res) => {
         }
       }
     ];
-    const summaryResult = await User.aggregate(summaryPipeline);
+    const summaryResult = await Customer.aggregate(summaryPipeline);
     const summary = summaryResult[0] || { totalCustomers: 0, customersWithOrders: 0, totalRevenue: 0, totalOrders: 0 };
     summary.customersWithNoOrders = summary.totalCustomers - summary.customersWithOrders;
     summary.avgOrderValue = summary.totalOrders > 0 ? Math.round(summary.totalRevenue / summary.totalOrders) : 0;
@@ -563,7 +576,7 @@ router.get('/customers', async (req, res) => {
 // ---- SELLER HEALTH METRICS ----
 router.get('/sellers/:id/health', async (req, res) => {
   try {
-    const seller = await User.findOne({ _id: req.params.id, userType: 'seller' }).select('sellerProfile.metrics sellerProfile.businessName sellerProfile.suspensionType sellerProfile.suspensionReason status');
+    const seller = await Seller.findById(req.params.id).select('sellerProfile.metrics sellerProfile.businessName sellerProfile.suspensionType sellerProfile.suspensionReason status');
     if (!seller) return res.status(404).json({ message: 'Seller not found' });
 
     // Get order breakdown for last 30 days
@@ -602,6 +615,268 @@ router.post('/cron/run', async (req, res) => {
     res.json({ message: 'Seller health cron jobs executed successfully' });
   } catch (err) {
     res.status(500).json({ message: 'Cron execution failed', error: err.message });
+  }
+});
+
+// =================== CORPORATE ADMIN ===================
+
+// GET /api/admin/corporate/dashboard
+router.get('/corporate/dashboard', async (req, res) => {
+  try {
+    const totalCorporateUsers = await CorporateUser.countDocuments();
+    const pendingApproval = await CorporateUser.countDocuments({ status: 'pending_approval' });
+    const activeCorporate = await CorporateUser.countDocuments({ status: 'active' });
+    const catalogSize = await CorporateCatalog.countDocuments({ isActive: true });
+    const totalQuotes = await CorporateQuote.countDocuments();
+    const pendingQuotes = await CorporateQuote.countDocuments({ status: 'sent' });
+    const convertedQuotes = await CorporateQuote.countDocuments({ status: 'converted' });
+
+    const b2bOrderAgg = await Order.aggregate([
+      { $match: { orderType: 'b2b_direct', paymentStatus: 'paid' } },
+      { $group: { _id: null, revenue: { $sum: '$totalAmount' }, count: { $sum: 1 } } }
+    ]);
+    const b2bStats = b2bOrderAgg[0] || { revenue: 0, count: 0 };
+
+    res.json({
+      stats: {
+        totalCorporateUsers, pendingApproval, activeCorporate, catalogSize,
+        totalQuotes, pendingQuotes, convertedQuotes,
+        b2bRevenue: b2bStats.revenue, b2bOrders: b2bStats.count
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ---- CORPORATE USERS ----
+router.get('/corporate/users', async (req, res) => {
+  try {
+    const { status, search, page = 1, limit = 20 } = req.query;
+    const filter = {};
+    if (status) filter.status = status;
+    if (search) filter.$or = [
+      { companyName: { $regex: search, $options: 'i' } },
+      { contactPerson: { $regex: search, $options: 'i' } },
+      { email: { $regex: search, $options: 'i' } }
+    ];
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const users = await CorporateUser.find(filter).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)).select('-otp -otpExpiry');
+    const total = await CorporateUser.countDocuments(filter);
+
+    res.json({ users, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/corporate/users/:id/approve', async (req, res) => {
+  try {
+    const user = await CorporateUser.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'Corporate user not found' });
+
+    user.status = 'active';
+    user.approvedBy = req.user._id;
+    user.approvedAt = new Date();
+    await user.save();
+
+    logActivity({ domain: 'admin', action: 'corporate_user_approved', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'CorporateUser', targetId: user._id, message: `Corporate user ${user.companyName} approved` });
+    res.json({ message: 'Corporate user approved', user });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/corporate/users/:id/suspend', async (req, res) => {
+  try {
+    const user = await CorporateUser.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'Corporate user not found' });
+
+    user.status = 'suspended';
+    user.notes = req.body.reason || 'Suspended by admin';
+    await user.save();
+
+    logActivity({ domain: 'admin', action: 'corporate_user_suspended', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'CorporateUser', targetId: user._id, message: `Corporate user ${user.companyName} suspended` });
+    res.json({ message: 'Corporate user suspended', user });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ---- CORPORATE CATALOG ----
+router.get('/corporate/catalog', async (req, res) => {
+  try {
+    const entries = await CorporateCatalog.find()
+      .populate('productId', 'title price images stock isActive category')
+      .populate('addedBy', 'name')
+      .sort({ createdAt: -1 });
+    res.json({ catalog: entries });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/corporate/catalog', async (req, res) => {
+  try {
+    const { productId, corporatePrice, minOrderQty, maxOrderQty, tags } = req.body;
+    if (!productId) return res.status(400).json({ message: 'Product ID required' });
+
+    const existing = await CorporateCatalog.findOne({ productId });
+    if (existing) return res.status(400).json({ message: 'Product already in corporate catalog' });
+
+    const product = await Product.findById(productId);
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+
+    const entry = new CorporateCatalog({
+      productId,
+      corporatePrice: corporatePrice || null,
+      minOrderQty: minOrderQty || 10,
+      maxOrderQty: maxOrderQty || 10000,
+      tags: tags || [],
+      addedBy: req.user._id
+    });
+    await entry.save();
+
+    logActivity({ domain: 'admin', action: 'corporate_catalog_add', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'CorporateCatalog', targetId: entry._id, message: `Product ${productId} added to corporate catalog` });
+    res.status(201).json({ entry, message: 'Product added to corporate catalog' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/corporate/catalog/:id', async (req, res) => {
+  try {
+    const { corporatePrice, minOrderQty, maxOrderQty, tags, isActive } = req.body;
+    const entry = await CorporateCatalog.findById(req.params.id);
+    if (!entry) return res.status(404).json({ message: 'Catalog entry not found' });
+
+    if (corporatePrice !== undefined) entry.corporatePrice = corporatePrice || null;
+    if (minOrderQty !== undefined) entry.minOrderQty = minOrderQty;
+    if (maxOrderQty !== undefined) entry.maxOrderQty = maxOrderQty;
+    if (tags !== undefined) entry.tags = tags;
+    if (isActive !== undefined) entry.isActive = isActive;
+    await entry.save();
+
+    res.json({ entry, message: 'Catalog entry updated' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.delete('/corporate/catalog/:id', async (req, res) => {
+  try {
+    await CorporateCatalog.findByIdAndDelete(req.params.id);
+    logActivity({ domain: 'admin', action: 'corporate_catalog_remove', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'CorporateCatalog', targetId: req.params.id, message: `Product removed from corporate catalog` });
+    res.json({ message: 'Removed from corporate catalog' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ---- CORPORATE QUOTES ----
+router.get('/corporate/quotes', async (req, res) => {
+  try {
+    const { status } = req.query;
+    const filter = {};
+    if (status) filter.status = status;
+
+    const quotes = await CorporateQuote.find(filter)
+      .sort({ createdAt: -1 })
+      .populate('corporateUserId', 'companyName email')
+      .populate('createdBy', 'name');
+    res.json({ quotes });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/corporate/quotes', async (req, res) => {
+  try {
+    const { companyName, contactEmail, contactPhone, corporateUserId, inquiryId, items, discountPercent, validUntil, adminNotes } = req.body;
+
+    if (!companyName || !contactEmail) return res.status(400).json({ message: 'Company name and email required' });
+    if (!items || !items.length) return res.status(400).json({ message: 'At least one item required' });
+
+    // Build items with product details
+    const quoteItems = [];
+    let totalAmount = 0;
+    for (const item of items) {
+      const product = await Product.findById(item.productId);
+      if (!product) continue;
+      const unitPrice = item.unitPrice || product.price;
+      const subtotal = unitPrice * (item.quantity || 1);
+      quoteItems.push({
+        productId: product._id,
+        title: product.title,
+        image: product.images?.[0]?.url || '',
+        unitPrice,
+        quantity: item.quantity || 1,
+        subtotal
+      });
+      totalAmount += subtotal;
+    }
+
+    const discount = discountPercent ? Math.round(totalAmount * discountPercent / 100) : 0;
+    const finalAmount = totalAmount - discount;
+
+    // Generate quote number
+    const d = new Date();
+    const date = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const rand = String(Math.floor(Math.random() * 9999)).padStart(4, '0');
+    const quoteNumber = `GFT-Q-${date}-${rand}`;
+
+    const quote = new CorporateQuote({
+      quoteNumber,
+      inquiryId: inquiryId || null,
+      corporateUserId: corporateUserId || null,
+      companyName,
+      contactEmail,
+      contactPhone: contactPhone || '',
+      items: quoteItems,
+      totalAmount,
+      discountPercent: discountPercent || 0,
+      finalAmount,
+      status: 'sent',
+      validUntil: validUntil ? new Date(validUntil) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days default
+      adminNotes: adminNotes || '',
+      createdBy: req.user._id
+    });
+    await quote.save();
+
+    logActivity({ domain: 'admin', action: 'corporate_quote_created', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'CorporateQuote', targetId: quote._id, message: `Quote ${quoteNumber} created for ${companyName}`, metadata: { quoteNumber, finalAmount } });
+    res.status(201).json({ quote, message: 'Quote created and sent' });
+  } catch (err) {
+    console.error('Create quote error:', err.message);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/corporate/quotes/:id', async (req, res) => {
+  try {
+    const quote = await CorporateQuote.findById(req.params.id);
+    if (!quote) return res.status(404).json({ message: 'Quote not found' });
+
+    const { items, discountPercent, validUntil, adminNotes, status } = req.body;
+
+    if (items) {
+      quote.items = items;
+      quote.totalAmount = items.reduce((s, i) => s + (i.subtotal || i.unitPrice * i.quantity), 0);
+    }
+    if (discountPercent !== undefined) {
+      quote.discountPercent = discountPercent;
+      const discount = Math.round(quote.totalAmount * discountPercent / 100);
+      quote.finalAmount = quote.totalAmount - discount;
+    }
+    if (validUntil) quote.validUntil = new Date(validUntil);
+    if (adminNotes !== undefined) quote.adminNotes = adminNotes;
+    if (status) quote.status = status;
+
+    await quote.save();
+    logActivity({ domain: 'admin', action: 'corporate_quote_updated', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'CorporateQuote', targetId: quote._id, message: `Quote ${quote.quoteNumber} updated` });
+    res.json({ quote, message: 'Quote updated' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

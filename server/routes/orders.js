@@ -1,12 +1,13 @@
 const express = require('express');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
-const User = require('../models/User');
+const Seller = require('../models/Seller');
 const PlatformSettings = require('../models/PlatformSettings');
-const { createCashfreeOrder, getCashfreeOrder, getCashfreePayments } = require('../config/cashfree');
+const { createCashfreeOrder, getCashfreeOrder, getCashfreePayments, createRefund } = require('../config/cashfree');
 const { requireAuth } = require('../middleware/auth');
 const { getCommissionRate, calculateOrderFinancials } = require('../utils/commission');
 const { sendOrderConfirmation } = require('../utils/email');
+const { logActivity } = require('../utils/audit');
 const router = express.Router();
 
 // Generate order number: GFT-YYYYMMDD-XXXX
@@ -20,6 +21,9 @@ const generateOrderNumber = () => {
 // POST /api/orders - create order + Cashfree payment session
 router.post('/', requireAuth, async (req, res) => {
   try {
+    if ((req.user.userType || req.user.role) !== 'customer') {
+      return res.status(403).json({ message: 'Customer access required' });
+    }
     const { items, shippingAddress, couponCode } = req.body;
     if (!items || !items.length) return res.status(400).json({ message: 'No items' });
     if (!shippingAddress) return res.status(400).json({ message: 'Shipping address required' });
@@ -41,14 +45,48 @@ router.post('/', requireAuth, async (req, res) => {
       } catch (e) { /* Coupon model may not exist yet, skip */ }
     }
 
-    // Group items by seller
+    // Validate products and reserve stock atomically
     const sellerGroups = {};
     for (const item of items) {
       const product = await Product.findById(item.productId);
       if (!product) return res.status(400).json({ message: `Product not found: ${item.productId}` });
-      if (!product.isActive || product.stock < item.quantity) {
-        return res.status(400).json({ message: `${product.title} is out of stock or unavailable` });
+      if (!product.isActive) {
+        return res.status(400).json({ message: `${product.title} is unavailable` });
       }
+
+      // Atomic stock check -- ensures no race condition
+      const stockCheck = await Product.findOne({ _id: item.productId, stock: { $gte: item.quantity } });
+      if (!stockCheck) {
+        return res.status(400).json({ message: `${product.title} is out of stock (only ${product.stock} left)` });
+      }
+
+      // Validate customizations against product's customizationOptions
+      if (product.isCustomizable && product.customizationOptions?.length > 0) {
+        const custData = item.customizations || [];
+        for (const opt of product.customizationOptions) {
+          const match = custData.find(c => c.label === opt.label);
+          if (opt.required) {
+            if (!match) {
+              return res.status(400).json({ message: `Customization "${opt.label}" is required for ${product.title}` });
+            }
+            if (opt.type === 'image' && (!match.imageUrls || match.imageUrls.length === 0)) {
+              return res.status(400).json({ message: `Please upload images for "${opt.label}" on ${product.title}` });
+            }
+            if (opt.type !== 'image' && (!match.value || !match.value.trim())) {
+              return res.status(400).json({ message: `Please fill in "${opt.label}" for ${product.title}` });
+            }
+          }
+          if (match) {
+            if (opt.type === 'image' && opt.maxFiles && match.imageUrls?.length > opt.maxFiles) {
+              return res.status(400).json({ message: `Maximum ${opt.maxFiles} images allowed for "${opt.label}"` });
+            }
+            if (opt.maxLength && match.value && match.value.length > opt.maxLength) {
+              return res.status(400).json({ message: `"${opt.label}" exceeds maximum length of ${opt.maxLength} characters` });
+            }
+          }
+        }
+      }
+
       const sid = product.sellerId.toString();
       if (!sellerGroups[sid]) sellerGroups[sid] = [];
       sellerGroups[sid].push({ product, quantity: item.quantity, customizations: item.customizations || [] });
@@ -56,7 +94,7 @@ router.post('/', requireAuth, async (req, res) => {
 
     const orders = [];
     for (const [sellerId, sellerItems] of Object.entries(sellerGroups)) {
-      const seller = await User.findById(sellerId);
+      const seller = await Seller.findById(sellerId);
       const commissionRate = getCommissionRate(seller, settings);
       const itemTotal = sellerItems.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
       const shippingCost = 0;
@@ -114,9 +152,7 @@ router.post('/', requireAuth, async (req, res) => {
         await order.save();
       }
 
-      // Increment usage count
-      validCoupon.usedCount += 1;
-      await validCoupon.save();
+      // Note: Coupon usage is tracked after payment verification, not here
     }
 
     // Create Cashfree order for the total
@@ -142,6 +178,10 @@ router.post('/', requireAuth, async (req, res) => {
       await order.save();
     }
 
+    for (const order of orders) {
+      logActivity({ domain: 'order', action: 'order_created', actorRole: 'customer', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Order', targetId: order._id, message: `Order ${order.orderNumber} created`, metadata: { orderNumber: order.orderNumber, totalAmount: order.totalAmount } });
+    }
+
     res.status(201).json({
       orders,
       cashfreeOrder: {
@@ -161,6 +201,9 @@ router.post('/', requireAuth, async (req, res) => {
 // POST /api/orders/verify-payment - verify Cashfree payment
 router.post('/verify-payment', requireAuth, async (req, res) => {
   try {
+    if ((req.user.userType || req.user.role) !== 'customer') {
+      return res.status(403).json({ message: 'Customer access required' });
+    }
     const { orderId } = req.body;
     if (!orderId) return res.status(400).json({ message: 'orderId required' });
 
@@ -185,26 +228,49 @@ router.post('/verify-payment', requireAuth, async (req, res) => {
       order.paidAt = new Date();
       await order.save();
 
-      // Update product stock and order count
+      // Atomic stock decrement -- only decrements if sufficient stock
       for (const item of order.items) {
-        await Product.findByIdAndUpdate(item.productId, {
-          $inc: { stock: -item.quantity, orderCount: item.quantity }
-        });
+        const updated = await Product.findOneAndUpdate(
+          { _id: item.productId, stock: { $gte: item.quantity } },
+          { $inc: { stock: -item.quantity, orderCount: item.quantity } },
+          { new: true }
+        );
+        if (!updated) {
+          console.error(`[Stock] Insufficient stock for product ${item.productId}, order ${order.orderNumber}`);
+        }
       }
 
       // Update seller stats
-      await User.findByIdAndUpdate(order.sellerId, {
+      await Seller.findByIdAndUpdate(order.sellerId, {
         $inc: { 'sellerProfile.totalSales': order.totalAmount, 'sellerProfile.totalOrders': 1 }
       });
 
       // Send emails (non-blocking)
       try {
         await sendOrderConfirmation(order.customerEmail, order, 'customer');
-        const seller = await User.findById(order.sellerId);
+        const seller = await Seller.findById(order.sellerId);
         if (seller) await sendOrderConfirmation(seller.email, order, 'seller');
       } catch (emailErr) {
         console.error('Email send error:', emailErr.message);
       }
+    }
+
+    // Track coupon usage after successful payment
+    const couponCode = orders.find(o => o.couponCode)?.couponCode;
+    if (couponCode) {
+      try {
+        const Coupon = require('../models/Coupon');
+        await Coupon.findOneAndUpdate(
+          { code: couponCode },
+          { $inc: { usedCount: 1 }, $addToSet: { usedBy: req.user._id } }
+        );
+      } catch (couponErr) {
+        console.error('[Coupon] Failed to track usage:', couponErr.message);
+      }
+    }
+
+    for (const order of orders) {
+      logActivity({ domain: 'order', action: 'payment_verified', actorRole: 'customer', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Order', targetId: order._id, message: `Payment verified for order ${order.orderNumber}` });
     }
 
     res.json({ message: 'Payment verified', orders });
@@ -256,18 +322,33 @@ router.post('/:id/cancel', requireAuth, async (req, res) => {
     order.cancelReason = req.body.reason || 'Cancelled by customer';
     await order.save();
 
-    // Restore stock if payment was completed
+    // Restore stock and initiate refund if payment was completed
     if (order.paymentStatus === 'paid') {
       for (const item of order.items) {
         await Product.findByIdAndUpdate(item.productId, {
           $inc: { stock: item.quantity, orderCount: -item.quantity }
         });
       }
-      // Note: Refund should be initiated separately (Cashfree refund API)
-      order.paymentStatus = 'refunded';
+
+      // Initiate Cashfree refund
+      try {
+        const refundId = `refund_${order.orderNumber}_${Date.now()}`;
+        await createRefund({
+          orderId: order.cashfreeOrderId,
+          refundAmount: order.totalAmount,
+          refundId,
+          refundNote: order.cancelReason || 'Order cancelled by customer'
+        });
+        order.paymentStatus = 'refunded';
+        order.refundId = refundId;
+      } catch (refundErr) {
+        console.error('[Refund] Failed for order', order.orderNumber, refundErr?.response?.data || refundErr.message);
+        order.paymentStatus = 'refund_pending';
+      }
       await order.save();
     }
 
+    logActivity({ domain: 'order', action: 'order_cancelled', actorRole: 'customer', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Order', targetId: order._id, message: `Order ${order.orderNumber} cancelled by customer`, metadata: { reason: order.cancelReason } });
     res.json({ message: 'Order cancelled successfully', order });
   } catch (err) {
     console.error('Cancel order error:', err.message);

@@ -4,12 +4,18 @@
   "description": "Giftsity - The Gift Marketplace",
   "main": "server/index.js",
   "scripts": {
-    "dev": "concurrently \"nodemon server/index.js\" \"nodemon server-seller/index.js\"",
+    "dev": "concurrently \"nodemon server/index.js\" \"nodemon server-seller/index.js\" \"nodemon server-corporate/index.js\"",
     "dev:main": "nodemon server/index.js",
     "dev:seller": "nodemon server-seller/index.js",
+    "dev:corporate": "nodemon server-corporate/index.js",
     "start": "node server/index.js",
     "start:seller": "node server-seller/index.js",
-    "seed": "node server/seed.js"
+    "start:corporate": "node server-corporate/index.js",
+    "seed": "node server/seed.js",
+    "migrate:identity:dry": "node server/scripts/migrate-identity-split.js --dry-run",
+    "migrate:identity": "node server/scripts/migrate-identity-split.js --execute",
+    "test:flow": "node server/scripts/test-app-flow.js",
+    "test:flow:section": "node server/scripts/test-app-flow.js --section"
   },
   "dependencies": {
     "axios": "^1.7.9",
@@ -23,6 +29,7 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.16",
     "resend": "^6.9.1",
+    "sanitize-html": "^2.17.0",
     "sharp": "^0.33.2"
   },
   "devDependencies": {

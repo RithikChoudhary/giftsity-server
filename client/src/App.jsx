@@ -5,12 +5,14 @@ import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { WishlistProvider } from './context/WishlistContext';
+import { CorporateAuthProvider } from './context/CorporateAuthContext';
 import LoadingSpinner from './components/LoadingSpinner';
 
 // Layouts (always loaded)
 import Layout from './components/Layout';
 import SellerLayout from './components/SellerLayout';
 import AdminLayout from './components/AdminLayout';
+import CorporateLayout from './components/CorporateLayout';
 
 // Public pages (lazy loaded)
 const Home = lazy(() => import('./pages/public/Home'));
@@ -32,6 +34,7 @@ const CustomerOrders = lazy(() => import('./pages/customer/CustomerOrders'));
 const OrderDetail = lazy(() => import('./pages/customer/OrderDetail'));
 const CustomerProfile = lazy(() => import('./pages/customer/CustomerProfile'));
 const WishlistPage = lazy(() => import('./pages/customer/Wishlist'));
+const OrderConfirmation = lazy(() => import('./pages/customer/OrderConfirmation'));
 
 // Seller pages
 const SellerDashboard = lazy(() => import('./pages/seller/SellerDashboard'));
@@ -52,6 +55,21 @@ const AdminB2B = lazy(() => import('./pages/admin/AdminB2B'));
 const AdminCategories = lazy(() => import('./pages/admin/AdminCategories'));
 const AdminCustomers = lazy(() => import('./pages/admin/AdminCustomers'));
 const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'));
+const AdminCorporateUsers = lazy(() => import('./pages/admin/AdminCorporateUsers'));
+const AdminCorporateCatalog = lazy(() => import('./pages/admin/AdminCorporateCatalog'));
+const AdminCorporateQuotes = lazy(() => import('./pages/admin/AdminCorporateQuotes'));
+
+// Corporate pages
+const CorporateLogin = lazy(() => import('./pages/corporate/CorporateLogin'));
+const CorporateDashboard = lazy(() => import('./pages/corporate/CorporateDashboard'));
+const CorporateCatalog = lazy(() => import('./pages/corporate/CorporateCatalog'));
+const CorporateCart = lazy(() => import('./pages/corporate/CorporateCart'));
+const CorporateOrders = lazy(() => import('./pages/corporate/CorporateOrders'));
+const CorporateOrderDetail = lazy(() => import('./pages/corporate/CorporateOrderDetail'));
+const CorporateQuotes = lazy(() => import('./pages/corporate/CorporateQuotes'));
+const CorporateProfile = lazy(() => import('./pages/corporate/CorporateProfile'));
+const CorporateInquiry = lazy(() => import('./pages/corporate/CorporateInquiry'));
+
 const NotFound = lazy(() => import('./components/NotFound'));
 
 function ScrollToTop() {
@@ -68,6 +86,7 @@ export default function App() {
       <AuthProvider>
         <CartProvider>
         <WishlistProvider>
+        <CorporateAuthProvider>
           <Toaster
             position="top-center"
             toastOptions={{
@@ -89,6 +108,7 @@ export default function App() {
               <Route path="/cart" element={<Cart />} />
               <Route path="/orders" element={<CustomerOrders />} />
               <Route path="/orders/:id" element={<OrderDetail />} />
+              <Route path="/orders/:id/confirmation" element={<OrderConfirmation />} />
               <Route path="/profile" element={<CustomerProfile />} />
               <Route path="/wishlist" element={<WishlistPage />} />
               <Route path="/terms" element={<Terms />} />
@@ -115,12 +135,27 @@ export default function App() {
               <Route path="/admin/b2b" element={<AdminB2B />} />
               <Route path="/admin/categories" element={<AdminCategories />} />
               <Route path="/admin/coupons" element={<AdminCoupons />} />
+              <Route path="/admin/corporate/users" element={<AdminCorporateUsers />} />
+              <Route path="/admin/corporate/catalog" element={<AdminCorporateCatalog />} />
+              <Route path="/admin/corporate/quotes" element={<AdminCorporateQuotes />} />
+            </Route>
+            <Route path="/corporate/login" element={<CorporateLogin />} />
+            <Route element={<CorporateLayout />}>
+              <Route path="/corporate" element={<CorporateDashboard />} />
+              <Route path="/corporate/catalog" element={<CorporateCatalog />} />
+              <Route path="/corporate/cart" element={<CorporateCart />} />
+              <Route path="/corporate/orders" element={<CorporateOrders />} />
+              <Route path="/corporate/orders/:id" element={<CorporateOrderDetail />} />
+              <Route path="/corporate/quotes" element={<CorporateQuotes />} />
+              <Route path="/corporate/profile" element={<CorporateProfile />} />
+              <Route path="/corporate/inquiry" element={<CorporateInquiry />} />
             </Route>
             <Route element={<Layout />}>
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
           </Suspense>
+        </CorporateAuthProvider>
         </WishlistProvider>
         </CartProvider>
       </AuthProvider>

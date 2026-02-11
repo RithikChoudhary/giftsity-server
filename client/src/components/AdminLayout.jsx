@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { LayoutDashboard, Store, Package, ShoppingCart, Settings, CreditCard, Briefcase, Users, LogOut, Gift, Sun, Moon, ArrowLeft, FolderTree } from 'lucide-react';
+import { LayoutDashboard, Store, Package, ShoppingCart, Settings, CreditCard, Briefcase, Users, LogOut, Gift, Sun, Moon, ArrowLeft, FolderTree, Building2, ShoppingBag, FileText } from 'lucide-react';
 import { useEffect } from 'react';
 
 const navItems = [
@@ -14,6 +14,9 @@ const navItems = [
   { path: '/admin/categories', icon: FolderTree, label: 'Categories' },
   { path: '/admin/coupons', icon: FolderTree, label: 'Coupons' },
   { path: '/admin/b2b', icon: Briefcase, label: 'B2B Leads' },
+  { path: '/admin/corporate/users', icon: Building2, label: 'Corp Users' },
+  { path: '/admin/corporate/catalog', icon: ShoppingBag, label: 'Corp Catalog' },
+  { path: '/admin/corporate/quotes', icon: FileText, label: 'Corp Quotes' },
   { path: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 

@@ -188,18 +188,35 @@ export default function SellerOrders() {
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-3 mb-3">
-                    {(() => { const item = order.items?.[0]; return (
-                      <>
+                  <div className="space-y-2 mb-3">
+                    {(order.items || []).map((item, itemIdx) => (
+                      <div key={itemIdx} className="flex items-start gap-3">
                         <div className="w-12 h-12 bg-inset rounded-lg overflow-hidden shrink-0">
                           {item?.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <Package className="w-5 h-5 text-theme-dim m-auto mt-3.5" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-theme-primary truncate">{item?.title || 'Product'}{order.items?.length > 1 ? ` +${order.items.length - 1} more` : ''}</p>
-                          <p className="text-xs text-theme-muted">Qty: {order.items?.reduce((s, i) => s + (i.quantity || 1), 0) || 1} &middot; Rs. {order.totalAmount?.toLocaleString('en-IN')}</p>
+                          <p className="text-sm font-medium text-theme-primary truncate">{item?.title || 'Product'}</p>
+                          <p className="text-xs text-theme-muted">Qty: {item.quantity || 1} &times; Rs. {item.price?.toLocaleString('en-IN')}</p>
+                          {item.customizations?.length > 0 && (
+                            <div className="mt-1 space-y-0.5">
+                              {item.customizations.map((c, ci) => (
+                                <div key={ci} className="text-xs text-theme-muted">
+                                  <span className="text-amber-400/80">{c.label}:</span>{' '}
+                                  {c.value || (c.imageUrls?.length ? `${c.imageUrls.length} image(s)` : '')}
+                                  {c.imageUrls?.length > 0 && (
+                                    <div className="flex gap-1 mt-0.5">
+                                      {c.imageUrls.map((url, i) => (
+                                        <img key={i} src={url} alt="" className="w-8 h-8 rounded object-cover" />
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </>
-                    ); })()}
+                      </div>
+                    ))}
                   </div>
 
                   {/* Customer & shipping */}

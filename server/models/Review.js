@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 const reviewSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-  sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Seller', required: true },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
   orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true },
 
   rating: { type: Number, required: true, min: 1, max: 5 },

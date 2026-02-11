@@ -40,6 +40,12 @@ export default function CustomerOrders() {
     try {
       const { data } = await API.post('/orders/verify-payment', { orderId });
       toast.success('Payment verified! Your order is confirmed.');
+      // Redirect to confirmation page
+      const confirmedOrder = data.orders?.[0];
+      if (confirmedOrder) {
+        setSearchParams({});
+        return navigate(`/orders/${confirmedOrder._id}/confirmation`);
+      }
     } catch (err) {
       const msg = err.response?.data?.message || 'Payment verification failed';
       if (msg.includes('not completed')) toast.error('Payment was not completed. Please try again.');

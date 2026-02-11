@@ -6,6 +6,9 @@ const router = express.Router();
 // POST /api/coupons/apply -- validate and return discount
 router.post('/apply', requireAuth, async (req, res) => {
   try {
+    if ((req.user.userType || req.user.role) !== 'customer') {
+      return res.status(403).json({ message: 'Customer access required' });
+    }
     const { code, orderTotal } = req.body;
     if (!code) return res.status(400).json({ message: 'Coupon code required' });
 
@@ -13,6 +16,9 @@ router.post('/apply', requireAuth, async (req, res) => {
     if (!coupon) return res.status(404).json({ message: 'Invalid coupon code' });
     if (coupon.expiresAt < new Date()) return res.status(400).json({ message: 'Coupon has expired' });
     if (coupon.usedCount >= coupon.usageLimit) return res.status(400).json({ message: 'Coupon usage limit reached' });
+    if (coupon.usedBy && coupon.usedBy.includes(req.user._id.toString())) {
+      return res.status(400).json({ message: 'You have already used this coupon' });
+    }
     if (orderTotal && orderTotal < coupon.minOrderAmount) {
       return res.status(400).json({ message: `Minimum order of Rs. ${coupon.minOrderAmount} required` });
     }

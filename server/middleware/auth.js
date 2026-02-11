@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const { findIdentityByToken, normalizeUser } = require('../utils/identity');
+const { logAuthEvent } = require('../utils/audit');
 
 // Verify JWT token
 const requireAuth = async (req, res, next) => {
@@ -11,8 +12,13 @@ const requireAuth = async (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select('-otp -otpExpiry');
+    const identity = await findIdentityByToken(decoded);
+    if (!identity) {
+      await logAuthEvent(req, { action: 'token_rejected', reason: 'identity_not_found' });
+      return res.status(401).json({ message: 'User not found' });
+    }
 
+    const user = normalizeUser(identity.entity, identity.role, identity.source);
     if (!user) return res.status(401).json({ message: 'User not found' });
     // Allow suspended sellers to authenticate (they need to request unsuspend)
     // Non-seller suspended users are still blocked
@@ -20,9 +26,13 @@ const requireAuth = async (req, res, next) => {
       return res.status(403).json({ message: 'Account suspended' });
     }
 
-    req.user = user;
+    req.user = identity.entity;
+    req.user.userType = user.userType;
+    req.user.role = identity.role;
+    req.identitySource = identity.source;
     next();
   } catch (err) {
+    await logAuthEvent(req, { action: 'token_rejected', reason: 'invalid_or_expired' });
     return res.status(401).json({ message: 'Invalid or expired token' });
   }
 };

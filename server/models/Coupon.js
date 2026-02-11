@@ -9,6 +9,7 @@ const couponSchema = new mongoose.Schema({
   maxDiscount: { type: Number, default: 0 }, // 0 means no cap (for percent type)
   usageLimit: { type: Number, default: 100 },
   usedCount: { type: Number, default: 0 },
+  usedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Customer' }],
   isActive: { type: Boolean, default: true },
   expiresAt: { type: Date, required: true },
   createdAt: { type: Date, default: Date.now }

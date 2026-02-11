@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, Filter, X, ChevronDown } from 'lucide-react';
 import ProductCard from '../../components/ProductCard';
-import LoadingSpinner from '../../components/LoadingSpinner';
+import { SkeletonProductGrid } from '../../components/SkeletonCard';
 import SEO from '../../components/SEO';
 import API from '../../api';
 
@@ -14,13 +14,25 @@ export default function Shop() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [category, setCategory] = useState(searchParams.get('category') || '');
   const [sort, setSort] = useState('newest');
   const [priceRange, setPriceRange] = useState([0, 50000]);
   const [showFilters, setShowFilters] = useState(false);
+  const debounceRef = useRef(null);
+
+  // Debounce search input by 300ms
+  const handleSearchChange = useCallback((value) => {
+    setSearch(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(value);
+      setPage(1);
+    }, 300);
+  }, []);
 
   useEffect(() => { loadCategories(); }, []);
-  useEffect(() => { loadProducts(); }, [page, category, sort, search]);
+  useEffect(() => { loadProducts(); }, [page, category, sort, debouncedSearch]);
 
   const loadCategories = async () => {
     try {
@@ -37,7 +49,7 @@ export default function Shop() {
       params.set('limit', 12);
       if (category) params.set('category', category);
       if (sort) params.set('sort', sort);
-      if (search) params.set('search', search);
+      if (debouncedSearch) params.set('search', debouncedSearch);
       if (priceRange[0] > 0) params.set('minPrice', priceRange[0]);
       if (priceRange[1] < 50000) params.set('maxPrice', priceRange[1]);
       const { data } = await API.get(`/products?${params}`);
@@ -51,8 +63,10 @@ export default function Shop() {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    // Immediately apply the search on form submit (Enter key)
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setDebouncedSearch(search);
     setPage(1);
-    loadProducts();
   };
 
   return (
@@ -68,7 +82,7 @@ export default function Shop() {
       <div className="flex flex-col md:flex-row gap-4 mb-8">
         <form onSubmit={handleSearch} className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-dim" />
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search gifts..." className="w-full pl-10 pr-4 py-2.5 bg-card border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
+          <input type="text" value={search} onChange={e => handleSearchChange(e.target.value)} placeholder="Search gifts..." className="w-full pl-10 pr-4 py-2.5 bg-card border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
         </form>
         <div className="flex gap-3">
           <select value={sort} onChange={e => { setSort(e.target.value); setPage(1); }} className="px-3 py-2.5 bg-card border border-edge rounded-xl text-sm text-theme-secondary focus:outline-none focus:border-amber-500/50">
@@ -121,7 +135,7 @@ export default function Shop() {
 
       {/* Products */}
       {loading ? (
-        <LoadingSpinner />
+        <SkeletonProductGrid count={12} />
       ) : products.length === 0 ? (
         <div className="text-center py-20">
           <p className="text-theme-muted">No products found. Try a different search or filter.</p>

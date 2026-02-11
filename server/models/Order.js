@@ -9,12 +9,12 @@ const orderSchema = new mongoose.Schema({
   },
 
   // Customer
-  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: false, default: null },
   customerEmail: { type: String, default: '' },
   customerPhone: { type: String, default: '' },
 
   // Seller (for B2C marketplace)
-  sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Seller' },
 
   // Items (must have at least 1)
   items: { type: [{
@@ -24,7 +24,7 @@ const orderSchema = new mongoose.Schema({
     image: String,
     sku: String,
     quantity: { type: Number, default: 1 },
-    sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Seller' },
     customizations: [{
       label: { type: String, default: '' },
       value: { type: String, default: '' },
@@ -56,9 +56,10 @@ const orderSchema = new mongoose.Schema({
   // Payment
   paymentStatus: {
     type: String,
-    enum: ['pending', 'paid', 'failed', 'refunded'],
+    enum: ['pending', 'paid', 'failed', 'refunded', 'refund_pending'],
     default: 'pending'
   },
+  refundId: { type: String, default: '' },
   cashfreeOrderId: { type: String, default: '' },
   cashfreePaymentId: { type: String, default: '' },
   paymentSessionId: { type: String, default: '' },

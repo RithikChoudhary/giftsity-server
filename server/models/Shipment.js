@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const shipmentSchema = new mongoose.Schema({
   orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', required: true },
-  sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Seller', required: true },
 
   // Shiprocket IDs
   shiprocketOrderId: { type: String, default: '' },

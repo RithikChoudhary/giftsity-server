@@ -1,7 +1,7 @@
 const express = require('express');
 const Order = require('../models/Order');
 const Shipment = require('../models/Shipment');
-const User = require('../models/User');
+const Seller = require('../models/Seller');
 const router = express.Router();
 
 // NOTE: All seller-facing shipping routes (serviceability, create, assign-courier,
@@ -42,9 +42,9 @@ router.post('/webhook', async (req, res) => {
       if (mappedStatus === 'delivered') {
         order.status = 'delivered';
         order.deliveredAt = new Date();
-        await User.findByIdAndUpdate(order.sellerId, { $inc: { 'sellerProfile.deliveredOrders': 1 } });
+        await Seller.findByIdAndUpdate(order.sellerId, { $inc: { 'sellerProfile.deliveredOrders': 1 } });
       } else if (mappedStatus === 'rto' || mappedStatus === 'cancelled') {
-        await User.findByIdAndUpdate(order.sellerId, { $inc: { 'sellerProfile.failedOrders': 1 } });
+        await Seller.findByIdAndUpdate(order.sellerId, { $inc: { 'sellerProfile.failedOrders': 1 } });
       }
       if (shipment.awbCode) {
         order.trackingInfo.trackingNumber = shipment.awbCode;

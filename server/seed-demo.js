@@ -1,6 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const User = require('./models/User');
+const Seller = require('./models/Seller');
 const Product = require('./models/Product');
 const Category = require('./models/Category');
 const PlatformSettings = require('./models/PlatformSettings');
@@ -287,18 +287,17 @@ async function seedDemo() {
 
     // Remove old demo sellers and their products
     const demoEmails = sellers.map(s => s.email);
-    const existingSellers = await User.find({ email: { $in: demoEmails } });
+    const existingSellers = await Seller.find({ email: { $in: demoEmails } });
     const existingIds = existingSellers.map(s => s._id);
     await Product.deleteMany({ sellerId: { $in: existingIds } });
-    await User.deleteMany({ email: { $in: demoEmails } });
+    await Seller.deleteMany({ email: { $in: demoEmails } });
     console.log('Cleaned old demo data');
 
     // Create sellers
     const createdSellers = [];
     for (const sellerData of sellers) {
-      const seller = new User({
+      const seller = new Seller({
         ...sellerData,
-        userType: 'seller',
         status: 'active',
         isProfileComplete: true
       });

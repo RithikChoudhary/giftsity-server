@@ -4,8 +4,17 @@ const Product = require('../models/Product');
 const { requireAuth } = require('../middleware/auth');
 const router = express.Router();
 
+const requireCustomer = (req, res, next) => {
+  if ((req.user.userType || req.user.role) !== 'customer') {
+    return res.status(403).json({ message: 'Customer access required' });
+  }
+  next();
+};
+
+router.use(requireAuth, requireCustomer);
+
 // GET /api/wishlist -- get user's wishlist
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const items = await Wishlist.find({ userId: req.user._id })
       .sort({ createdAt: -1 })
@@ -23,7 +32,7 @@ router.get('/', requireAuth, async (req, res) => {
 });
 
 // GET /api/wishlist/ids -- get just product IDs (for quick checking)
-router.get('/ids', requireAuth, async (req, res) => {
+router.get('/ids', async (req, res) => {
   try {
     const items = await Wishlist.find({ userId: req.user._id }).select('productId');
     res.json({ productIds: items.map(i => i.productId.toString()) });
@@ -33,7 +42,7 @@ router.get('/ids', requireAuth, async (req, res) => {
 });
 
 // POST /api/wishlist -- add to wishlist
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { productId } = req.body;
     if (!productId) return res.status(400).json({ message: 'Product ID required' });
@@ -52,7 +61,7 @@ router.post('/', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/wishlist/:productId -- remove from wishlist
-router.delete('/:productId', requireAuth, async (req, res) => {
+router.delete('/:productId', async (req, res) => {
   try {
     await Wishlist.deleteOne({ userId: req.user._id, productId: req.params.productId });
     res.json({ message: 'Removed from wishlist' });

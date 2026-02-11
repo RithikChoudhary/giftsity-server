@@ -1,7 +1,29 @@
 const express = require('express');
+const multer = require('multer');
 const Product = require('../models/Product');
 const Category = require('../models/Category');
+const { requireAuth } = require('../middleware/auth');
+const { uploadImage } = require('../config/cloudinary');
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB per customization image
+
+// POST /api/products/upload-customization - upload customization image
+router.post('/upload-customization', requireAuth, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No image file provided' });
+
+    const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    const result = await uploadImage(base64, {
+      folder: `giftsity/customizations/${req.user._id}`,
+      transformation: [{ width: 1200, height: 1200, crop: 'limit', quality: 'auto' }]
+    });
+
+    res.json({ url: result.url, publicId: result.publicId });
+  } catch (err) {
+    console.error('[Customization Upload]', err.message);
+    res.status(500).json({ message: 'Image upload failed' });
+  }
+});
 
 // GET /api/products - public product listing
 router.get('/', async (req, res) => {
@@ -9,8 +31,8 @@ router.get('/', async (req, res) => {
     const { category, minPrice, maxPrice, seller, search, featured, sort, page = 1, limit = 24 } = req.query;
 
     // Get suspended seller IDs to exclude their products
-    const User = require('../models/User');
-    const suspendedSellers = await User.find({ userType: 'seller', status: 'suspended' }).select('_id').lean();
+    const Seller = require('../models/Seller');
+    const suspendedSellers = await Seller.find({ status: 'suspended' }).select('_id').lean();
     const suspendedIds = suspendedSellers.map(s => s._id);
 
     const filter = { isActive: true, stock: { $gt: 0 } };
@@ -54,8 +76,8 @@ router.get('/', async (req, res) => {
 // GET /api/products/featured
 router.get('/featured', async (req, res) => {
   try {
-    const User = require('../models/User');
-    const suspendedSellers = await User.find({ userType: 'seller', status: 'suspended' }).select('_id').lean();
+    const Seller = require('../models/Seller');
+    const suspendedSellers = await Seller.find({ status: 'suspended' }).select('_id').lean();
     const suspendedIds = suspendedSellers.map(s => s._id);
 
     const featuredFilter = { isFeatured: true, isActive: true, stock: { $gt: 0 } };

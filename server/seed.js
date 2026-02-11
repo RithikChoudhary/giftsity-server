@@ -1,6 +1,6 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
-const User = require('./models/User');
+const Admin = require('./models/Admin');
 const Category = require('./models/Category');
 const PlatformSettings = require('./models/PlatformSettings');
 
@@ -43,19 +43,17 @@ async function seed() {
 
     // Ensure admin user exists
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@giftsity.com';
-    let admin = await User.findOne({ email: adminEmail });
+    let admin = await Admin.findOne({ email: adminEmail });
     if (!admin) {
-      admin = await User.create({
+      admin = await Admin.create({
         email: adminEmail,
         name: 'Admin',
         phone: '',
-        userType: 'admin',
         status: 'active',
-        isProfileComplete: true
+        role: 'admin'
       });
       console.log(`Created admin: ${adminEmail}`);
     } else {
-      admin.userType = 'admin';
       admin.status = 'active';
       await admin.save();
       console.log(`Updated admin: ${adminEmail}`);

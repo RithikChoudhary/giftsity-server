@@ -1,7 +1,8 @@
 const Order = require('../models/Order');
-const User = require('../models/User');
+const Seller = require('../models/Seller');
 const Product = require('../models/Product');
 const { sendOTP } = require('../utils/email'); // reuse transporter
+const { logActivity } = require('../utils/audit');
 
 // ==================== CONFIG ====================
 const SHIP_DEADLINE_HOURS = 48;        // Orders must be shipped within 48h
@@ -40,11 +41,12 @@ async function autoCancelUnshippedOrders() {
     }
 
     // Track failed order for seller
-    await User.findByIdAndUpdate(order.sellerId, {
+    await Seller.findByIdAndUpdate(order.sellerId, {
       $inc: { 'sellerProfile.failedOrders': 1 }
     });
 
     cancelled++;
+    logActivity({ domain: 'cron', action: 'order_auto_cancelled', actorRole: 'system', targetType: 'Order', targetId: order._id, message: `Order ${order.orderNumber} auto-cancelled (not shipped within ${AUTO_CANCEL_HOURS}h)`, metadata: { sellerId: order.sellerId.toString(), orderNumber: order.orderNumber } });
     console.log(`[AutoCancel] Order ${order.orderNumber} cancelled (seller: ${order.sellerId})`);
   }
 
@@ -59,7 +61,7 @@ async function calculateSellerMetrics() {
   const lookbackDate = new Date(Date.now() - METRICS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
   const lateThreshold = SHIP_DEADLINE_HOURS * 60 * 60 * 1000; // ms
 
-  const sellers = await User.find({ userType: 'seller', status: { $in: ['active', 'suspended'] } });
+  const sellers = await Seller.find({ status: { $in: ['active', 'suspended'] } });
 
   let updated = 0;
   for (const seller of sellers) {
@@ -154,8 +156,7 @@ async function calculateSellerMetrics() {
 
 // ==================== AUTO-SUSPEND LOW HEALTH SELLERS ====================
 async function autoSuspendBadSellers() {
-  const sellers = await User.find({
-    userType: 'seller',
+  const sellers = await Seller.find({
     status: 'active',
     'sellerProfile.metrics.lastCalculatedAt': { $ne: null }
   });
@@ -194,6 +195,7 @@ async function autoSuspendBadSellers() {
       await Product.updateMany({ sellerId: seller._id }, { isActive: false });
 
       suspended++;
+      logActivity({ domain: 'cron', action: 'seller_auto_suspended', actorRole: 'system', targetType: 'Seller', targetId: seller._id, message: `Seller ${seller.sellerProfile.businessName} auto-suspended: ${reason}`, metadata: { businessName: seller.sellerProfile.businessName, healthScore: m.healthScore } });
       console.log(`[AutoSuspend] Suspended seller ${seller.sellerProfile.businessName}: ${reason}`);
       continue;
     }
@@ -223,7 +225,7 @@ async function autoSuspendBadSellers() {
 
 // ==================== UPDATE SELLER LAST ACTIVE ====================
 async function updateSellerLastActive(sellerId) {
-  await User.findByIdAndUpdate(sellerId, {
+  await Seller.findByIdAndUpdate(sellerId, {
     'sellerProfile.lastActiveAt': new Date()
   });
 }

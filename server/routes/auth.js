@@ -1,12 +1,14 @@
 const express = require('express');
 const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const rateLimit = require('express-rate-limit');
-const User = require('../models/User');
+const Customer = require('../models/Customer');
+const Seller = require('../models/Seller');
 const { sendOTP } = require('../utils/email');
 const { requireAuth } = require('../middleware/auth');
 const { cloudinary } = require('../config/cloudinary');
+const { findIdentityByEmail, signIdentityToken, createAuthSession } = require('../utils/identity');
+const { logOtpEvent, logAuthEvent } = require('../utils/audit');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -42,21 +44,28 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
     const otp = generateOTP();
     const otpExpiry = new Date(Date.now() + (parseInt(process.env.OTP_EXPIRY_MINUTES || '10')) * 60 * 1000);
 
-    // Find or create user
-    let user = await User.findOne({ email: normalizedEmail });
-    if (!user) {
-      user = new User({ email: normalizedEmail, userType: 'customer' });
+    // Find in role-specific collections first, then fallback to legacy User
+    let identity = await findIdentityByEmail(normalizedEmail);
+    if (!identity) {
+      const customer = new Customer({ email: normalizedEmail, status: 'active' });
+      await customer.save();
+      identity = { role: 'customer', source: 'new', entity: customer };
     }
 
-    user.otp = otp;
-    user.otpExpiry = otpExpiry;
-    await user.save();
+    identity.entity.otp = otp;
+    identity.entity.otpExpiry = otpExpiry;
+    await identity.entity.save();
 
     await sendOTP(normalizedEmail, otp);
+    await logOtpEvent(req, { email: normalizedEmail, role: identity.role, event: 'sent' });
 
-    res.json({ message: 'OTP sent to your email', isNewUser: !user.isProfileComplete });
+    res.json({
+      message: 'OTP sent to your email',
+      isNewUser: identity.role === 'customer' ? !identity.entity.isProfileComplete : false
+    });
   } catch (err) {
     console.error('Send OTP error:', err);
+    await logOtpEvent(req, { email: req.body?.email || '', event: 'failed', metadata: { stage: 'send' } });
     res.status(500).json({ message: 'Failed to send OTP' });
   }
 });
@@ -69,34 +78,34 @@ router.post('/verify-otp', verifyLimiter, async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim();
     const otpStr = String(otp).trim();
+    let identity = await findIdentityByEmail(normalizedEmail);
+    if (!identity) return res.status(400).json({ message: 'No account found' });
 
-    // Atomic: find user with matching OTP, clear it in one step (prevents race conditions from double-submit)
-    const user = await User.findOneAndUpdate(
-      {
-        email: normalizedEmail,
-        otp: otpStr,
-        otpExpiry: { $gt: new Date() }
-      },
-      { $set: { otp: null, otpExpiry: null } },
-      { new: true }
-    );
-
-    if (!user) {
-      // Provide specific error message
-      const existingUser = await User.findOne({ email: normalizedEmail });
-      if (!existingUser) return res.status(400).json({ message: 'No account found' });
-      if (!existingUser.otp || !existingUser.otpExpiry) return res.status(400).json({ message: 'OTP expired or not requested. Please resend OTP.' });
-      if (new Date() > existingUser.otpExpiry) return res.status(400).json({ message: 'OTP expired. Request a new one.' });
+    const user = identity.entity;
+    if (!user.otp || !user.otpExpiry) return res.status(400).json({ message: 'OTP expired or not requested. Please resend OTP.' });
+    if (new Date() > user.otpExpiry) {
+      await logOtpEvent(req, { email: normalizedEmail, role: identity.role, event: 'expired' });
+      return res.status(400).json({ message: 'OTP expired. Request a new one.' });
+    }
+    if (String(user.otp) !== otpStr) {
+      await logOtpEvent(req, { email: normalizedEmail, role: identity.role, event: 'failed', metadata: { reason: 'invalid_otp' } });
+      await logAuthEvent(req, { action: 'login_failed', role: identity.role, email: normalizedEmail, reason: 'invalid_otp' });
       return res.status(400).json({ message: 'Invalid OTP' });
     }
 
-    // Suspended sellers CAN log in to request removal - but show suspended status
-    // Only fully blocked for non-sellers
-    if (user.status === 'suspended' && user.userType !== 'seller') {
+    user.otp = null;
+    user.otpExpiry = null;
+    await user.save();
+
+    const userType = identity.source === 'legacy' ? user.userType : identity.role;
+    if (user.status === 'suspended' && userType !== 'seller') {
       return res.status(403).json({ message: 'Account suspended' });
     }
 
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+    const token = signIdentityToken(identity);
+    await createAuthSession(token, identity, req);
+    await logOtpEvent(req, { email: normalizedEmail, role: identity.role, event: 'verified' });
+    await logAuthEvent(req, { action: 'login_success', role: identity.role, userId: user._id, email: normalizedEmail });
 
     res.json({
       token,
@@ -105,14 +114,16 @@ router.post('/verify-otp', verifyLimiter, async (req, res) => {
         email: user.email,
         name: user.name,
         phone: user.phone,
-        userType: user.userType,
+        userType: userType,
+        role: identity.role,
         status: user.status,
-        isProfileComplete: user.isProfileComplete,
-        sellerProfile: user.userType === 'seller' ? user.sellerProfile : undefined
+        isProfileComplete: user.isProfileComplete !== undefined ? user.isProfileComplete : true,
+        sellerProfile: userType === 'seller' ? user.sellerProfile : undefined
       }
     });
   } catch (err) {
     console.error('Verify OTP error:', err);
+    await logAuthEvent(req, { action: 'login_failed', reason: 'server_error', email: req.body?.email || '' });
     res.status(500).json({ message: 'Verification failed' });
   }
 });
@@ -152,93 +163,70 @@ router.post('/register-seller', async (req, res) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
-    let user = await User.findOne({ email: normalizedEmail });
-
-    if (user && user.userType === 'seller') {
+    let seller = await Seller.findOne({ email: normalizedEmail });
+    if (seller) {
       return res.status(400).json({ message: 'Seller account already exists for this email' });
     }
 
-    // Handle referral
-    let referredByUser = null;
+    let referredBySeller = null;
     if (referralCode) {
-      referredByUser = await User.findOne({ 'sellerProfile.referralCode': referralCode.toUpperCase(), userType: 'seller' });
+      referredBySeller = await Seller.findOne({ 'sellerProfile.referralCode': referralCode.toUpperCase() });
     }
 
-    // Generate unique referral code from name
     const sellerRefCode = (name.replace(/\s/g, '').substring(0, 4).toUpperCase() + Date.now().toString(36).toUpperCase()).substring(0, 10);
-
-    // Generate business slug from name
     const businessSlug = name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 20) + Math.random().toString(36).substring(2, 6);
 
-    if (user) {
-      user.userType = 'seller';
-      user.status = 'pending';
-      user.name = name;
-      user.phone = phone;
-    } else {
-      user = new User({
-        email: normalizedEmail,
-        name,
-        phone,
-        userType: 'seller',
-        status: 'pending'
-      });
-    }
-
-    // Merge carefully to avoid overwriting sub-documents with undefined
-    const existingProfile = user.sellerProfile ? (user.sellerProfile.toObject ? user.sellerProfile.toObject() : user.sellerProfile) : {};
-    user.sellerProfile = {
-      businessName: existingProfile.businessName || name,
-      businessSlug: businessSlug,
-      bio: existingProfile.bio || '',
-      avatar: { url: avatarUrl || '', publicId: avatarPublicId || '' },
-      coverImage: existingProfile.coverImage || { url: '', publicId: '' },
-      businessType: existingProfile.businessType || '',
-      gstNumber: existingProfile.gstNumber || '',
-      isVerified: false,
-      deliveredOrders: existingProfile.deliveredOrders || 0,
-      failedOrders: existingProfile.failedOrders || 0,
-      businessAddress: existingProfile.businessAddress || { street: '', city: '', state: '', pincode: '' },
-      pickupAddress: existingProfile.pickupAddress || { street: '', city: '', state: '', pincode: '', phone: '' },
-      bankDetails: existingProfile.bankDetails || { accountHolderName: '', accountNumber: '', ifscCode: '', bankName: '' },
-      commissionRate: null,
-      totalSales: existingProfile.totalSales || 0,
-      totalOrders: existingProfile.totalOrders || 0,
-      rating: existingProfile.rating || 0,
-      approvedAt: null,
-      approvedBy: null,
-      referralCode: sellerRefCode,
-      referredBy: referredByUser?._id || null,
-      referralCount: existingProfile.referralCount || 0,
-      instagramUsername: instagramUsername.replace('@', '').trim(),
-      suspensionRemovalRequested: false,
-      suspensionRemovalReason: ''
-    };
-    user.isProfileComplete = true;
-    await user.save();
-
-    if (referredByUser) {
-      referredByUser.sellerProfile.referralCount = (referredByUser.sellerProfile.referralCount || 0) + 1;
-      const rc = referredByUser.sellerProfile.referralCount;
-      // Referral rewards
-      if (rc >= 10) {
-        // Lock 0% commission for 1 year
-        referredByUser.sellerProfile.commissionRate = 0;
-        referredByUser.sellerProfile.commissionLockedUntil = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    seller = new Seller({
+      email: normalizedEmail,
+      name,
+      phone,
+      status: 'pending',
+      isProfileComplete: true,
+      sellerProfile: {
+        businessName: name,
+        businessSlug,
+        bio: '',
+        avatar: { url: avatarUrl || '', publicId: avatarPublicId || '' },
+        coverImage: { url: '', publicId: '' },
+        businessType: '',
+        gstNumber: '',
+        isVerified: false,
+        deliveredOrders: 0,
+        failedOrders: 0,
+        businessAddress: { street: '', city: '', state: '', pincode: '' },
+        pickupAddress: { street: '', city: '', state: '', pincode: '', phone: '' },
+        bankDetails: { accountHolderName: '', accountNumber: '', ifscCode: '', bankName: '' },
+        commissionRate: null,
+        totalSales: 0,
+        totalOrders: 0,
+        rating: 0,
+        approvedAt: null,
+        approvedBy: null,
+        referralCode: sellerRefCode,
+        referredBy: referredBySeller?._id || null,
+        referralCount: 0,
+        instagramUsername: instagramUsername.replace('@', '').trim(),
+        suspensionRemovalRequested: false,
+        suspensionRemovalReason: ''
       }
-      await referredByUser.save();
+    });
+    await seller.save();
+
+    if (referredBySeller) {
+      referredBySeller.sellerProfile.referralCount = (referredBySeller.sellerProfile.referralCount || 0) + 1;
+      await referredBySeller.save();
     }
 
-    // Send OTP
     const otp = generateOTP();
-    user.otp = otp;
-    user.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
-    await user.save();
+    seller.otp = otp;
+    seller.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    await seller.save();
     await sendOTP(normalizedEmail, otp);
+    await logOtpEvent(req, { email: normalizedEmail, role: 'seller', event: 'sent', metadata: { stage: 'register_seller' } });
 
     res.status(201).json({
       message: 'Application submitted! Check your email for the login code. Admin will review your profile.',
-      sellerId: user._id
+      sellerId: seller._id
     });
   } catch (err) {
     console.error('Register seller error:', err);
@@ -249,17 +237,18 @@ router.post('/register-seller', async (req, res) => {
 // GET /api/auth/me
 router.get('/me', requireAuth, async (req, res) => {
   const user = req.user;
+  const userType = user.userType || user.role;
   res.json({
     user: {
       _id: user._id,
       email: user.email,
       name: user.name,
       phone: user.phone,
-      userType: user.userType,
+      userType,
       status: user.status,
-      isProfileComplete: user.isProfileComplete,
-      shippingAddresses: user.shippingAddresses,
-      sellerProfile: user.userType === 'seller' ? user.sellerProfile : undefined
+      isProfileComplete: user.isProfileComplete !== undefined ? user.isProfileComplete : true,
+      shippingAddresses: user.shippingAddresses || [],
+      sellerProfile: userType === 'seller' ? user.sellerProfile : undefined
     }
   });
 });
@@ -272,10 +261,10 @@ router.put('/profile', requireAuth, async (req, res) => {
 
     if (name) user.name = name;
     if (phone) user.phone = phone;
-    if (name && phone) user.isProfileComplete = true;
+    if (name && phone && user.isProfileComplete !== undefined) user.isProfileComplete = true;
     await user.save();
 
-    res.json({ message: 'Profile updated', user: { _id: user._id, email: user.email, name: user.name, phone: user.phone, userType: user.userType, isProfileComplete: user.isProfileComplete } });
+    res.json({ message: 'Profile updated', user: { _id: user._id, email: user.email, name: user.name, phone: user.phone, userType: user.userType || user.role, isProfileComplete: user.isProfileComplete !== undefined ? user.isProfileComplete : true } });
   } catch (err) {
     res.status(500).json({ message: 'Update failed' });
   }
@@ -284,6 +273,9 @@ router.put('/profile', requireAuth, async (req, res) => {
 // PUT /api/auth/addresses
 router.put('/addresses', requireAuth, async (req, res) => {
   try {
+    if ((req.user.userType || req.user.role) !== 'customer') {
+      return res.status(403).json({ message: 'Addresses can only be updated for customer accounts' });
+    }
     const { addresses } = req.body;
     req.user.shippingAddresses = addresses;
     await req.user.save();

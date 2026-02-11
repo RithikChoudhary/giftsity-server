@@ -185,10 +185,27 @@ export default function OrderDetail() {
                 <div className="w-16 h-16 bg-inset rounded-lg overflow-hidden shrink-0">
                   {item.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <Package className="w-6 h-6 text-theme-dim m-auto mt-5" />}
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm text-theme-primary">{item.title}</p>
                   <p className="text-xs text-theme-muted mt-1">Qty: {item.quantity || 1}</p>
                   <p className="text-sm font-bold text-theme-primary mt-0.5">Rs. {((item.price || 0) * (item.quantity || 1)).toLocaleString('en-IN')}</p>
+                  {item.customizations?.length > 0 && (
+                    <div className="mt-1.5 space-y-1">
+                      {item.customizations.map((c, ci) => (
+                        <div key={ci} className="text-xs text-theme-muted">
+                          <span className="text-amber-400/80">{c.label}:</span>{' '}
+                          {c.value || (c.imageUrls?.length ? `${c.imageUrls.length} image(s)` : '')}
+                          {c.imageUrls?.length > 0 && (
+                            <div className="flex gap-1 mt-1">
+                              {c.imageUrls.map((url, i) => (
+                                <img key={i} src={url} alt="" className="w-10 h-10 rounded object-cover" />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
