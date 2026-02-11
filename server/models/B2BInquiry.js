@@ -22,6 +22,7 @@ const b2bInquirySchema = new mongoose.Schema({
   quotedAmount: { type: Number, default: 0 },
 
   convertedOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order', default: null },
+  convertedCorporateUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'CorporateUser', default: null },
   convertedAt: { type: Date, default: null },
 
   activityLog: [{

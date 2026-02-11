@@ -13,7 +13,7 @@ const CorporateCatalog = require('../models/CorporateCatalog');
 const CorporateQuote = require('../models/CorporateQuote');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadImage, deleteImage } = require('../config/cloudinary');
-const { sendCommissionChangeNotification, sendPayoutNotification } = require('../utils/email');
+const { sendCommissionChangeNotification, sendPayoutNotification, sendCorporateWelcomeEmail } = require('../utils/email');
 const { logActivity } = require('../utils/audit');
 const router = express.Router();
 
@@ -668,6 +668,63 @@ router.get('/corporate/users', async (req, res) => {
     res.json({ users, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/admin/corporate/users/from-inquiry -- create corporate user from B2B inquiry
+router.post('/corporate/users/from-inquiry', async (req, res) => {
+  try {
+    const { inquiryId } = req.body;
+    if (!inquiryId) return res.status(400).json({ message: 'Inquiry ID required' });
+
+    const inquiry = await B2BInquiry.findById(inquiryId);
+    if (!inquiry) return res.status(404).json({ message: 'Inquiry not found' });
+
+    // Check if already converted
+    if (inquiry.convertedCorporateUserId) {
+      return res.status(400).json({ message: 'This inquiry has already been converted to a corporate user' });
+    }
+
+    // Check if corporate user already exists with this email
+    const existing = await CorporateUser.findOne({ email: inquiry.email.toLowerCase().trim() });
+    if (existing) {
+      return res.status(400).json({ message: `Corporate user already exists for ${inquiry.email}` });
+    }
+
+    // Create corporate user (pre-approved)
+    const user = new CorporateUser({
+      companyName: inquiry.companyName,
+      contactPerson: inquiry.contactPerson,
+      email: inquiry.email.toLowerCase().trim(),
+      phone: inquiry.phone || '',
+      status: 'active',
+      approvedBy: req.user._id,
+      approvedAt: new Date()
+    });
+    await user.save();
+
+    // Update inquiry to converted
+    inquiry.status = 'converted';
+    inquiry.convertedCorporateUserId = user._id;
+    inquiry.convertedAt = new Date();
+    inquiry.activityLog.push({
+      action: `Corporate account created for ${inquiry.email}`,
+      timestamp: new Date(),
+      by: req.user._id
+    });
+    await inquiry.save();
+
+    // Send welcome email (non-blocking)
+    try {
+      await sendCorporateWelcomeEmail(inquiry.email, inquiry.companyName, inquiry.contactPerson);
+    } catch (e) { console.error('Corporate welcome email failed:', e.message); }
+
+    logActivity({ domain: 'admin', action: 'corporate_user_created_from_inquiry', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'CorporateUser', targetId: user._id, message: `Corporate user created from inquiry: ${inquiry.companyName} (${inquiry.email})` });
+
+    res.status(201).json({ user, message: 'Corporate account created and welcome email sent' });
+  } catch (err) {
+    console.error('Create corporate user from inquiry error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 

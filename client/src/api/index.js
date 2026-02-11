@@ -128,6 +128,7 @@ export const adminAPI = {
   getCustomers: (params) => API.get('/admin/customers', { params }),
   getSellerHealth: (id) => API.get(`/admin/sellers/${id}/health`),
   runCron: () => API.post('/admin/cron/run'),
+  createCorporateUserFromInquiry: (inquiryId) => API.post('/admin/corporate/users/from-inquiry', { inquiryId }),
 };
 
 export const b2bAPI = {

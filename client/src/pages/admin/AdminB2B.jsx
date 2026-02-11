@@ -1,8 +1,22 @@
 import { useState, useEffect } from 'react';
-import { Briefcase, Phone, Mail, Building, Calendar, ChevronDown, Loader, MessageSquare } from 'lucide-react';
+import { Briefcase, Phone, Mail, Building, Calendar, ChevronDown, Loader, MessageSquare, UserPlus, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import API from '../../api';
+import API, { adminAPI } from '../../api';
+
+const FREE_EMAIL_DOMAINS = [
+  'gmail.com', 'yahoo.com', 'yahoo.in', 'yahoo.co.in',
+  'outlook.com', 'hotmail.com', 'live.com', 'aol.com',
+  'icloud.com', 'me.com', 'mac.com', 'protonmail.com',
+  'proton.me', 'mail.com', 'email.com', 'zoho.com',
+  'rediffmail.com', 'gmx.com', 'gmx.net'
+];
+
+function isFreeEmail(email) {
+  if (!email) return true;
+  const domain = email.toLowerCase().trim().split('@')[1];
+  return !domain || FREE_EMAIL_DOMAINS.includes(domain);
+}
 
 const statusColors = {
   new: 'text-blue-400 bg-blue-400/10',
@@ -18,6 +32,7 @@ export default function AdminB2B() {
   const [filter, setFilter] = useState('all');
   const [expandedId, setExpandedId] = useState(null);
   const [noteText, setNoteText] = useState('');
+  const [convertingId, setConvertingId] = useState('');
 
   useEffect(() => { loadInquiries(); }, []);
 
@@ -45,6 +60,19 @@ export default function AdminB2B() {
       setNoteText('');
       loadInquiries();
     } catch (err) { toast.error('Failed'); }
+  };
+
+  const createCorporateUser = async (inquiryId) => {
+    setConvertingId(inquiryId);
+    try {
+      await adminAPI.createCorporateUserFromInquiry(inquiryId);
+      toast.success('Corporate account created and welcome email sent!');
+      loadInquiries();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create corporate user');
+    } finally {
+      setConvertingId('');
+    }
   };
 
   const filtered = filter === 'all' ? inquiries : inquiries.filter(i => i.status === filter);
@@ -92,6 +120,29 @@ export default function AdminB2B() {
 
               {inq.occasion && <p className="text-xs text-theme-dim mb-2">Occasion: {inq.occasion}</p>}
               {inq.specialRequirements && <p className="text-xs text-theme-secondary mb-2">"{inq.specialRequirements}"</p>}
+
+              {/* Corporate Account Creation */}
+              <div className="flex items-center gap-3 mb-3">
+                {inq.convertedCorporateUserId || inq.status === 'converted' ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 text-green-400 rounded-lg text-xs font-medium">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Corporate Account Created
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => createCorporateUser(inq._id)}
+                    disabled={convertingId === inq._id || isFreeEmail(inq.email)}
+                    title={isFreeEmail(inq.email) ? 'Cannot create corporate account with a free email (Gmail, Yahoo, etc.)' : 'Create corporate account and send welcome email'}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {convertingId === inq._id ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+                    {convertingId === inq._id ? 'Creating...' : 'Create Corporate Account'}
+                  </button>
+                )}
+                {isFreeEmail(inq.email) && !inq.convertedCorporateUserId && inq.status !== 'converted' && (
+                  <span className="text-xs text-theme-dim">Free email -- corporate requires a company domain</span>
+                )}
+              </div>
 
               <button onClick={() => setExpandedId(expandedId === inq._id ? null : inq._id)} className="text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1 mb-3">
                 <ChevronDown className={`w-3 h-3 transition-transform ${expandedId === inq._id ? 'rotate-180' : ''}`} />

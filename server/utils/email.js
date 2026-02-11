@@ -273,12 +273,53 @@ const sendReviewRequestEmail = async (email, order) => {
   }
 };
 
+// Send corporate welcome email after admin creates account from inquiry
+const sendCorporateWelcomeEmail = async (email, companyName, contactPerson) => {
+  if (!resend) {
+    console.log(`[Email] Skipping corporate welcome to ${email} (no API key)`);
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'corporate', template: 'corporate_welcome', subject: 'Corporate Account Ready', status: 'skipped', provider: 'resend', errorMessage: 'No API key' });
+    return;
+  }
+
+  const portalUrl = (process.env.CLIENT_URL || 'http://localhost:5173') + '/corporate/login';
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: 'Your Giftsity Corporate Account is Ready',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;background:#1a1a2e;border-radius:16px;">
+          <h1 style="color:#f5c518;margin:0 0 8px;font-size:24px;">Giftsity</h1>
+          <h2 style="color:#eee;margin:0 0 20px;">Welcome to Giftsity Corporate!</h2>
+          <p style="color:#ccc;font-size:14px;">Hi ${contactPerson || 'there'},</p>
+          <p style="color:#ccc;font-size:14px;">Great news! Your corporate gifting account for <strong style="color:#f5c518;">${companyName}</strong> has been created and approved.</p>
+          <div style="background:#2a2a4a;border-radius:8px;padding:20px;margin:20px 0;text-align:center;">
+            <p style="color:#eee;font-size:16px;margin:0 0 8px;font-weight:bold;">How to log in</p>
+            <p style="color:#ccc;font-size:14px;margin:0;">1. Visit the corporate portal</p>
+            <p style="color:#ccc;font-size:14px;margin:0;">2. Enter your email: <strong style="color:#f5c518;">${email}</strong></p>
+            <p style="color:#ccc;font-size:14px;margin:0;">3. You'll receive a one-time code (OTP) to verify</p>
+          </div>
+          <a href="${portalUrl}" style="display:block;background:#f5c518;color:#1a1a2e;text-align:center;padding:14px 24px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:16px;margin:16px 0;">Go to Corporate Portal</a>
+          <p style="color:#888;font-size:13px;margin-top:20px;">Browse our curated corporate catalog, request custom quotes, and place bulk orders -- all from your dedicated portal.</p>
+          <p style="color:#888;font-size:13px;">Need help? Reply to this email or contact us at ${process.env.ADMIN_EMAIL || 'support@giftsity.com'}.</p>
+        </div>
+      `
+    });
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'corporate', template: 'corporate_welcome', subject: 'Corporate Account Ready', status: 'sent', provider: 'resend' });
+  } catch (err) {
+    console.error(`[Email] Failed to send corporate welcome to ${email}:`, err.message);
+    logNotification({ channel: 'email', recipient: email, recipientRole: 'corporate', template: 'corporate_welcome', subject: 'Corporate Account Ready', status: 'failed', provider: 'resend', errorMessage: err.message });
+  }
+};
+
 module.exports = {
   sendOTP,
   sendOrderConfirmation,
   sendPayoutNotification,
   sendCommissionChangeNotification,
   sendB2BInquiryNotification,
+  sendCorporateWelcomeEmail,
   sendShippedEmail,
   sendDeliveredEmail,
   sendReviewRequestEmail
