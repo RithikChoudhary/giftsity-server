@@ -6,12 +6,25 @@ const AuthContext = createContext();
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [availableRoles, setAvailableRoles] = useState([]);
+
+  const fetchAvailableRoles = async () => {
+    try {
+      const res = await authAPI.getAvailableRoles();
+      setAvailableRoles(res.data.roles || []);
+    } catch {
+      setAvailableRoles([]);
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('giftsity_token');
     if (token) {
       authAPI.me()
-        .then(res => setUser(res.data.user))
+        .then(res => {
+          setUser(res.data.user);
+          return fetchAvailableRoles();
+        })
         .catch(() => {
           localStorage.removeItem('giftsity_token');
           localStorage.removeItem('giftsity_user');
@@ -32,6 +45,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('giftsity_token', res.data.token);
     localStorage.setItem('giftsity_user', JSON.stringify(res.data.user));
     setUser(res.data.user);
+    await fetchAvailableRoles();
     return res.data;
   };
 
@@ -43,12 +57,23 @@ export function AuthProvider({ children }) {
       localStorage.setItem('giftsity_user', JSON.stringify(userData));
       setUser(userData);
     }
+    fetchAvailableRoles();
   };
 
   const logout = () => {
     localStorage.removeItem('giftsity_token');
     localStorage.removeItem('giftsity_user');
     setUser(null);
+    setAvailableRoles([]);
+  };
+
+  const switchRole = async (role) => {
+    const res = await authAPI.switchRole(role);
+    localStorage.setItem('giftsity_token', res.data.token);
+    localStorage.setItem('giftsity_user', JSON.stringify(res.data.user));
+    setUser(res.data.user);
+    // Roles stay the same (same email), no need to re-fetch
+    return res.data.user;
   };
 
   const updateProfile = async (data) => {
@@ -68,7 +93,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, sendOtp, verifyOtp, logout, updateProfile, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, sendOtp, verifyOtp, logout, updateProfile, refreshUser, availableRoles, switchRole }}>
       {children}
     </AuthContext.Provider>
   );

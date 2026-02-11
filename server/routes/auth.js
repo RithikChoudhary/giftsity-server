@@ -7,7 +7,7 @@ const Seller = require('../models/Seller');
 const { sendOTP } = require('../utils/email');
 const { requireAuth } = require('../middleware/auth');
 const { cloudinary } = require('../config/cloudinary');
-const { findIdentityByEmail, signIdentityToken, createAuthSession } = require('../utils/identity');
+const { findIdentityByEmail, findAllRolesForEmail, findIdentityByEmailAndRole, signIdentityToken, createAuthSession } = require('../utils/identity');
 const { sanitizeBody } = require('../middleware/sanitize');
 const { logOtpEvent, logAuthEvent } = require('../utils/audit');
 const router = express.Router();
@@ -163,7 +163,7 @@ router.post('/upload-avatar', avatarUploadLimiter, upload.single('avatar'), asyn
 // POST /api/auth/register-seller
 router.post('/register-seller', async (req, res) => {
   try {
-    const { email, name, phone, instagramUsername, avatarUrl, avatarPublicId, referralCode } = req.body;
+    const { email, name, phone, instagramUsername, avatarUrl, avatarPublicId, referralCode, coverImageUrl, coverImagePublicId, businessName, businessType, gstNumber } = req.body;
 
     if (!email || !name || !phone) {
       return res.status(400).json({ message: 'Email, name, and phone are required' });
@@ -193,13 +193,13 @@ router.post('/register-seller', async (req, res) => {
       status: 'pending',
       isProfileComplete: true,
       sellerProfile: {
-        businessName: name,
+        businessName: businessName || name,
         businessSlug,
         bio: '',
         avatar: { url: avatarUrl || '', publicId: avatarPublicId || '' },
-        coverImage: { url: '', publicId: '' },
-        businessType: '',
-        gstNumber: '',
+        coverImage: { url: coverImageUrl || '', publicId: coverImagePublicId || '' },
+        businessType: businessType || '',
+        gstNumber: gstNumber || '',
         isVerified: false,
         deliveredOrders: 0,
         failedOrders: 0,
@@ -314,6 +314,72 @@ router.put('/addresses', requireAuth, sanitizeBody, async (req, res) => {
     res.json({ message: 'Addresses updated', addresses: req.user.shippingAddresses });
   } catch (err) {
     res.status(500).json({ message: 'Update failed' });
+  }
+});
+
+// GET /api/auth/available-roles
+router.get('/available-roles', requireAuth, async (req, res) => {
+  try {
+    const email = req.user.email;
+    const roles = await findAllRolesForEmail(email);
+    const currentRole = req.user.role || req.user.userType || 'customer';
+    res.json({ roles, currentRole });
+  } catch (err) {
+    console.error('Available roles error:', err);
+    res.status(500).json({ message: 'Failed to fetch roles' });
+  }
+});
+
+// POST /api/auth/switch-role
+router.post('/switch-role', requireAuth, async (req, res) => {
+  try {
+    const { role } = req.body;
+    if (!role) return res.status(400).json({ message: 'Role is required' });
+
+    const allowedRoles = ['customer', 'seller', 'admin'];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+
+    const email = req.user.email;
+
+    // Verify the target role exists for this email
+    const roles = await findAllRolesForEmail(email);
+    if (!roles.includes(role)) {
+      return res.status(403).json({ message: 'You do not have access to this role' });
+    }
+
+    // Find the target identity
+    const identity = await findIdentityByEmailAndRole(email, role);
+    if (!identity) {
+      return res.status(404).json({ message: 'Target role account not found' });
+    }
+
+    // Sign new token and create session
+    const token = signIdentityToken(identity);
+    await createAuthSession(token, identity, req);
+
+    const user = identity.entity;
+    const userType = identity.role;
+
+    res.json({
+      token,
+      user: {
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        phone: user.phone,
+        userType,
+        role: identity.role,
+        status: user.status,
+        isProfileComplete: user.isProfileComplete !== undefined ? user.isProfileComplete : true,
+        shippingAddresses: user.shippingAddresses || [],
+        sellerProfile: userType === 'seller' ? user.sellerProfile : undefined
+      }
+    });
+  } catch (err) {
+    console.error('Switch role error:', err);
+    res.status(500).json({ message: 'Role switch failed' });
   }
 });
 

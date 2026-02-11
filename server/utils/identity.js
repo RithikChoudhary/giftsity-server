@@ -120,6 +120,42 @@ async function createAuthSession(token, identity, req) {
   }
 }
 
+/**
+ * Find all roles that exist for a given email.
+ * Returns array like ['customer', 'seller'] or ['customer'].
+ */
+async function findAllRolesForEmail(email) {
+  const normalizedEmail = String(email || '').toLowerCase().trim();
+  if (!normalizedEmail) return [];
+
+  const [customer, seller, admin] = await Promise.all([
+    Customer.findOne({ email: normalizedEmail }).select('_id').lean(),
+    Seller.findOne({ email: normalizedEmail }).select('_id').lean(),
+    Admin.findOne({ email: normalizedEmail }).select('_id').lean()
+  ]);
+
+  const roles = [];
+  if (customer) roles.push('customer');
+  if (seller) roles.push('seller');
+  if (admin) roles.push('admin');
+  return roles;
+}
+
+/**
+ * Find a specific role's identity for an email.
+ */
+async function findIdentityByEmailAndRole(email, role) {
+  const normalizedEmail = String(email || '').toLowerCase().trim();
+  if (!normalizedEmail || !role) return null;
+
+  const Model = ROLE_TO_MODEL[role];
+  if (!Model) return null;
+
+  const entity = await Model.findOne({ email: normalizedEmail });
+  if (!entity) return null;
+  return { role, source: 'new', entity };
+}
+
 module.exports = {
   ROLE_TO_MODEL,
   normalizeUser,
@@ -127,5 +163,7 @@ module.exports = {
   findIdentityByToken,
   signIdentityToken,
   createAuthSession,
-  getAuthMeta
+  getAuthMeta,
+  findAllRolesForEmail,
+  findIdentityByEmailAndRole
 };

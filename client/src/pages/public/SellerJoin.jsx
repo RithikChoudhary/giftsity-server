@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Gift, ArrowRight, Check, Loader, Upload, Instagram, Mail, Phone, Store, Camera } from 'lucide-react';
+import { Gift, ArrowRight, Check, Loader, Upload, Instagram, Mail, Phone, Store, Camera, ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SEO from '../../components/SEO';
 import API from '../../api';
@@ -26,6 +26,8 @@ export default function SellerJoin() {
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState('');
   const [gstNumber, setGstNumber] = useState('');
+  const [coverPhoto, setCoverPhoto] = useState(null);
+  const [coverPreview, setCoverPreview] = useState('');
 
   useEffect(() => {
     if (user?.userType === 'seller') navigate('/seller');
@@ -65,6 +67,14 @@ export default function SellerJoin() {
     }
   };
 
+  const handleCoverChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setCoverPhoto(file);
+      setCoverPreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleSubmitDetails = async (e) => {
     e.preventDefault();
     if (!businessName) return toast.error('Business name is required');
@@ -82,12 +92,24 @@ export default function SellerJoin() {
         avatarPublicId = uploadRes.data.publicId || '';
       }
 
-      // Step 2: Register seller with JSON body
+      // Step 2: Upload cover image if provided
+      let coverImageUrl = '';
+      let coverImagePublicId = '';
+      if (coverPhoto) {
+        const coverForm = new FormData();
+        coverForm.append('avatar', coverPhoto); // reuse upload-avatar endpoint
+        const coverRes = await API.post('/auth/upload-avatar', coverForm, { headers: { 'Content-Type': 'multipart/form-data' } });
+        coverImageUrl = coverRes.data.url || '';
+        coverImagePublicId = coverRes.data.publicId || '';
+      }
+
+      // Step 3: Register seller with JSON body
       const { data } = await API.post('/auth/register-seller', {
         email, name, phone,
         businessName, businessType, instagramUsername,
         gstNumber: gstNumber || undefined,
         avatarUrl, avatarPublicId,
+        coverImageUrl, coverImagePublicId,
         referralCode: new URLSearchParams(window.location.search).get('ref') || undefined
       });
       login(data.token, data.user);
@@ -218,6 +240,25 @@ export default function SellerJoin() {
                 </label>
               </div>
               <p className="text-xs text-theme-dim text-center">Profile photo (should match your Instagram)</p>
+
+              {/* Cover Photo */}
+              <div>
+                <label className="text-xs text-theme-muted font-medium mb-1 block">Cover Image (optional)</label>
+                <label className="relative cursor-pointer group block">
+                  <div className="w-full h-28 rounded-xl overflow-hidden bg-inset border-2 border-dashed border-edge flex items-center justify-center hover:border-amber-500/50 transition-colors">
+                    {coverPreview ? (
+                      <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="text-center">
+                        <ImageIcon className="w-6 h-6 text-theme-dim mx-auto mb-1" />
+                        <p className="text-xs text-theme-dim">Click to upload cover image</p>
+                        <p className="text-[10px] text-theme-dim">Recommended: 1200 x 400px</p>
+                      </div>
+                    )}
+                  </div>
+                  <input type="file" accept="image/*" onChange={handleCoverChange} className="hidden" />
+                </label>
+              </div>
 
               <div>
                 <label className="text-xs text-theme-muted font-medium mb-1 block">Business Name *</label>

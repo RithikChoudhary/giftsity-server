@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Settings, Store, CreditCard, MapPin, Loader, AlertTriangle, Send } from 'lucide-react';
+import { sellerAPI } from '../../api';
+import { Store, CreditCard, MapPin, Loader, AlertTriangle, Send, Camera, ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { SellerAPI } from '../../api';
 
@@ -9,6 +10,12 @@ export default function SellerSettings() {
   const [tab, setTab] = useState('store');
   const [loading, setLoading] = useState(false);
   const [suspendMsg, setSuspendMsg] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
+  const [coverUrl, setCoverUrl] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const avatarInputRef = useRef(null);
+  const coverInputRef = useRef(null);
 
   const [storeForm, setStoreForm] = useState({ businessName: '', businessType: 'individual', gstNumber: '', instagramUsername: '' });
   const [bankForm, setBankForm] = useState({ accountHolderName: '', accountNumber: '', ifscCode: '', bankName: '' });
@@ -24,17 +31,49 @@ export default function SellerSettings() {
         setBankForm({ accountHolderName: sp.bankDetails?.accountHolderName || '', accountNumber: sp.bankDetails?.accountNumber || '', ifscCode: sp.bankDetails?.ifscCode || '', bankName: sp.bankDetails?.bankName || '' });
         setAddressForm({ street: sp.businessAddress?.street || '', city: sp.businessAddress?.city || '', state: sp.businessAddress?.state || '', pincode: sp.businessAddress?.pincode || '' });
         setPickupForm({ street: sp.pickupAddress?.street || '', city: sp.pickupAddress?.city || '', state: sp.pickupAddress?.state || '', pincode: sp.pickupAddress?.pincode || '', phone: sp.pickupAddress?.phone || '' });
+        setAvatarUrl(sp.avatar?.url || '');
+        setCoverUrl(sp.coverImage?.url || '');
       } catch {
-        // Fallback to auth context
         const sp = user?.sellerProfile || {};
         setStoreForm({ businessName: sp.businessName || '', businessType: sp.businessType || 'individual', gstNumber: sp.gstNumber || '', instagramUsername: sp.instagramUsername || '' });
         setBankForm({ accountHolderName: sp.bankDetails?.accountHolderName || '', accountNumber: sp.bankDetails?.accountNumber || '', ifscCode: sp.bankDetails?.ifscCode || '', bankName: sp.bankDetails?.bankName || '' });
         setAddressForm({ street: sp.businessAddress?.street || '', city: sp.businessAddress?.city || '', state: sp.businessAddress?.state || '', pincode: sp.businessAddress?.pincode || '' });
         setPickupForm({ street: sp.pickupAddress?.street || '', city: sp.pickupAddress?.city || '', state: sp.pickupAddress?.state || '', pincode: sp.pickupAddress?.pincode || '', phone: sp.pickupAddress?.phone || '' });
+        setAvatarUrl(sp.avatar?.url || '');
+        setCoverUrl(sp.coverImage?.url || '');
       }
     };
     loadSettings();
   }, []);
+
+  const handleImageUpload = async (file, type) => {
+    if (!file) return;
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.type)) {
+      toast.error('Only JPEG, PNG, WebP, and GIF images are allowed');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB');
+      return;
+    }
+
+    const setter = type === 'avatar' ? setUploadingAvatar : setUploadingCover;
+    setter(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('type', type);
+      const { data } = await sellerAPI.uploadImage(formData);
+      if (type === 'avatar') setAvatarUrl(data.url);
+      else setCoverUrl(data.url);
+      toast.success(`${type === 'avatar' ? 'Avatar' : 'Cover image'} updated`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Upload failed');
+    } finally {
+      setter(false);
+    }
+  };
 
   const saveStore = async () => {
     setLoading(true);
@@ -117,31 +156,102 @@ export default function SellerSettings() {
 
       {/* Store settings */}
       {tab === 'store' && (
-        <div className="bg-card border border-edge/50 rounded-xl p-6 space-y-4">
-          <div>
-            <label className="text-xs text-theme-muted font-medium mb-1 block">Business Name</label>
-            <input type="text" value={storeForm.businessName} onChange={e => setStoreForm(f => ({ ...f, businessName: e.target.value }))} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
+        <div className="space-y-6">
+          {/* Cover Image */}
+          <div className="bg-card border border-edge/50 rounded-xl overflow-hidden">
+            <div
+              className="relative h-40 bg-inset cursor-pointer group"
+              onClick={() => coverInputRef.current?.click()}
+            >
+              {coverUrl ? (
+                <img src={coverUrl} alt="Cover" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <ImageIcon className="w-8 h-8 text-theme-dim mx-auto mb-1" />
+                    <p className="text-xs text-theme-dim">Click to upload cover image</p>
+                    <p className="text-[10px] text-theme-dim">Recommended: 1200 x 400px</p>
+                  </div>
+                </div>
+              )}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                {uploadingCover ? (
+                  <Loader className="w-6 h-6 text-white animate-spin" />
+                ) : (
+                  <div className="text-center text-white">
+                    <Camera className="w-6 h-6 mx-auto mb-1" />
+                    <span className="text-xs font-medium">Change Cover</span>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={e => handleImageUpload(e.target.files[0], 'cover')}
+              />
+            </div>
+
+            {/* Avatar overlapping cover */}
+            <div className="px-6 pb-4 -mt-10 relative z-10">
+              <div
+                className="w-20 h-20 rounded-full border-4 border-card bg-inset cursor-pointer group relative overflow-hidden"
+                onClick={() => avatarInputRef.current?.click()}
+              >
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Camera className="w-6 h-6 text-theme-dim" />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-full">
+                  {uploadingAvatar ? (
+                    <Loader className="w-5 h-5 text-white animate-spin" />
+                  ) : (
+                    <Camera className="w-5 h-5 text-white" />
+                  )}
+                </div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={e => handleImageUpload(e.target.files[0], 'avatar')}
+                />
+              </div>
+              <p className="text-xs text-theme-dim mt-2">Click avatar or cover to change</p>
+            </div>
           </div>
-          <div>
-            <label className="text-xs text-theme-muted font-medium mb-1 block">Business Type</label>
-            <select value={storeForm.businessType} onChange={e => setStoreForm(f => ({ ...f, businessType: e.target.value }))} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50">
-              <option value="individual">Individual</option>
-              <option value="proprietorship">Proprietorship</option>
-              <option value="partnership">Partnership</option>
-              <option value="pvt_ltd">Pvt Ltd</option>
-            </select>
+
+          {/* Store form fields */}
+          <div className="bg-card border border-edge/50 rounded-xl p-6 space-y-4">
+            <div>
+              <label className="text-xs text-theme-muted font-medium mb-1 block">Business Name</label>
+              <input type="text" value={storeForm.businessName} onChange={e => setStoreForm(f => ({ ...f, businessName: e.target.value }))} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
+            </div>
+            <div>
+              <label className="text-xs text-theme-muted font-medium mb-1 block">Business Type</label>
+              <select value={storeForm.businessType} onChange={e => setStoreForm(f => ({ ...f, businessType: e.target.value }))} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50">
+                <option value="individual">Individual</option>
+                <option value="proprietorship">Proprietorship</option>
+                <option value="partnership">Partnership</option>
+                <option value="pvt_ltd">Pvt Ltd</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-theme-muted font-medium mb-1 block">Instagram Username</label>
+              <input type="text" value={storeForm.instagramUsername} onChange={e => setStoreForm(f => ({ ...f, instagramUsername: e.target.value }))} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
+            </div>
+            <div>
+              <label className="text-xs text-theme-muted font-medium mb-1 block">GST Number</label>
+              <input type="text" value={storeForm.gstNumber} onChange={e => setStoreForm(f => ({ ...f, gstNumber: e.target.value }))} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
+            </div>
+            <button onClick={saveStore} disabled={loading} className="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-xl font-semibold text-sm transition-colors">
+              {loading ? 'Saving...' : 'Save Changes'}
+            </button>
           </div>
-          <div>
-            <label className="text-xs text-theme-muted font-medium mb-1 block">Instagram Username</label>
-            <input type="text" value={storeForm.instagramUsername} onChange={e => setStoreForm(f => ({ ...f, instagramUsername: e.target.value }))} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
-          </div>
-          <div>
-            <label className="text-xs text-theme-muted font-medium mb-1 block">GST Number</label>
-            <input type="text" value={storeForm.gstNumber} onChange={e => setStoreForm(f => ({ ...f, gstNumber: e.target.value }))} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
-          </div>
-          <button onClick={saveStore} disabled={loading} className="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-xl font-semibold text-sm transition-colors">
-            {loading ? 'Saving...' : 'Save Changes'}
-          </button>
         </div>
       )}
 

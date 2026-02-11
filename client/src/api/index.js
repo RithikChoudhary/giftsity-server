@@ -63,6 +63,8 @@ export const authAPI = {
   me: () => API.get('/auth/me'),
   updateProfile: (data) => API.put('/auth/profile', data),
   updateAddresses: (addresses) => API.put('/auth/addresses', { addresses }),
+  getAvailableRoles: () => API.get('/auth/available-roles'),
+  switchRole: (role) => API.post('/auth/switch-role', { role }),
 };
 
 export const productAPI = {
@@ -93,6 +95,7 @@ export const sellerAPI = {
   getMarketing: () => SellerAPI.get('/marketing'),
   requestUnsuspend: (reason) => SellerAPI.post('/request-unsuspend', { reason }),
   bulkCsvUpload: (formData) => SellerAPI.post('/products/bulk-csv', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  uploadImage: (formData) => SellerAPI.post('/upload-image', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
 };
 
 export const shippingAPI = {

@@ -3,10 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
-import { ShoppingBag, User, Menu, X, LogOut, Package, Sun, Moon, Gift, Search, Heart } from 'lucide-react';
+import { ShoppingBag, User, Menu, X, LogOut, Package, Sun, Moon, Gift, Search, Heart, ArrowLeftRight } from 'lucide-react';
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, logout, availableRoles, switchRole } = useAuth();
   const { items } = useCart();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -14,6 +14,7 @@ export default function Navbar() {
   const [userMenu, setUserMenu] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [switchingRole, setSwitchingRole] = useState(false);
   const searchRef = useRef(null);
 
   useEffect(() => {
@@ -33,6 +34,24 @@ export default function Navbar() {
   const isCustomer = !user || user.userType === 'customer';
   const isSeller = user?.userType === 'seller';
   const isAdmin = user?.userType === 'admin';
+  const canSwitchRole = availableRoles.length > 1;
+
+  const handleSwitchRole = async (targetRole) => {
+    if (switchingRole) return;
+    setSwitchingRole(true);
+    try {
+      await switchRole(targetRole);
+      setUserMenu(false);
+      setMenuOpen(false);
+      if (targetRole === 'seller') navigate('/seller');
+      else if (targetRole === 'admin') navigate('/admin');
+      else navigate('/');
+    } catch (err) {
+      console.error('Role switch failed:', err);
+    } finally {
+      setSwitchingRole(false);
+    }
+  };
 
   return (
     <nav className="sticky top-0 z-50 bg-surface/80 backdrop-blur-xl border-b border-edge/50">
@@ -117,13 +136,33 @@ export default function Navbar() {
                   <span className="hidden sm:block text-sm">{user.name?.split(' ')[0]}</span>
                 </button>
                 {userMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-card border border-edge rounded-xl shadow-xl py-1 animate-fade-in z-50">
+                  <div className="absolute right-0 mt-2 w-52 bg-card border border-edge rounded-xl shadow-xl py-1 animate-fade-in z-50">
                     <Link to="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-theme-secondary hover:bg-inset/50" onClick={() => setUserMenu(false)}>
                       <User className="w-4 h-4" /> Profile
                     </Link>
                     <Link to="/orders" className="flex items-center gap-2 px-4 py-2 text-sm text-theme-secondary hover:bg-inset/50" onClick={() => setUserMenu(false)}>
                       <Package className="w-4 h-4" /> My Orders
                     </Link>
+                    {canSwitchRole && (
+                      <>
+                        <div className="border-t border-edge/50 my-1" />
+                        <div className="px-4 py-1.5">
+                          <span className="text-[11px] uppercase tracking-wider text-theme-dim font-medium">Switch to</span>
+                        </div>
+                        {availableRoles.filter(r => r !== (user?.role || user?.userType)).map(targetRole => (
+                          <button
+                            key={targetRole}
+                            onClick={() => handleSwitchRole(targetRole)}
+                            disabled={switchingRole}
+                            className="flex items-center gap-2 px-4 py-2 text-sm text-amber-400 hover:bg-inset/50 w-full text-left disabled:opacity-50"
+                          >
+                            <ArrowLeftRight className="w-4 h-4" />
+                            {targetRole === 'seller' ? 'Seller Dashboard' : targetRole === 'admin' ? 'Admin Dashboard' : 'Customer'}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                    <div className="border-t border-edge/50 my-1" />
                     <button onClick={() => { logout(); setUserMenu(false); navigate('/'); }} className="flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-inset/50 w-full text-left">
                       <LogOut className="w-4 h-4" /> Logout
                     </button>
@@ -162,6 +201,23 @@ export default function Navbar() {
             )}
             {isSeller && <Link to="/seller" className="block py-2 text-sm text-theme-secondary" onClick={() => setMenuOpen(false)}>Seller Dashboard</Link>}
             {isAdmin && <Link to="/admin" className="block py-2 text-sm text-theme-secondary" onClick={() => setMenuOpen(false)}>Admin Dashboard</Link>}
+            {canSwitchRole && (
+              <>
+                <div className="border-t border-edge/50 my-2" />
+                <p className="text-[11px] uppercase tracking-wider text-theme-dim font-medium pb-1">Switch to</p>
+                {availableRoles.filter(r => r !== (user?.role || user?.userType)).map(targetRole => (
+                  <button
+                    key={targetRole}
+                    onClick={() => handleSwitchRole(targetRole)}
+                    disabled={switchingRole}
+                    className="flex items-center gap-2 py-2 text-sm text-amber-400 hover:text-amber-300 disabled:opacity-50 w-full text-left"
+                  >
+                    <ArrowLeftRight className="w-4 h-4" />
+                    {targetRole === 'seller' ? 'Seller Dashboard' : targetRole === 'admin' ? 'Admin Dashboard' : 'Customer'}
+                  </button>
+                ))}
+              </>
+            )}
           </div>
         </div>
       )}
