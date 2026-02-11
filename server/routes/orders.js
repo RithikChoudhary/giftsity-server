@@ -11,6 +11,13 @@ const { logActivity } = require('../utils/audit');
 const { validateOrderCreation, validatePaymentVerification } = require('../middleware/validators');
 const router = express.Router();
 
+// Normalize phone to 10 digits for Cashfree
+const normalizePhone = (phone) => {
+  const digits = (phone || '').replace(/\D/g, '');
+  if (digits.length >= 10) return digits.slice(-10);
+  return '9999999999';
+};
+
 // Generate order number: GFT-YYYYMMDD-XXXX
 const generateOrderNumber = () => {
   const d = new Date();
@@ -131,6 +138,15 @@ router.post('/', requireAuth, validateOrderCreation, async (req, res) => {
 
     // Apply coupon discount if valid
     const grandTotalBeforeDiscount = orders.reduce((s, o) => s + o.totalAmount, 0);
+    // Re-validate coupon against actual order total and usage
+    if (validCoupon) {
+      if (validCoupon.minOrderAmount > 0 && grandTotalBeforeDiscount < validCoupon.minOrderAmount) {
+        validCoupon = null; // Order total below minimum
+      }
+      if (validCoupon && validCoupon.usedBy?.map(id => id.toString()).includes(req.user._id.toString())) {
+        validCoupon = null; // Already used by this customer
+      }
+    }
     if (validCoupon) {
       let discount = 0;
       if (validCoupon.type === 'percent') {
@@ -166,10 +182,10 @@ router.post('/', requireAuth, validateOrderCreation, async (req, res) => {
       customerDetails: {
         customerId: req.user._id.toString(),
         email: req.user.email,
-        phone: req.user.phone || shippingAddress.phone || '9999999999',
+        phone: normalizePhone(req.user.phone || shippingAddress.phone),
         name: req.user.name || 'Customer'
       },
-      returnUrl: `${process.env.CLIENT_URL}/orders?cf_id=${cfOrderId}`
+      returnUrl: `${(process.env.CLIENT_URL || '').split(',')[0].trim() || 'http://localhost:5173'}/orders?cf_id=${cfOrderId}`
     });
 
     // Store Cashfree order ID and payment session on all orders

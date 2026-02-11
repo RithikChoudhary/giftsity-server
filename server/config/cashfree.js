@@ -27,7 +27,7 @@ async function createCashfreeOrder({ orderId, orderAmount, customerDetails, retu
       customer_name: customerDetails.name || 'Customer'
     },
     order_meta: {
-      return_url: returnUrl || `${process.env.CLIENT_URL}/orders?cf_id={order_id}`,
+      return_url: returnUrl || `${(process.env.CLIENT_URL || '').split(',')[0].trim() || 'http://localhost:5173'}/orders?cf_id={order_id}`,
       notify_url: notifyUrl || ''
     }
   }, { headers: cashfreeHeaders() });
