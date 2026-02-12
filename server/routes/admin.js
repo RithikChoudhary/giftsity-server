@@ -16,6 +16,7 @@ const { uploadImage, deleteImage } = require('../config/cloudinary');
 const { sendCommissionChangeNotification, sendPayoutNotification, sendCorporateWelcomeEmail, sendCorporateQuoteNotification } = require('../utils/email');
 const { logActivity } = require('../utils/audit');
 const logger = require('../utils/logger');
+const { invalidateCache } = require('../middleware/cache');
 const router = express.Router();
 
 router.use(requireAuth, requireAdmin);
@@ -155,6 +156,8 @@ router.put('/sellers/:id/approve', async (req, res) => {
     const sellerResponse = seller.toObject();
     delete sellerResponse.otp;
     delete sellerResponse.otpExpiry;
+    invalidateCache('/api/products');
+    invalidateCache('/api/store/');
     res.json({ message: wasSuspended ? 'Seller unsuspended. Products restored.' : 'Seller approved', seller: sellerResponse });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -181,6 +184,8 @@ router.put('/sellers/:id/suspend', async (req, res) => {
     const sellerResponse = seller.toObject();
     delete sellerResponse.otp;
     delete sellerResponse.otpExpiry;
+    invalidateCache('/api/products');
+    invalidateCache('/api/store/');
     res.json({ message: 'Seller suspended. Products hidden.', seller: sellerResponse });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -366,6 +371,7 @@ router.put('/categories/:id', async (req, res) => {
 
     const category = await Category.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!category) return res.status(404).json({ message: 'Category not found' });
+    invalidateCache('/api/products/categories');
     logActivity({ domain: 'admin', action: 'category_updated', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Category', targetId: category._id, message: `Category "${category.name}" updated` });
     res.json({ category, message: 'Category updated' });
   } catch (err) {

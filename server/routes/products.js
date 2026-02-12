@@ -4,6 +4,7 @@ const Product = require('../models/Product');
 const Category = require('../models/Category');
 const { requireAuth } = require('../middleware/auth');
 const { uploadImage } = require('../config/cloudinary');
+const { cacheMiddleware } = require('../middleware/cache');
 const logger = require('../utils/logger');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB per customization image
@@ -33,7 +34,7 @@ router.post('/upload-customization', requireAuth, upload.single('image'), async 
 });
 
 // GET /api/products - public product listing
-router.get('/', async (req, res) => {
+router.get('/', cacheMiddleware(60), async (req, res) => {
   try {
     const { category, minPrice, maxPrice, seller, search, featured, sort, page = 1, limit = 24 } = req.query;
 
@@ -81,7 +82,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/products/featured
-router.get('/featured', async (req, res) => {
+router.get('/featured', cacheMiddleware(60), async (req, res) => {
   try {
     const Seller = require('../models/Seller');
     const suspendedSellers = await Seller.find({ status: 'suspended' }).select('_id').lean();
@@ -100,7 +101,7 @@ router.get('/featured', async (req, res) => {
 });
 
 // GET /api/products/categories
-router.get('/categories', async (req, res) => {
+router.get('/categories', cacheMiddleware(300), async (req, res) => {
   try {
     const categories = await Category.find({ isActive: true }).sort({ displayOrder: 1 });
     res.json({ categories });
@@ -110,7 +111,7 @@ router.get('/categories', async (req, res) => {
 });
 
 // GET /api/products/:slug
-router.get('/:slug', async (req, res) => {
+router.get('/:slug', cacheMiddleware(120), async (req, res) => {
   try {
     const product = await Product.findOne({ slug: req.params.slug, isActive: true })
       .populate('sellerId', 'name status sellerProfile.businessName sellerProfile.businessSlug sellerProfile.avatar sellerProfile.rating sellerProfile.totalOrders sellerProfile.isVerified');

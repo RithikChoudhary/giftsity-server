@@ -4,5 +4,8 @@ Disallow: /admin
 Disallow: /seller
 Disallow: /profile
 Disallow: /orders
+Disallow: /corporate
+Disallow: /wishlist
 
 Sitemap: https://giftsity.com/sitemap.xml
+Sitemap: https://giftsity-server.onrender.com/api/sitemap.xml

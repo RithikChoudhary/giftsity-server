@@ -64,21 +64,42 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-    <!-- Google Analytics (GA4) — Replace G-XXXXXXXXXX with your Measurement ID -->
-    <!--
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <!-- Canonical -->
+    <link rel="canonical" href="https://giftsity.com/" />
+
+    <!-- Structured Data: BreadcrumbList -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://giftsity.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Shop", "item": "https://giftsity.com/shop" },
+        { "@type": "ListItem", "position": 3, "name": "Sellers", "item": "https://giftsity.com/sellers" }
+      ]
+    }
+    </script>
+
+    <!-- Google Analytics (GA4) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5JKNZP50MT"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-      gtag('config', 'G-XXXXXXXXXX');
+      gtag('config', 'G-5JKNZP50MT');
     </script>
-    -->
 
-    <!-- Cashfree SDK -->
-    <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+    <!-- Cashfree SDK (deferred to avoid render-blocking) -->
+    <script defer src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
   </head>
   <body>
+    <noscript>
+      <div style="padding:2rem;text-align:center;font-family:sans-serif;">
+        <h1>Giftsity — India's Gift Marketplace</h1>
+        <p>Please enable JavaScript to use this application.</p>
+        <p>Visit us at <a href="https://giftsity.com">giftsity.com</a></p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

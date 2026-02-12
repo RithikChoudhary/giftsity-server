@@ -1,0 +1,10 @@
+{
+  "name": "giftsity-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "api": "node api-latency.js",
+    "seo": "node seo-audit.js",
+    "test": "node api-latency.js && node seo-audit.js"
+  }
+}

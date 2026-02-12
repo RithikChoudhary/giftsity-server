@@ -6,10 +6,11 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadImage } = require('../config/cloudinary');
 const { sanitizeBody } = require('../middleware/sanitize');
 const { validateReviewCreation } = require('../middleware/validators');
+const { cacheMiddleware, invalidateCache } = require('../middleware/cache');
 const router = express.Router();
 
 // GET /api/reviews/product/:productId
-router.get('/product/:productId', async (req, res) => {
+router.get('/product/:productId', cacheMiddleware(120), async (req, res) => {
   try {
     const mongoose = require('mongoose');
     if (!mongoose.Types.ObjectId.isValid(req.params.productId)) {
@@ -103,6 +104,11 @@ router.post('/', requireAuth, sanitizeBody, validateReviewCreation, async (req, 
       await product.save();
     }
 
+    // Invalidate cached reviews and product data
+    invalidateCache('/api/reviews/product/' + productId);
+    invalidateCache('/api/products/' + (await Product.findById(productId).select('slug').lean())?.slug);
+    invalidateCache('/api/store/');
+
     res.status(201).json({ review, message: 'Review submitted' });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -131,6 +137,10 @@ router.put('/:id/hide', requireAuth, requireAdmin, async (req, res) => {
       product.reviewCount = agg[0] ? agg[0].count : 0;
       await product.save();
     }
+
+    // Invalidate cached reviews
+    invalidateCache('/api/reviews/product/' + review.productId);
+    invalidateCache('/api/store/');
 
     res.json({ review, message: review.isHidden ? 'Review hidden' : 'Review shown' });
   } catch (err) {

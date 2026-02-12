@@ -5,6 +5,7 @@ const Product = require('../models/Product');
 const Review = require('../models/Review');
 const Order = require('../models/Order');
 const PlatformSettings = require('../models/PlatformSettings');
+const { cacheMiddleware } = require('../middleware/cache');
 const router = express.Router();
 
 // Helper: find seller by businessSlug OR ObjectId
@@ -18,7 +19,7 @@ function sellerQuery(slug, requireActive = true) {
 }
 
 // GET /api/store/info - public platform info (social links, contact)
-router.get('/info', async (req, res) => {
+router.get('/info', cacheMiddleware(600), async (req, res) => {
   try {
     const settings = await PlatformSettings.getSettings();
     res.json({
@@ -36,7 +37,7 @@ router.get('/info', async (req, res) => {
 });
 
 // GET /api/store/top-sellers - featured sellers for homepage
-router.get('/featured/top-sellers', async (req, res) => {
+router.get('/featured/top-sellers', cacheMiddleware(300), async (req, res) => {
   try {
     const sellers = await Seller.find({
       status: 'active',
@@ -70,7 +71,7 @@ router.get('/featured/top-sellers', async (req, res) => {
 });
 
 // GET /api/store/sellers - all active sellers (public, paginated)
-router.get('/sellers', async (req, res) => {
+router.get('/sellers', cacheMiddleware(120), async (req, res) => {
   try {
     const { page = 1, limit = 24, sort = 'orders' } = req.query;
     const pageNum = parseInt(page);
@@ -121,7 +122,7 @@ router.get('/sellers', async (req, res) => {
 });
 
 // GET /api/store/:slug - public seller store page
-router.get('/:slug', async (req, res) => {
+router.get('/:slug', cacheMiddleware(120), async (req, res) => {
   try {
     const seller = await Seller.findOne(sellerQuery(req.params.slug))
       .select('-otp -otpExpiry -sellerProfile.bankDetails');
@@ -167,7 +168,7 @@ router.get('/:slug', async (req, res) => {
 });
 
 // GET /api/store/:slug/products - seller's products (Instagram grid)
-router.get('/:slug/products', async (req, res) => {
+router.get('/:slug/products', cacheMiddleware(60), async (req, res) => {
   try {
     const { page = 1, limit = 24 } = req.query;
     const seller = await Seller.findOne(sellerQuery(req.params.slug, false));
@@ -189,7 +190,7 @@ router.get('/:slug/products', async (req, res) => {
 });
 
 // GET /api/store/:slug/reviews - reviews for seller's products
-router.get('/:slug/reviews', async (req, res) => {
+router.get('/:slug/reviews', cacheMiddleware(120), async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;
     const seller = await Seller.findOne(sellerQuery(req.params.slug, false));
