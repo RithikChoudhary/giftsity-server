@@ -172,6 +172,18 @@ router.post('/register-seller', async (req, res) => {
       return res.status(400).json({ message: 'Instagram username is required' });
     }
 
+    // Verify Instagram username exists
+    const cleanIg = instagramUsername.replace('@', '').trim();
+    try {
+      const { verifyInstagramUsername } = require('../utils/instagram');
+      const igResult = await verifyInstagramUsername(cleanIg);
+      if (!igResult.exists) {
+        return res.status(400).json({ message: `Instagram account @${cleanIg} not found. Please enter a valid username.` });
+      }
+    } catch (igErr) {
+      console.warn('[Instagram] Verification failed during registration, allowing:', igErr.message);
+    }
+
     const normalizedEmail = email.toLowerCase().trim();
     let seller = await Seller.findOne({ email: normalizedEmail });
     if (seller) {
@@ -215,7 +227,9 @@ router.post('/register-seller', async (req, res) => {
         referralCode: sellerRefCode,
         referredBy: referredBySeller?._id || null,
         referralCount: 0,
-        instagramUsername: instagramUsername.replace('@', '').trim(),
+        instagramUsername: cleanIg,
+        instagramVerified: true,
+        shiprocketPickupLocation: '',
         suspensionRemovalRequested: false,
         suspensionRemovalReason: ''
       }
@@ -323,6 +337,17 @@ router.put('/addresses', requireAuth, sanitizeBody, async (req, res) => {
     res.json({ message: 'Addresses updated', addresses: req.user.shippingAddresses });
   } catch (err) {
     res.status(500).json({ message: 'Update failed' });
+  }
+});
+
+// GET /api/auth/verify-instagram/:username - public Instagram username verification
+router.get('/verify-instagram/:username', async (req, res) => {
+  try {
+    const { verifyInstagramUsername } = require('../utils/instagram');
+    const result = await verifyInstagramUsername(req.params.username);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ exists: false, error: 'Verification failed' });
   }
 });
 

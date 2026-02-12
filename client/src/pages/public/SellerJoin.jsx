@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Gift, ArrowRight, Check, Loader, Upload, Instagram, Mail, Phone, Store, Camera, ImageIcon } from 'lucide-react';
+import { Gift, ArrowRight, Check, Loader, Upload, Instagram, Mail, Phone, Store, Camera, ImageIcon, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SEO from '../../components/SEO';
 import API from '../../api';
@@ -24,6 +24,8 @@ export default function SellerJoin() {
   const [businessName, setBusinessName] = useState('');
   const [businessType, setBusinessType] = useState('individual');
   const [instagramUsername, setInstagramUsername] = useState('');
+  const [igVerifying, setIgVerifying] = useState(false);
+  const [igVerified, setIgVerified] = useState(null); // null = not checked, true = valid, false = invalid
   const [profilePhoto, setProfilePhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState('');
   const [gstNumber, setGstNumber] = useState('');
@@ -37,6 +39,18 @@ export default function SellerJoin() {
   useEffect(() => {
     if (user?.userType === 'seller') navigate('/seller');
   }, [user]);
+
+  const verifyInstagram = async () => {
+    const clean = instagramUsername.replace('@', '').trim();
+    if (!clean) { setIgVerified(null); return; }
+    setIgVerifying(true);
+    try {
+      const { data } = await API.get(`/auth/verify-instagram/${clean}`);
+      setIgVerified(data.exists === true);
+      if (!data.exists) toast.error(`Instagram account @${clean} not found`);
+    } catch { setIgVerified(null); }
+    setIgVerifying(false);
+  };
 
   const handleSendOTP = async (e) => {
     e.preventDefault();
@@ -309,8 +323,20 @@ export default function SellerJoin() {
                 <label className="text-xs text-theme-muted font-medium mb-1 block">Instagram Username *</label>
                 <div className="relative">
                   <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-dim" />
-                  <input type="text" value={instagramUsername} onChange={e => setInstagramUsername(e.target.value)} placeholder="@yourbrand" className="w-full pl-10 pr-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" required />
+                  <input type="text" value={instagramUsername}
+                    onChange={e => { setInstagramUsername(e.target.value); setIgVerified(null); }}
+                    onBlur={verifyInstagram}
+                    placeholder="@yourbrand"
+                    className={`w-full pl-10 pr-10 py-2.5 bg-inset border rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50 ${igVerified === false ? 'border-red-500/50' : igVerified === true ? 'border-green-500/50' : 'border-edge'}`}
+                    required />
+                  {/* Verification indicator */}
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {igVerifying && <Loader className="w-4 h-4 animate-spin text-theme-dim" />}
+                    {!igVerifying && igVerified === true && <CheckCircle className="w-4 h-4 text-green-400" />}
+                    {!igVerifying && igVerified === false && <XCircle className="w-4 h-4 text-red-400" />}
+                  </div>
                 </div>
+                {igVerified === false && <p className="text-xs text-red-400 mt-1">This Instagram account was not found. Please check the username.</p>}
               </div>
               <div>
                 <label className="text-xs text-theme-muted font-medium mb-1 block">GST Number (optional)</label>

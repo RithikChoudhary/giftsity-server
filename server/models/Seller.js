@@ -65,6 +65,8 @@ const sellerSchema = new mongoose.Schema({
     referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Seller', default: null },
     referralCount: { type: Number, default: 0 },
     instagramUsername: { type: String, default: '' },
+    instagramVerified: { type: Boolean, default: false },
+    shiprocketPickupLocation: { type: String, default: '' },
     suspensionRemovalRequested: { type: Boolean, default: false },
     suspensionRemovalReason: { type: String, default: '' },
     metrics: {

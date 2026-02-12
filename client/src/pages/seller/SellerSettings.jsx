@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { sellerAPI } from '../../api';
-import { Store, CreditCard, MapPin, Loader, AlertTriangle, Send, Camera, ImageIcon } from 'lucide-react';
+import { Store, CreditCard, MapPin, Loader, AlertTriangle, Send, Camera, ImageIcon, CheckCircle, XCircle, Instagram } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { SellerAPI } from '../../api';
+import API, { SellerAPI } from '../../api';
 import ImageCropper from '../../components/ImageCropper';
 
 export default function SellerSettings() {
@@ -23,6 +23,8 @@ export default function SellerSettings() {
   const [cropperType, setCropperType] = useState(null); // 'avatar' or 'cover'
 
   const [storeForm, setStoreForm] = useState({ businessName: '', businessType: 'individual', gstNumber: '', instagramUsername: '' });
+  const [igVerifying, setIgVerifying] = useState(false);
+  const [igVerified, setIgVerified] = useState(null); // null = not checked, true = valid, false = invalid
   const [bankForm, setBankForm] = useState({ accountHolderName: '', accountNumber: '', ifscCode: '', bankName: '' });
   const [addressForm, setAddressForm] = useState({ street: '', city: '', state: '', pincode: '' });
   const [pickupForm, setPickupForm] = useState({ street: '', city: '', state: '', pincode: '', phone: '' });
@@ -50,6 +52,18 @@ export default function SellerSettings() {
     };
     loadSettings();
   }, []);
+
+  const verifyInstagram = async () => {
+    const clean = storeForm.instagramUsername?.replace('@', '').trim();
+    if (!clean) { setIgVerified(null); return; }
+    setIgVerifying(true);
+    try {
+      const { data } = await API.get(`/auth/verify-instagram/${clean}`);
+      setIgVerified(data.exists === true);
+      if (!data.exists) toast.error(`Instagram account @${clean} not found`);
+    } catch { setIgVerified(null); }
+    setIgVerifying(false);
+  };
 
   const handleImageSelect = (file, type) => {
     if (!file) return;
@@ -99,7 +113,7 @@ export default function SellerSettings() {
       const { data } = await SellerAPI.put('/settings', { businessName: storeForm.businessName, businessType: storeForm.businessType, gstNumber: storeForm.gstNumber, instagramUsername: storeForm.instagramUsername });
       login(data.token, data.user);
       toast.success('Store settings saved');
-    } catch (err) { toast.error('Failed to save'); }
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to save store settings'); }
     setLoading(false);
   };
 
@@ -260,7 +274,20 @@ export default function SellerSettings() {
             </div>
             <div>
               <label className="text-xs text-theme-muted font-medium mb-1 block">Instagram Username</label>
-              <input type="text" value={storeForm.instagramUsername} onChange={e => setStoreForm(f => ({ ...f, instagramUsername: e.target.value }))} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
+              <div className="relative">
+                <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-dim" />
+                <input type="text" value={storeForm.instagramUsername}
+                  onChange={e => { setStoreForm(f => ({ ...f, instagramUsername: e.target.value })); setIgVerified(null); }}
+                  onBlur={verifyInstagram}
+                  placeholder="@yourbrand"
+                  className={`w-full pl-10 pr-10 py-2.5 bg-inset border rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50 ${igVerified === false ? 'border-red-500/50' : igVerified === true ? 'border-green-500/50' : 'border-edge'}`} />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {igVerifying && <Loader className="w-4 h-4 animate-spin text-theme-dim" />}
+                  {!igVerifying && igVerified === true && <CheckCircle className="w-4 h-4 text-green-400" />}
+                  {!igVerifying && igVerified === false && <XCircle className="w-4 h-4 text-red-400" />}
+                </div>
+              </div>
+              {igVerified === false && <p className="text-xs text-red-400 mt-1">This Instagram account was not found.</p>}
             </div>
             <div>
               <label className="text-xs text-theme-muted font-medium mb-1 block">GST Number</label>

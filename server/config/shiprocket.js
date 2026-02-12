@@ -91,6 +91,24 @@ async function getPickupLocations() {
   return locations;
 }
 
+// Add a new pickup location for a seller
+async function addPickupLocation({ pickupLocationName, name, email, phone, address, address2, city, state, pinCode, country }) {
+  const token = await getToken();
+  const res = await axios.post(`${SHIPROCKET_BASE}/settings/company/addpickup`, {
+    pickup_location: pickupLocationName,
+    name: name || pickupLocationName,
+    email: email || process.env.SHIPROCKET_EMAIL,
+    phone: phone,
+    address: address,
+    address_2: address2 || '',
+    city: city,
+    state: state,
+    pin_code: pinCode,
+    country: country || 'India'
+  }, { headers: shiprocketHeaders(token) });
+  return res.data;
+}
+
 // Generate label
 async function generateLabel({ shipmentId }) {
   const token = await getToken();
@@ -118,5 +136,6 @@ module.exports = {
   generateLabel,
   generateManifest,
   getPickupLocations,
+  addPickupLocation,
   getToken
 };
