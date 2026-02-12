@@ -260,16 +260,10 @@ async function checkExternalResources() {
   const resources = [
     { label: 'Google Fonts (Inter + Space Grotesk)',
       url: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap',
-      critical: true,
-      note: 'Render-blocking in <head>' },
+      critical: true },
     { label: 'Cashfree SDK',
       url: 'https://sdk.cashfree.com/js/v3/cashfree.js',
-      critical: true,
-      note: 'Render-blocking <script> in <head> — should use async/defer' },
-    { label: 'Google Fonts preconnect',
-      url: 'https://fonts.gstatic.com',
-      critical: false,
-      note: 'Preconnect target' },
+      critical: true },
   ];
 
   for (const r of resources) {
@@ -278,26 +272,57 @@ async function checkExternalResources() {
     const st = reachable ? PASS : (r.critical ? FAIL : WARN);
     console.log(`  ${st}  ${r.label}`);
     console.log(`  ${c.dim}       ${r.url.substring(0, 80)}...${c.reset}`);
-    if (r.note) console.log(`  ${c.dim}       Note: ${r.note}${c.reset}`);
     console.log(`  ${c.dim}       Status: ${res.status} (${res.ms}ms)${c.reset}`);
     record(st, 'External Resources', `${r.label}: ${reachable ? 'reachable' : 'UNREACHABLE'}`);
   }
 
-  // Cashfree specific warning
-  console.log(`\n  ${WARN}  Cashfree SDK loaded synchronously in <head>`);
-  console.log(`  ${c.dim}       This blocks page rendering until the script is downloaded.${c.reset}`);
-  console.log(`  ${c.dim}       Recommendation: Add 'defer' or load it only on checkout pages.${c.reset}`);
-  record(WARN, 'External Resources', 'Cashfree SDK is render-blocking — should use defer');
+  // Check if Cashfree SDK is deferred in the actual HTML
+  const htmlRes = await probe(`${SITE}/`);
+  if (htmlRes.ok && htmlRes.body) {
+    const hasCashfreeDefer = htmlRes.body.includes('defer') && htmlRes.body.includes('cashfree');
+    const st = hasCashfreeDefer ? PASS : WARN;
+    console.log(`\n  ${st}  Cashfree SDK defer attribute: ${hasCashfreeDefer ? 'YES (non-blocking)' : 'NO (render-blocking)'}`);
+    record(st, 'External Resources', hasCashfreeDefer ? 'Cashfree SDK deferred' : 'Cashfree SDK is render-blocking');
+  }
 }
 
 async function checkGoogleAnalytics() {
   console.log(`\n${c.bold}${c.magenta}── 6. Google Analytics ${'─'.repeat(41)}${c.reset}\n`);
 
-  // We know from source code that GA is commented out
-  console.log(`  ${WARN}  Google Analytics (GA4) is commented out in index.html`);
-  console.log(`  ${c.dim}       Lines 68-76: GA4 snippet exists but is wrapped in <!-- -->${c.reset}`);
-  console.log(`  ${c.dim}       No traffic tracking is active. You have zero analytics data.${c.reset}`);
-  record(WARN, 'Google Analytics', 'GA4 commented out — no tracking active');
+  // Fetch the actual HTML and check for GA4 snippet
+  const res = await probe(`${SITE}/`);
+  if (!res.ok || !res.body) {
+    console.log(`  ${WARN}  Could not fetch HTML to check GA4`);
+    record(WARN, 'Google Analytics', 'Could not verify');
+    return;
+  }
+
+  const html = res.body;
+  // Strip HTML comments, then check if gtag script is present in the remaining HTML
+  const htmlNoComments = html.replace(/<!--[\s\S]*?-->/g, '');
+  const hasActiveGtag = htmlNoComments.includes('googletagmanager.com/gtag/js');
+  const hasGtagAnywhere = html.includes('googletagmanager.com/gtag/js');
+  const isCommentedOut = hasGtagAnywhere && !hasActiveGtag;
+  const gtagMatch = html.match(/gtag\/js\?id=(G-[A-Z0-9]+)/);
+  const measurementId = gtagMatch ? gtagMatch[1] : null;
+  const hasGtagScript = hasActiveGtag;
+
+  if (hasGtagScript && !isCommentedOut) {
+    console.log(`  ${PASS}  Google Analytics (GA4) is active`);
+    if (measurementId) {
+      console.log(`  ${c.dim}       Measurement ID: ${measurementId}${c.reset}`);
+    }
+    record(PASS, 'Google Analytics', `GA4 active${measurementId ? ' (' + measurementId + ')' : ''}`);
+  } else if (hasGtagScript && isCommentedOut) {
+    console.log(`  ${WARN}  Google Analytics (GA4) is commented out in index.html`);
+    console.log(`  ${c.dim}       The gtag snippet exists but is wrapped in <!-- -->${c.reset}`);
+    console.log(`  ${c.dim}       No traffic tracking is active.${c.reset}`);
+    record(WARN, 'Google Analytics', 'GA4 commented out — no tracking active');
+  } else {
+    console.log(`  ${WARN}  Google Analytics (GA4) not found in HTML`);
+    console.log(`  ${c.dim}       No gtag.js snippet detected. No tracking active.${c.reset}`);
+    record(WARN, 'Google Analytics', 'GA4 not found');
+  }
 }
 
 async function checkCanonicalRedirect() {
