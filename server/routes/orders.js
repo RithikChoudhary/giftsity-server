@@ -17,7 +17,7 @@ const router = express.Router();
 const orderCreationLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
-  keyGenerator: (req) => req.user?._id?.toString() || req.ip,
+  keyGenerator: (req) => req.user?._id?.toString() || 'unknown',
   message: { message: 'Too many order attempts. Please try again in a minute.' },
   standardHeaders: true,
   legacyHeaders: false

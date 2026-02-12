@@ -48,7 +48,7 @@ const corporateQuoteSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-corporateQuoteSchema.index({ quoteNumber: 1 }, { unique: true });
+// quoteNumber uniqueness handled by schema `unique: true`
 corporateQuoteSchema.index({ corporateUserId: 1, status: 1 });
 corporateQuoteSchema.index({ status: 1, createdAt: -1 });
 

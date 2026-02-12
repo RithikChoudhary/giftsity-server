@@ -11,7 +11,7 @@ const corporateCatalogSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
-corporateCatalogSchema.index({ productId: 1 }, { unique: true });
+// productId uniqueness handled by schema `unique: true`
 corporateCatalogSchema.index({ isActive: 1 });
 corporateCatalogSchema.index({ tags: 1 });
 

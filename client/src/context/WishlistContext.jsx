@@ -9,20 +9,22 @@ export function WishlistProvider({ children }) {
   const { user } = useAuth();
   const [wishlistIds, setWishlistIds] = useState([]);
 
+  const isCustomer = user && (user.role === 'customer' || user.userType === 'customer');
+
   const loadWishlist = useCallback(async () => {
-    if (!user) { setWishlistIds([]); return; }
+    if (!isCustomer) { setWishlistIds([]); return; }
     try {
       const { data } = await API.get('/wishlist/ids');
       setWishlistIds(data.productIds || []);
     } catch (e) { /* silent */ }
-  }, [user]);
+  }, [isCustomer]);
 
   useEffect(() => { loadWishlist(); }, [loadWishlist]);
 
   const isWishlisted = (productId) => wishlistIds.includes(productId);
 
   const toggleWishlist = async (productId) => {
-    if (!user) { toast.error('Please sign in to use wishlist'); return; }
+    if (!isCustomer) { toast.error('Please sign in as a customer to use wishlist'); return; }
     try {
       if (isWishlisted(productId)) {
         await API.delete(`/wishlist/${productId}`);

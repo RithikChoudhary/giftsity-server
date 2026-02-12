@@ -17,7 +17,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 const otpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
-  keyGenerator: (req) => req.body?.email?.toLowerCase?.()?.trim() || req.ip,
+  keyGenerator: (req) => req.body?.email?.toLowerCase?.()?.trim() || 'unknown',
   message: { message: 'Too many OTP requests. Please try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false
