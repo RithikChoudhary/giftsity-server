@@ -104,6 +104,10 @@ export default function SellerProducts() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.title || !form.price || !form.category || !form.stock) return toast.error('Fill required fields');
+    if (form.isCustomizable && form.customizationOptions.length > 0) {
+      const emptyLabel = form.customizationOptions.find(opt => !opt.label?.trim());
+      if (emptyLabel) return toast.error('All customization options must have a label');
+    }
     setSubmitting(true);
     try {
       const formData = new FormData();

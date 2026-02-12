@@ -31,7 +31,7 @@ const adminSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-adminSchema.index({ email: 1 }, { unique: true });
+// email uniqueness handled by schema `unique: true`
 adminSchema.index({ status: 1, createdAt: -1 });
 
 adminSchema.pre('save', function (next) {

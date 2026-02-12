@@ -51,7 +51,7 @@ const corporateUserSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-corporateUserSchema.index({ email: 1 }, { unique: true });
+// email uniqueness handled by schema `unique: true`
 corporateUserSchema.index({ status: 1, createdAt: -1 });
 corporateUserSchema.index({ companyName: 'text', contactPerson: 'text' });
 
