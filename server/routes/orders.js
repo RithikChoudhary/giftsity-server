@@ -250,6 +250,15 @@ router.post('/verify-payment', requireAuth, validatePaymentVerification, async (
 
     // Update all orders with this cashfree order ID (ownership check)
     const orders = await Order.find({ cashfreeOrderId: orderId, customerId: req.user._id });
+
+    // Verify payment amount matches order total (prevent amount tampering)
+    const expectedTotal = orders.reduce((s, o) => s + o.totalAmount, 0);
+    const paidAmount = parseFloat(cfOrder.order_amount);
+    if (Math.abs(paidAmount - expectedTotal) > 1) {
+      console.error(`[Payment] AMOUNT MISMATCH on verify: paid ${paidAmount}, expected ${expectedTotal}, orderId=${orderId}`);
+      logActivity({ domain: 'payment', action: 'payment_amount_mismatch', actorRole: 'customer', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Order', targetId: orders[0]?._id, message: `Amount mismatch: paid ${paidAmount}, expected ${expectedTotal}` });
+      return res.status(400).json({ message: 'Payment amount does not match order total. Please contact support.' });
+    }
     for (const order of orders) {
       if (order.paymentStatus === 'paid') continue; // Already processed
 
@@ -323,8 +332,17 @@ router.get('/my-orders', requireAuth, async (req, res) => {
   }
 });
 
+// Rate limiter for public tracking endpoints (prevent enumeration)
+const trackingLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { message: 'Too many tracking requests. Please try again in a minute.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 // GET /api/orders/track/:orderNumber - public order tracking (no auth)
-router.get('/track/:orderNumber', async (req, res) => {
+router.get('/track/:orderNumber', trackingLimiter, async (req, res) => {
   try {
     const order = await Order.findOne({ orderNumber: req.params.orderNumber })
       .select('orderNumber status paymentStatus createdAt paidAt trackingInfo items.title items.quantity items.price items.image')
@@ -366,7 +384,7 @@ router.get('/track/:orderNumber', async (req, res) => {
 });
 
 // GET /api/orders/track/:orderNumber/details - public detailed tracking with scan events
-router.get('/track/:orderNumber/details', async (req, res) => {
+router.get('/track/:orderNumber/details', trackingLimiter, async (req, res) => {
   try {
     const order = await Order.findOne({ orderNumber: req.params.orderNumber })
       .select('_id orderNumber status trackingInfo')
@@ -531,12 +549,21 @@ router.post('/:id/cancel', requireAuth, sanitizeBody, async (req, res) => {
         });
       }
 
-      // Initiate Cashfree refund
+      // Initiate Cashfree refund (verify actual paid amount to prevent over-refund)
       try {
+        let refundAmount = order.totalAmount;
+        try {
+          const cfOrderData = await getCashfreeOrder(order.cashfreeOrderId);
+          if (cfOrderData.order_amount) {
+            refundAmount = Math.min(order.totalAmount, parseFloat(cfOrderData.order_amount));
+          }
+        } catch (cfErr) {
+          console.warn('[Refund] Could not verify Cashfree amount, using order total:', cfErr.message);
+        }
         const refundId = `refund_${order.orderNumber}_${Date.now()}`;
         await createRefund({
           orderId: order.cashfreeOrderId,
-          refundAmount: order.totalAmount,
+          refundAmount,
           refundId,
           refundNote: order.cancelReason || 'Order cancelled by customer'
         });

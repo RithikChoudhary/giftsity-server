@@ -237,8 +237,9 @@ router.post('/register-seller', async (req, res) => {
     await seller.save();
 
     if (referredBySeller) {
-      referredBySeller.sellerProfile.referralCount = (referredBySeller.sellerProfile.referralCount || 0) + 1;
-      await referredBySeller.save();
+      await Seller.findByIdAndUpdate(referredBySeller._id, {
+        $inc: { 'sellerProfile.referralCount': 1 }
+      });
     }
 
     const otp = generateOTP();

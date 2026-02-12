@@ -48,6 +48,15 @@ async function processPaymentConfirmation(cashfreeOrderId) {
     return { processed: false, reason: 'No matching orders found' };
   }
 
+  // Verify payment amount matches order total (prevent amount tampering)
+  const expectedTotal = orders.reduce((s, o) => s + o.totalAmount, 0);
+  const paidAmount = parseFloat(cfOrder.order_amount);
+  if (Math.abs(paidAmount - expectedTotal) > 1) { // 1 rupee tolerance for rounding
+    console.error(`[Payment] AMOUNT MISMATCH: paid ${paidAmount}, expected ${expectedTotal}, cashfreeOrderId=${cashfreeOrderId}`);
+    logActivity({ domain: 'payment', action: 'payment_amount_mismatch', actorRole: 'system', actorId: null, actorEmail: 'cashfree-webhook', targetType: 'Order', targetId: orders[0]._id, message: `Amount mismatch: paid ${paidAmount}, expected ${expectedTotal}` });
+    return { processed: false, reason: `Amount mismatch: paid ${paidAmount}, expected ${expectedTotal}` };
+  }
+
   let processedCount = 0;
 
   for (const order of orders) {

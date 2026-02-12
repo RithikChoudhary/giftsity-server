@@ -46,8 +46,8 @@ router.get('/', async (req, res) => {
       filter.sellerId = { $nin: suspendedIds };
     }
 
-    if (category) filter.category = category;
-    if (seller) filter.sellerId = seller;
+    if (category && typeof category === 'string') filter.category = category;
+    if (seller && typeof seller === 'string' && /^[a-f0-9]{24}$/i.test(seller)) filter.sellerId = seller;
     if (featured === 'true') filter.isFeatured = true;
     if (minPrice || maxPrice) {
       filter.price = {};

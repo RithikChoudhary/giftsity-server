@@ -19,6 +19,9 @@ const router = express.Router();
 
 router.use(requireAuth, requireAdmin);
 
+// Helper to escape user input for safe use in $regex queries (prevents ReDoS)
+const escapeRegex = (str) => (typeof str === 'string' ? str : '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 // ---- DASHBOARD ----
 router.get('/dashboard', async (req, res) => {
   try {
@@ -103,7 +106,7 @@ router.get('/sellers', async (req, res) => {
     const { status, search, page = 1, limit = 20 } = req.query;
     const filter = {};
     if (status) filter.status = status;
-    if (search) filter['sellerProfile.businessName'] = { $regex: search, $options: 'i' };
+    if (search) filter['sellerProfile.businessName'] = { $regex: escapeRegex(search), $options: 'i' };
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const sellers = await Seller.find(filter).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)).select('-otp -otpExpiry');
@@ -208,9 +211,9 @@ router.get('/products', async (req, res) => {
   try {
     const { search, category, seller, page = 1, limit = 30 } = req.query;
     const filter = {};
-    if (search) filter.title = { $regex: search, $options: 'i' };
-    if (category) filter.category = category;
-    if (seller) filter.sellerId = seller;
+    if (search) filter.title = { $regex: escapeRegex(search), $options: 'i' };
+    if (category && typeof category === 'string') filter.category = category;
+    if (seller && typeof seller === 'string' && /^[a-f0-9]{24}$/i.test(seller)) filter.sellerId = seller;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const products = await Product.find(filter).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit))
@@ -504,11 +507,12 @@ router.get('/customers', async (req, res) => {
 
     // Search filter
     if (search) {
+      const safeSearch = escapeRegex(search);
       pipeline.splice(1, 0, {
         $match: {
           $or: [
-            { name: { $regex: search, $options: 'i' } },
-            { email: { $regex: search, $options: 'i' } }
+            { name: { $regex: safeSearch, $options: 'i' } },
+            { email: { $regex: safeSearch, $options: 'i' } }
           ]
         }
       });
@@ -655,11 +659,14 @@ router.get('/corporate/users', async (req, res) => {
     const { status, search, page = 1, limit = 20 } = req.query;
     const filter = {};
     if (status) filter.status = status;
-    if (search) filter.$or = [
-      { companyName: { $regex: search, $options: 'i' } },
-      { contactPerson: { $regex: search, $options: 'i' } },
-      { email: { $regex: search, $options: 'i' } }
-    ];
+    if (search) {
+      const safeSearch = escapeRegex(search);
+      filter.$or = [
+        { companyName: { $regex: safeSearch, $options: 'i' } },
+        { contactPerson: { $regex: safeSearch, $options: 'i' } },
+        { email: { $regex: safeSearch, $options: 'i' } }
+      ];
+    }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const users = await CorporateUser.find(filter).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit)).select('-otp -otpExpiry');
@@ -959,7 +966,7 @@ router.get('/logs/activity', async (req, res) => {
     const { domain, action, actorRole, page = 1, limit = 50, from, to } = req.query;
     const filter = {};
     if (domain) filter.domain = domain;
-    if (action) filter.action = { $regex: action, $options: 'i' };
+    if (action) filter.action = { $regex: escapeRegex(action), $options: 'i' };
     if (actorRole) filter.actorRole = actorRole;
     if (from || to) {
       filter.createdAt = {};
@@ -983,7 +990,7 @@ router.get('/logs/auth', async (req, res) => {
     const { action, email, role, page = 1, limit = 50, from, to } = req.query;
     const filter = {};
     if (action) filter.action = action;
-    if (email) filter.email = { $regex: email, $options: 'i' };
+    if (email) filter.email = { $regex: escapeRegex(email), $options: 'i' };
     if (role) filter.role = role;
     if (from || to) {
       filter.createdAt = {};
@@ -1006,7 +1013,7 @@ router.get('/logs/otp', async (req, res) => {
   try {
     const { email, event, role, page = 1, limit = 50, from, to } = req.query;
     const filter = {};
-    if (email) filter.email = { $regex: email, $options: 'i' };
+    if (email) filter.email = { $regex: escapeRegex(email), $options: 'i' };
     if (event) filter.event = event;
     if (role) filter.role = role;
     if (from || to) {
