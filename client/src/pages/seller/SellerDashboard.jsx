@@ -51,6 +51,16 @@ export default function SellerDashboard() {
           <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
           <div>
             <p className="font-medium text-red-400">Account Suspended</p>
+            {user?.sellerProfile?.suspensionReason && (
+              <p className="text-sm text-red-300 mt-1">
+                <span className="font-medium">Reason:</span> {user.sellerProfile.suspensionReason}
+              </p>
+            )}
+            {user?.sellerProfile?.suspensionType && (
+              <p className="text-xs text-theme-dim mt-1">
+                Suspension type: {user.sellerProfile.suspensionType === 'auto' ? 'Automatic (performance-based)' : 'Manual (admin action)'}
+              </p>
+            )}
             <p className="text-sm text-theme-muted mt-1">Your products and store are hidden. Go to Settings to request reactivation.</p>
           </div>
         </div>

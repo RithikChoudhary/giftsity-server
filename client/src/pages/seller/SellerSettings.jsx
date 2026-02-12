@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { sellerAPI } from '../../api';
-import { Store, CreditCard, MapPin, Loader, AlertTriangle, Send, Camera, ImageIcon, CheckCircle, XCircle, Instagram } from 'lucide-react';
+import { Store, CreditCard, MapPin, Loader, AlertTriangle, Send, Camera, ImageIcon, CheckCircle, XCircle, Instagram, ExternalLink, RefreshCw, ShieldCheck, ShieldAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
 import API, { SellerAPI } from '../../api';
 import ImageCropper from '../../components/ImageCropper';
@@ -28,6 +28,8 @@ export default function SellerSettings() {
   const [bankForm, setBankForm] = useState({ accountHolderName: '', accountNumber: '', ifscCode: '', bankName: '' });
   const [addressForm, setAddressForm] = useState({ street: '', city: '', state: '', pincode: '' });
   const [pickupForm, setPickupForm] = useState({ street: '', city: '', state: '', pincode: '', phone: '' });
+  const [pickupVerified, setPickupVerified] = useState(null); // null = unknown, true = verified, false = unverified
+  const [checkingVerification, setCheckingVerification] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -40,6 +42,7 @@ export default function SellerSettings() {
         setPickupForm({ street: sp.pickupAddress?.street || '', city: sp.pickupAddress?.city || '', state: sp.pickupAddress?.state || '', pincode: sp.pickupAddress?.pincode || '', phone: sp.pickupAddress?.phone || '' });
         setAvatarUrl(sp.avatar?.url || '');
         setCoverUrl(sp.coverImage?.url || '');
+        if (sp.shiprocketPickupVerified !== undefined) setPickupVerified(sp.shiprocketPickupVerified);
       } catch {
         const sp = user?.sellerProfile || {};
         setStoreForm({ businessName: sp.businessName || '', businessType: sp.businessType || 'individual', gstNumber: sp.gstNumber || '', instagramUsername: sp.instagramUsername || '' });
@@ -48,6 +51,7 @@ export default function SellerSettings() {
         setPickupForm({ street: sp.pickupAddress?.street || '', city: sp.pickupAddress?.city || '', state: sp.pickupAddress?.state || '', pincode: sp.pickupAddress?.pincode || '', phone: sp.pickupAddress?.phone || '' });
         setAvatarUrl(sp.avatar?.url || '');
         setCoverUrl(sp.coverImage?.url || '');
+        if (sp.shiprocketPickupVerified !== undefined) setPickupVerified(sp.shiprocketPickupVerified);
       }
     };
     loadSettings();
@@ -132,9 +136,26 @@ export default function SellerSettings() {
     try {
       const { data } = await SellerAPI.put('/settings', { businessAddress: addressForm, pickupAddress: pickupForm });
       login(data.token, data.user);
+      if (data.shiprocketPickupVerified !== undefined) setPickupVerified(data.shiprocketPickupVerified);
       toast.success('Address saved');
     } catch (err) { toast.error('Failed to save'); }
     setLoading(false);
+  };
+
+  const checkPickupVerification = async () => {
+    setCheckingVerification(true);
+    try {
+      const { data } = await SellerAPI.post('/shipping/verify-pickup');
+      setPickupVerified(data.verified);
+      if (data.verified) {
+        toast.success('Pickup address is verified!');
+      } else {
+        toast('Pickup address is not yet verified. Complete the OTP verification on Shiprocket.', { icon: '⚠️' });
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to check verification status');
+    }
+    setCheckingVerification(false);
   };
 
   const requestReactivation = async () => {
@@ -167,6 +188,16 @@ export default function SellerSettings() {
             <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
             <div>
               <p className="font-medium text-red-400">Account Suspended</p>
+              {user?.sellerProfile?.suspensionReason && (
+                <p className="text-sm text-red-300 mt-1">
+                  <span className="font-medium">Reason:</span> {user.sellerProfile.suspensionReason}
+                </p>
+              )}
+              {user?.sellerProfile?.suspensionType && (
+                <p className="text-xs text-theme-dim mt-1">
+                  Suspension type: {user.sellerProfile.suspensionType === 'auto' ? 'Automatic (performance-based)' : 'Manual (admin action)'}
+                </p>
+              )}
               <p className="text-sm text-theme-muted mt-1">Your store and products are hidden from the platform. Submit a reactivation request below.</p>
             </div>
           </div>
@@ -340,7 +371,15 @@ export default function SellerSettings() {
             </div>
           </div>
           <div className="bg-card border border-edge/50 rounded-xl p-6 space-y-4">
-            <h3 className="font-semibold text-theme-primary">Pickup Address</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-theme-primary">Pickup Address</h3>
+              {pickupVerified !== null && (
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${pickupVerified ? 'bg-green-500/10 text-green-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                  {pickupVerified ? <ShieldCheck className="w-3.5 h-3.5" /> : <ShieldAlert className="w-3.5 h-3.5" />}
+                  {pickupVerified ? 'Verified' : 'Unverified'}
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <input type="text" value={pickupForm.street} onChange={e => setPickupForm(f => ({ ...f, street: e.target.value }))} placeholder="Street" className="col-span-2 px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
               <input type="text" value={pickupForm.city} onChange={e => setPickupForm(f => ({ ...f, city: e.target.value }))} placeholder="City" className="px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
@@ -348,6 +387,37 @@ export default function SellerSettings() {
               <input type="text" value={pickupForm.pincode} onChange={e => setPickupForm(f => ({ ...f, pincode: e.target.value }))} placeholder="Pincode" className="px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
               <input type="tel" value={pickupForm.phone} onChange={e => setPickupForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone" className="px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
             </div>
+
+            {/* Pickup verification status and actions */}
+            {pickupVerified === false && (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-amber-400">Pickup address not verified</p>
+                    <p className="text-xs text-theme-muted mt-1">Your pickup address must be phone-verified on Shiprocket before you can ship orders. Click below to complete the OTP verification.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-3">
+                  <a href="https://app.shiprocket.in/settings/pickup-address" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-lg text-xs font-semibold transition-colors">
+                    <ExternalLink className="w-3.5 h-3.5" /> Verify on Shiprocket
+                  </a>
+                  <button onClick={checkPickupVerification} disabled={checkingVerification} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-inset border border-edge hover:border-amber-500/50 text-theme-primary rounded-lg text-xs font-medium transition-colors">
+                    {checkingVerification ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Check Status
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {pickupVerified === true && (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-green-400 shrink-0" />
+                <p className="text-sm text-green-400">Pickup address phone is verified. You can ship orders.</p>
+                <button onClick={checkPickupVerification} disabled={checkingVerification} className="ml-auto inline-flex items-center gap-1 px-2 py-1 text-xs text-theme-muted hover:text-theme-primary transition-colors">
+                  {checkingVerification ? <Loader className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Re-check
+                </button>
+              </div>
+            )}
           </div>
           <button onClick={saveAddress} disabled={loading} className="px-6 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-xl font-semibold text-sm transition-colors">
             {loading ? 'Saving...' : 'Save Addresses'}

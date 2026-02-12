@@ -109,6 +109,27 @@ async function addPickupLocation({ pickupLocationName, name, email, phone, addre
   return res.data;
 }
 
+// Update an existing pickup location
+async function updatePickupLocation({ pickupLocationId, pickupLocationName, name, email, phone, address, address2, city, state, pinCode, country }) {
+  const token = await getToken();
+  const body = {
+    pickup_location: pickupLocationName,
+    name: name || pickupLocationName,
+    email: email || process.env.SHIPROCKET_EMAIL,
+    phone: phone,
+    address: address,
+    address_2: address2 || '',
+    city: city,
+    state: state,
+    pin_code: pinCode,
+    country: country || 'India'
+  };
+  const res = await axios.patch(`${SHIPROCKET_BASE}/settings/company/pickup`, body, {
+    headers: shiprocketHeaders(token)
+  });
+  return res.data;
+}
+
 // Generate label
 async function generateLabel({ shipmentId }) {
   const token = await getToken();
@@ -137,5 +158,6 @@ module.exports = {
   generateManifest,
   getPickupLocations,
   addPickupLocation,
+  updatePickupLocation,
   getToken
 };

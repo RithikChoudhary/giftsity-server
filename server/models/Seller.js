@@ -67,6 +67,7 @@ const sellerSchema = new mongoose.Schema({
     instagramUsername: { type: String, default: '' },
     instagramVerified: { type: Boolean, default: false },
     shiprocketPickupLocation: { type: String, default: '' },
+    shiprocketPickupVerified: { type: Boolean, default: false },
     suspensionRemovalRequested: { type: Boolean, default: false },
     suspensionRemovalReason: { type: String, default: '' },
     metrics: {
