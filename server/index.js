@@ -1,11 +1,19 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
 const connectDB = require('./config/db');
 
 const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5000;
+
+// Security headers
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+// Compression
+app.use(compression());
 
 // Middleware - CORS supports comma-separated origins in CLIENT_URL (e.g. "https://giftsity.com,https://www.giftsity.com")
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173').split(',').map(s => s.trim());
@@ -16,7 +24,11 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json({ limit: '10mb' }));
+// Capture raw body for Cashfree webhook signature verification
+app.use(express.json({
+  limit: '10mb',
+  verify: (req, _res, buf) => { req.rawBody = buf.toString(); }
+}));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -31,6 +43,7 @@ app.use('/api/store', require('./routes/store'));
 app.use('/api/shipping', require('./routes/shipping'));
 app.use('/api/wishlist', require('./routes/wishlist'));
 app.use('/api/coupons', require('./routes/coupons'));
+app.use('/api/payments', require('./routes/payments'));
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', platform: 'Giftsity' }));

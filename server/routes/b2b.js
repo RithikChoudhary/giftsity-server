@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const B2BInquiry = require('../models/B2BInquiry');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sanitizeBody } = require('../middleware/sanitize');
@@ -6,8 +7,17 @@ const { validateB2BInquiry } = require('../middleware/validators');
 const { sendB2BInquiryNotification } = require('../utils/email');
 const router = express.Router();
 
+// Rate limiter: max 5 B2B inquiries per IP per 15 minutes
+const inquiryLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { message: 'Too many inquiry submissions. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 // POST /api/b2b/inquiries - public (no auth required)
-router.post('/inquiries', sanitizeBody, validateB2BInquiry, async (req, res) => {
+router.post('/inquiries', inquiryLimiter, sanitizeBody, validateB2BInquiry, async (req, res) => {
   try {
     const { companyName, contactPerson, email, phone, numberOfEmployees, budgetPerGift, quantityNeeded, occasion, specialRequirements } = req.body;
 

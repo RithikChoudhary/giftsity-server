@@ -14,6 +14,14 @@ const cashfreeHeaders = () => ({
   'x-client-secret': process.env.CASHFREE_SECRET_KEY
 });
 
+// Build webhook notify URL from environment
+function getNotifyUrl() {
+  const apiUrl = process.env.API_BASE_URL || '';
+  if (apiUrl) return `${apiUrl}/api/payments/cashfree/webhook`;
+  // Fallback: derive from CLIENT_URL (assumes API is on same domain or Render)
+  return '';
+}
+
 // Create order on Cashfree
 async function createCashfreeOrder({ orderId, orderAmount, customerDetails, returnUrl, notifyUrl }) {
   const res = await axios.post(`${BASE_URL}/orders`, {
@@ -28,7 +36,7 @@ async function createCashfreeOrder({ orderId, orderAmount, customerDetails, retu
     },
     order_meta: {
       return_url: returnUrl || `${(process.env.CLIENT_URL || '').split(',')[0].trim() || 'http://localhost:5173'}/orders?cf_id={order_id}`,
-      notify_url: notifyUrl || ''
+      notify_url: notifyUrl || getNotifyUrl()
     }
   }, { headers: cashfreeHeaders() });
 

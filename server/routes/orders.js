@@ -10,7 +10,18 @@ const { sendOrderConfirmation } = require('../utils/email');
 const { logActivity } = require('../utils/audit');
 const { sanitizeBody } = require('../middleware/sanitize');
 const { validateOrderCreation, validatePaymentVerification } = require('../middleware/validators');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
+
+// Rate limiter: max 10 order creations per user per minute
+const orderCreationLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => req.user?._id?.toString() || req.ip,
+  message: { message: 'Too many order attempts. Please try again in a minute.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 // Normalize phone to 10 digits for Cashfree
 const normalizePhone = (phone) => {
@@ -28,7 +39,7 @@ const generateOrderNumber = () => {
 };
 
 // POST /api/orders - create order + Cashfree payment session
-router.post('/', requireAuth, validateOrderCreation, async (req, res) => {
+router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async (req, res) => {
   try {
     if ((req.user.userType || req.user.role) !== 'customer') {
       return res.status(403).json({ message: 'Customer access required' });
