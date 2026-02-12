@@ -309,7 +309,16 @@ router.put('/addresses', requireAuth, sanitizeBody, async (req, res) => {
       return res.status(403).json({ message: 'Addresses can only be updated for customer accounts' });
     }
     const { addresses } = req.body;
-    req.user.shippingAddresses = addresses;
+    // Sanitize _id fields: keep valid ObjectIds (existing), strip invalid ones (new)
+    const mongoose = require('mongoose');
+    const sanitized = (addresses || []).map(addr => {
+      const { _id, ...rest } = addr;
+      if (_id && mongoose.Types.ObjectId.isValid(_id)) {
+        return { _id, ...rest };
+      }
+      return rest; // Let Mongoose auto-generate _id for new addresses
+    });
+    req.user.shippingAddresses = sanitized;
     await req.user.save();
     res.json({ message: 'Addresses updated', addresses: req.user.shippingAddresses });
   } catch (err) {

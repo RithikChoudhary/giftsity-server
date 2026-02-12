@@ -87,3 +87,7 @@ export function CartProvider({ children }) {
 }
 
 export const useCart = () => useContext(CartContext);
+
+/** Check if a product has required customization options that must be filled before add-to-cart */
+export const needsCustomization = (product) =>
+  product?.isCustomizable && product?.customizationOptions?.some(o => o.required);

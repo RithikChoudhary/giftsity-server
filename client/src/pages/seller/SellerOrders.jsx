@@ -250,9 +250,14 @@ export default function SellerOrders() {
                       </>
                     )}
                     {(order.status === 'confirmed' || order.status === 'processing') && (
-                      <button onClick={() => toggleExpand(order._id)} className="px-3 py-1.5 bg-purple-500/10 text-purple-400 rounded-lg text-xs font-medium hover:bg-purple-500/20 flex items-center gap-1">
-                        <Truck className="w-3 h-3" /> Ship Order {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                      </button>
+                      <>
+                        <button onClick={() => toggleExpand(order._id)} className="px-3 py-1.5 bg-purple-500/10 text-purple-400 rounded-lg text-xs font-medium hover:bg-purple-500/20 flex items-center gap-1">
+                          <Truck className="w-3 h-3" /> Ship Order {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+                        <button onClick={() => updateStatus(order._id, 'cancelled')} disabled={updating === order._id} className="px-3 py-1.5 bg-red-500/10 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/20">
+                          Cancel Order
+                        </button>
+                      </>
                     )}
                     {order.status === 'shipped' && (
                       <>

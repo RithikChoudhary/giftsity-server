@@ -3,10 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Heart, ShoppingBag, Trash2 } from 'lucide-react';
 import { useWishlist } from '../../context/WishlistContext';
-import { useCart } from '../../context/CartContext';
+import { useCart, needsCustomization } from '../../context/CartContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import SEO from '../../components/SEO';
 import API from '../../api';
+import toast from 'react-hot-toast';
 
 export default function Wishlist() {
   const { user } = useAuth();
@@ -35,6 +36,11 @@ export default function Wishlist() {
   };
 
   const handleAddToCart = (product) => {
+    if (needsCustomization(product)) {
+      toast('Customization required — redirecting to product page', { icon: '✏️' });
+      navigate(`/product/${product.slug}`);
+      return;
+    }
     addItem({
       _id: product._id,
       productId: product._id,

@@ -4,6 +4,7 @@ import { sellerAPI } from '../../api';
 import { Store, CreditCard, MapPin, Loader, AlertTriangle, Send, Camera, ImageIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { SellerAPI } from '../../api';
+import ImageCropper from '../../components/ImageCropper';
 
 export default function SellerSettings() {
   const { user, login } = useAuth();
@@ -16,6 +17,10 @@ export default function SellerSettings() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const avatarInputRef = useRef(null);
   const coverInputRef = useRef(null);
+
+  // Cropper state
+  const [cropperImage, setCropperImage] = useState(null); // data URL for cropper
+  const [cropperType, setCropperType] = useState(null); // 'avatar' or 'cover'
 
   const [storeForm, setStoreForm] = useState({ businessName: '', businessType: 'individual', gstNumber: '', instagramUsername: '' });
   const [bankForm, setBankForm] = useState({ accountHolderName: '', accountNumber: '', ifscCode: '', bankName: '' });
@@ -46,7 +51,7 @@ export default function SellerSettings() {
     loadSettings();
   }, []);
 
-  const handleImageUpload = async (file, type) => {
+  const handleImageSelect = (file, type) => {
     if (!file) return;
     const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     if (!allowed.includes(file.type)) {
@@ -57,12 +62,25 @@ export default function SellerSettings() {
       toast.error('Image must be under 5MB');
       return;
     }
+    // Open cropper modal
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropperImage(reader.result);
+      setCropperType(type);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCropDone = async (blob) => {
+    const type = cropperType;
+    setCropperImage(null);
+    setCropperType(null);
 
     const setter = type === 'avatar' ? setUploadingAvatar : setUploadingCover;
     setter(true);
     try {
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('image', blob, `${type}.jpg`);
       formData.append('type', type);
       const { data } = await sellerAPI.uploadImage(formData);
       if (type === 'avatar') setAvatarUrl(data.url);
@@ -189,7 +207,7 @@ export default function SellerSettings() {
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 className="hidden"
-                onChange={e => handleImageUpload(e.target.files[0], 'cover')}
+                onChange={e => { handleImageSelect(e.target.files[0], 'cover'); e.target.value = ''; }}
               />
             </div>
 
@@ -218,7 +236,7 @@ export default function SellerSettings() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif"
                   className="hidden"
-                  onChange={e => handleImageUpload(e.target.files[0], 'avatar')}
+                  onChange={e => { handleImageSelect(e.target.files[0], 'avatar'); e.target.value = ''; }}
                 />
               </div>
               <p className="text-xs text-theme-dim mt-2">Click avatar or cover to change</p>
@@ -308,6 +326,17 @@ export default function SellerSettings() {
             {loading ? 'Saving...' : 'Save Addresses'}
           </button>
         </div>
+      )}
+
+      {/* Image Cropper Modal */}
+      {cropperImage && (
+        <ImageCropper
+          image={cropperImage}
+          aspect={cropperType === 'avatar' ? 1 : 3}
+          title={cropperType === 'avatar' ? 'Crop Avatar' : 'Crop Cover Image'}
+          onCropDone={handleCropDone}
+          onCancel={() => { setCropperImage(null); setCropperType(null); }}
+        />
       )}
     </div>
   );

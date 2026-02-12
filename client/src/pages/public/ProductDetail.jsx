@@ -136,7 +136,7 @@ export default function ProductDetail() {
         <div>
           <div className="relative aspect-square bg-card border border-edge/50 rounded-2xl overflow-hidden mb-3">
             {images.length > 0 ? (
-              <img src={images[imgIdx]?.url} alt={product.title} loading="lazy" className="w-full h-full object-cover" />
+              <img src={images[imgIdx]?.url} alt={product.title} loading="lazy" className="w-full h-full object-contain" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-theme-dim"><ShoppingBag className="w-16 h-16" /></div>
             )}

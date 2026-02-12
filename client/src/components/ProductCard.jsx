@@ -1,11 +1,13 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag, Star, Eye, Heart } from 'lucide-react';
-import { useCart } from '../context/CartContext';
+import { useCart, needsCustomization } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import toast from 'react-hot-toast';
 
 export default function ProductCard({ product }) {
   const { addItem } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
+  const navigate = useNavigate();
   const wishlisted = isWishlisted(product._id);
 
   const handleWishlist = (e) => {
@@ -17,6 +19,11 @@ export default function ProductCard({ product }) {
   const handleAdd = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (needsCustomization(product)) {
+      toast('Customization required — redirecting to product page', { icon: '✏️' });
+      navigate(`/product/${product.slug}`);
+      return;
+    }
     addItem({
       productId: product._id,
       title: product.title,

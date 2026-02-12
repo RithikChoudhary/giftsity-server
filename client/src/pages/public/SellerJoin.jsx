@@ -5,6 +5,7 @@ import { Gift, ArrowRight, Check, Loader, Upload, Instagram, Mail, Phone, Store,
 import toast from 'react-hot-toast';
 import SEO from '../../components/SEO';
 import API from '../../api';
+import ImageCropper from '../../components/ImageCropper';
 
 export default function SellerJoin() {
   const { user, login } = useAuth();
@@ -28,6 +29,10 @@ export default function SellerJoin() {
   const [gstNumber, setGstNumber] = useState('');
   const [coverPhoto, setCoverPhoto] = useState(null);
   const [coverPreview, setCoverPreview] = useState('');
+
+  // Cropper state
+  const [cropperImage, setCropperImage] = useState(null);
+  const [cropperType, setCropperType] = useState(null); // 'avatar' or 'cover'
 
   useEffect(() => {
     if (user?.userType === 'seller') navigate('/seller');
@@ -62,17 +67,41 @@ export default function SellerJoin() {
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setProfilePhoto(file);
-      setPhotoPreview(URL.createObjectURL(file));
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropperImage(reader.result);
+        setCropperType('avatar');
+      };
+      reader.readAsDataURL(file);
     }
+    e.target.value = '';
   };
 
   const handleCoverChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setCoverPhoto(file);
-      setCoverPreview(URL.createObjectURL(file));
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropperImage(reader.result);
+        setCropperType('cover');
+      };
+      reader.readAsDataURL(file);
     }
+    e.target.value = '';
+  };
+
+  const handleCropDone = (blob) => {
+    const url = URL.createObjectURL(blob);
+    const file = new File([blob], `${cropperType}.jpg`, { type: 'image/jpeg' });
+    if (cropperType === 'avatar') {
+      setProfilePhoto(file);
+      setPhotoPreview(url);
+    } else {
+      setCoverPhoto(file);
+      setCoverPreview(url);
+    }
+    setCropperImage(null);
+    setCropperType(null);
   };
 
   const handleSubmitDetails = async (e) => {
@@ -310,6 +339,17 @@ export default function SellerJoin() {
           ))}
         </div>
       </section>
+
+      {/* Image Cropper Modal */}
+      {cropperImage && (
+        <ImageCropper
+          image={cropperImage}
+          aspect={cropperType === 'avatar' ? 1 : 3}
+          title={cropperType === 'avatar' ? 'Crop Profile Photo' : 'Crop Cover Image'}
+          onCropDone={handleCropDone}
+          onCancel={() => { setCropperImage(null); setCropperType(null); }}
+        />
+      )}
     </div>
   );
 }

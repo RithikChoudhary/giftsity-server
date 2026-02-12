@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { MapPin, Star, CheckCircle, Package, Truck, XCircle, Calendar, ShoppingCart, Play, Store, Grid3X3, Instagram, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
 import { storeAPI } from '../../api';
-import { useCart } from '../../context/CartContext';
+import { useCart, needsCustomization } from '../../context/CartContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import SEO from '../../components/SEO';
+import toast from 'react-hot-toast';
 
 export default function SellerStore() {
   const { slug } = useParams();
   const { addItem } = useCart();
+  const navigate = useNavigate();
   const [store, setStore] = useState(null);
   const [products, setProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
@@ -255,7 +257,15 @@ export default function SellerStore() {
                           </div>
                         )}
                         <button
-                          onClick={(e) => { e.preventDefault(); addItem({ ...p, sellerId: { _id: store._id, sellerProfile: { businessName: store.businessName } } }); }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (needsCustomization(p)) {
+                              toast('Customization required — redirecting to product page', { icon: '✏️' });
+                              navigate(`/product/${p.slug || p._id}`);
+                              return;
+                            }
+                            addItem({ ...p, sellerId: { _id: store._id, sellerProfile: { businessName: store.businessName } } });
+                          }}
                           className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-zinc-950 text-xs font-bold rounded-lg pointer-events-auto hover:bg-amber-400 transition-colors">
                           <ShoppingCart className="w-3 h-3" /> Add
                         </button>

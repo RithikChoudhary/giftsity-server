@@ -49,7 +49,7 @@ export default function CustomerProfile() {
   const saveAddresses = async (newAddresses) => {
     try {
       const { data } = await API.put('/auth/addresses', { addresses: newAddresses });
-      const updated = data.user?.shippingAddresses || data.shippingAddresses || newAddresses;
+      const updated = data.user?.shippingAddresses || data.addresses || newAddresses;
       login(null, data.user || data);
       setAddresses(updated);
       return updated;
@@ -63,7 +63,7 @@ export default function CustomerProfile() {
     if (editingAddr) {
       newAddresses = addresses.map(a => a._id === editingAddr ? { ...a, ...addrForm } : a);
     } else {
-      newAddresses = [...addresses, { ...addrForm, _id: Date.now().toString() }];
+      newAddresses = [...addresses, { ...addrForm }];
     }
     const result = await saveAddresses(newAddresses);
     if (result) { setShowAddressForm(false); toast.success(editingAddr ? 'Address updated' : 'Address added'); }
