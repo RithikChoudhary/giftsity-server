@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Package, Truck, CheckCircle, Clock, XCircle, MapPin, Star, ArrowLeft, Loader, Camera, X } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, XCircle, MapPin, Star, ArrowLeft, Loader, Camera, X, Navigation } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import API from '../../api';
@@ -31,6 +31,8 @@ export default function OrderDetail() {
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [tracking, setTracking] = useState(null);
+  const [trackingLoading, setTrackingLoading] = useState(false);
 
   useEffect(() => {
     if (!user) return navigate('/auth');
@@ -56,8 +58,21 @@ export default function OrderDetail() {
         } catch (e) {}
       }
       setItemReviews(reviewState);
+      // Load tracking data
+      if (['processing', 'shipped', 'delivered'].includes(ord.status)) {
+        loadTracking(ord._id);
+      }
     } catch (e) { console.error(e); }
     setLoading(false);
+  };
+
+  const loadTracking = async (orderId) => {
+    setTrackingLoading(true);
+    try {
+      const { data } = await API.get(`/orders/${orderId}/tracking`);
+      setTracking(data);
+    } catch (e) { /* silent */ }
+    setTrackingLoading(false);
   };
 
   const handleReviewImageAdd = (productId, files) => {
@@ -223,15 +238,71 @@ export default function OrderDetail() {
           </div>
         </div>
 
-        {/* Tracking */}
-        {order.trackingInfo?.trackingNumber && (
-          <div className="bg-card border border-edge/50 rounded-xl p-5">
-            <h3 className="font-semibold text-theme-primary mb-3 flex items-center gap-2"><Truck className="w-4 h-4 text-amber-400" /> Tracking Info</h3>
-            <div className="text-sm text-theme-secondary space-y-1">
-              <p>Courier: {order.trackingInfo.courierName}</p>
-              <p>Tracking #: {order.trackingInfo.trackingNumber}</p>
-              {order.trackingInfo.estimatedDelivery && <p>Est. Delivery: {new Date(order.trackingInfo.estimatedDelivery).toLocaleDateString()}</p>}
+        {/* Detailed Tracking */}
+        {(tracking || order.trackingInfo?.trackingNumber) && (
+          <div className="bg-card border border-edge/50 rounded-xl p-5 md:col-span-2">
+            <h3 className="font-semibold text-theme-primary mb-4 flex items-center gap-2"><Truck className="w-4 h-4 text-amber-400" /> Shipment Tracking</h3>
+
+            {/* Summary row */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              {(tracking?.courierName || order.trackingInfo?.courierName) && (
+                <div className="bg-inset rounded-lg p-3">
+                  <p className="text-[10px] text-theme-dim uppercase tracking-wider">Courier</p>
+                  <p className="text-sm font-medium text-theme-primary mt-0.5">{tracking?.courierName || order.trackingInfo?.courierName}</p>
+                </div>
+              )}
+              {(tracking?.awb || order.trackingInfo?.trackingNumber) && (
+                <div className="bg-inset rounded-lg p-3">
+                  <p className="text-[10px] text-theme-dim uppercase tracking-wider">AWB / Tracking #</p>
+                  <p className="text-sm font-medium text-theme-primary mt-0.5 font-mono">{tracking?.awb || order.trackingInfo?.trackingNumber}</p>
+                </div>
+              )}
+              {tracking?.shipmentStatus && (
+                <div className="bg-inset rounded-lg p-3">
+                  <p className="text-[10px] text-theme-dim uppercase tracking-wider">Shipment Status</p>
+                  <p className="text-sm font-medium text-amber-400 mt-0.5 capitalize">{tracking.shipmentStatus.replace(/_/g, ' ')}</p>
+                </div>
+              )}
+              {(tracking?.estimatedDelivery || order.trackingInfo?.estimatedDelivery) && (
+                <div className="bg-inset rounded-lg p-3">
+                  <p className="text-[10px] text-theme-dim uppercase tracking-wider">Est. Delivery</p>
+                  <p className="text-sm font-medium text-theme-primary mt-0.5">{new Date(tracking?.estimatedDelivery || order.trackingInfo?.estimatedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                </div>
+              )}
             </div>
+
+            {/* Scan timeline */}
+            {trackingLoading ? (
+              <div className="flex items-center gap-2 text-sm text-theme-dim py-4"><Loader className="w-4 h-4 animate-spin" /> Loading tracking details...</div>
+            ) : tracking?.scans?.length > 0 ? (
+              <div className="space-y-0 max-h-72 overflow-y-auto pr-1">
+                {tracking.scans.map((scan, i) => {
+                  const isFirst = i === 0;
+                  const isLast = i === tracking.scans.length - 1;
+                  return (
+                    <div key={i} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className={`w-3 h-3 rounded-full shrink-0 mt-1 ${isFirst ? 'bg-amber-500' : 'bg-edge'}`} />
+                        {!isLast && <div className="w-px flex-1 bg-edge/40 min-h-[24px]" />}
+                      </div>
+                      <div className="pb-3 min-w-0">
+                        <p className={`text-sm ${isFirst ? 'font-semibold text-theme-primary' : 'text-theme-secondary'}`}>{scan.activity}</p>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                          {scan.location && (
+                            <span className="text-xs text-theme-dim flex items-center gap-1"><Navigation className="w-3 h-3" />{scan.location}</span>
+                          )}
+                          {scan.timestamp && (
+                            <span className="text-xs text-theme-dim">{new Date(scan.timestamp).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-theme-dim">No scan events available yet. Tracking details will appear once your order is picked up.</p>
+            )}
           </div>
         )}
 

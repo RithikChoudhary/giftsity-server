@@ -2,8 +2,10 @@ const express = require('express');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const Seller = require('../models/Seller');
+const Shipment = require('../models/Shipment');
 const PlatformSettings = require('../models/PlatformSettings');
 const { createCashfreeOrder, getCashfreeOrder, getCashfreePayments, createRefund } = require('../config/cashfree');
+const shiprocket = require('../config/shiprocket');
 const { requireAuth } = require('../middleware/auth');
 const { getCommissionRate, calculateOrderFinancials } = require('../utils/commission');
 const { sendOrderConfirmation } = require('../utils/email');
@@ -359,6 +361,134 @@ router.get('/track/:orderNumber', async (req, res) => {
       timeline
     });
   } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/orders/track/:orderNumber/details - public detailed tracking with scan events
+router.get('/track/:orderNumber/details', async (req, res) => {
+  try {
+    const order = await Order.findOne({ orderNumber: req.params.orderNumber })
+      .select('_id orderNumber status trackingInfo')
+      .lean();
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    const shipment = await Shipment.findOne({ orderId: order._id }).lean();
+    if (!shipment) {
+      return res.json({
+        orderNumber: order.orderNumber,
+        status: order.status,
+        shipmentStatus: null,
+        courierName: order.trackingInfo?.courierName || null,
+        awb: order.trackingInfo?.trackingNumber || null,
+        estimatedDelivery: null,
+        scans: []
+      });
+    }
+
+    // Try to get real-time tracking from Shiprocket if AWB exists
+    let liveScans = [];
+    if (shipment.awbCode) {
+      try {
+        const trackData = await shiprocket.trackByAwb(shipment.awbCode);
+        const activities = trackData?.tracking_data?.shipment_track_activities
+          || trackData?.tracking_data?.track_activities || [];
+        liveScans = activities.map(a => ({
+          activity: a.activity || a['sr-status-label'] || '',
+          location: a.location || '',
+          timestamp: a.date || null,
+          status: a['sr-status-label'] || a.status || ''
+        }));
+      } catch (trackErr) {
+        console.warn('[Tracking] Live tracking failed for AWB', shipment.awbCode, trackErr.message);
+      }
+    }
+
+    // Merge DB history with live scans (prefer live if available, otherwise use DB)
+    const dbScans = (shipment.statusHistory || []).map(h => ({
+      activity: h.description || h.status || '',
+      location: h.location || '',
+      timestamp: h.timestamp || null,
+      status: h.status || ''
+    }));
+
+    const scans = liveScans.length > 0 ? liveScans : dbScans;
+
+    res.json({
+      orderNumber: order.orderNumber,
+      status: order.status,
+      shipmentStatus: shipment.status,
+      courierName: shipment.courierName || order.trackingInfo?.courierName || null,
+      awb: shipment.awbCode || order.trackingInfo?.trackingNumber || null,
+      estimatedDelivery: shipment.estimatedDelivery || order.trackingInfo?.estimatedDelivery || null,
+      scans
+    });
+  } catch (err) {
+    console.error('[Tracking] Public tracking error:', err.message);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/orders/:id/tracking - authenticated customer tracking with scan events
+router.get('/:id/tracking', requireAuth, async (req, res) => {
+  try {
+    const order = await Order.findOne({
+      _id: req.params.id,
+      $or: [{ customerId: req.user._id }, { sellerId: req.user._id }]
+    }).select('_id orderNumber status trackingInfo').lean();
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    const shipment = await Shipment.findOne({ orderId: order._id }).lean();
+    if (!shipment) {
+      return res.json({
+        orderNumber: order.orderNumber,
+        status: order.status,
+        shipmentStatus: null,
+        courierName: order.trackingInfo?.courierName || null,
+        awb: order.trackingInfo?.trackingNumber || null,
+        estimatedDelivery: null,
+        scans: []
+      });
+    }
+
+    // Try real-time Shiprocket tracking
+    let liveScans = [];
+    if (shipment.awbCode) {
+      try {
+        const trackData = await shiprocket.trackByAwb(shipment.awbCode);
+        const activities = trackData?.tracking_data?.shipment_track_activities
+          || trackData?.tracking_data?.track_activities || [];
+        liveScans = activities.map(a => ({
+          activity: a.activity || a['sr-status-label'] || '',
+          location: a.location || '',
+          timestamp: a.date || null,
+          status: a['sr-status-label'] || a.status || ''
+        }));
+      } catch (trackErr) {
+        console.warn('[Tracking] Live tracking failed for AWB', shipment.awbCode, trackErr.message);
+      }
+    }
+
+    const dbScans = (shipment.statusHistory || []).map(h => ({
+      activity: h.description || h.status || '',
+      location: h.location || '',
+      timestamp: h.timestamp || null,
+      status: h.status || ''
+    }));
+
+    const scans = liveScans.length > 0 ? liveScans : dbScans;
+
+    res.json({
+      orderNumber: order.orderNumber,
+      status: order.status,
+      shipmentStatus: shipment.status,
+      courierName: shipment.courierName || order.trackingInfo?.courierName || null,
+      awb: shipment.awbCode || order.trackingInfo?.trackingNumber || null,
+      estimatedDelivery: shipment.estimatedDelivery || order.trackingInfo?.estimatedDelivery || null,
+      scans
+    });
+  } catch (err) {
+    console.error('[Tracking] Authenticated tracking error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });

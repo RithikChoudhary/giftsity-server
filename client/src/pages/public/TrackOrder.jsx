@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Package, CheckCircle2, Truck, MapPin, XCircle, Clock, Loader2 } from 'lucide-react';
+import { Search, Package, CheckCircle2, Truck, MapPin, XCircle, Clock, Loader2, Navigation } from 'lucide-react';
 import API from '../../api';
 
 const statusConfig = {
@@ -14,6 +14,7 @@ const statusConfig = {
 export default function TrackOrder() {
   const [orderNumber, setOrderNumber] = useState('');
   const [result, setResult] = useState(null);
+  const [tracking, setTracking] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,9 +24,15 @@ export default function TrackOrder() {
     setLoading(true);
     setError('');
     setResult(null);
+    setTracking(null);
     try {
       const { data } = await API.get(`/orders/track/${orderNumber.trim()}`);
       setResult(data);
+      // Also fetch detailed tracking
+      try {
+        const { data: trackData } = await API.get(`/orders/track/${orderNumber.trim()}/details`);
+        setTracking(trackData);
+      } catch (_) { /* silent — details are optional */ }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to track order. Please try again.');
     } finally {
@@ -118,8 +125,74 @@ export default function TrackOrder() {
               </div>
             </div>
 
-            {/* Tracking info */}
-            {result.tracking && (
+            {/* Detailed Shipment Tracking */}
+            {(tracking?.courierName || tracking?.awb || tracking?.scans?.length > 0) && (
+              <div className="p-6 border-b border-edge/30">
+                <h3 className="text-sm font-semibold mb-4 flex items-center gap-2"><Truck className="w-4 h-4 text-amber-400" /> Shipment Tracking</h3>
+
+                {/* Summary chips */}
+                <div className="flex flex-wrap gap-3 mb-4">
+                  {tracking.courierName && (
+                    <div className="bg-inset rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-theme-dim uppercase tracking-wider">Courier</p>
+                      <p className="text-sm font-medium text-theme-primary">{tracking.courierName}</p>
+                    </div>
+                  )}
+                  {tracking.awb && (
+                    <div className="bg-inset rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-theme-dim uppercase tracking-wider">AWB / Tracking #</p>
+                      <p className="text-sm font-medium text-theme-primary font-mono">{tracking.awb}</p>
+                    </div>
+                  )}
+                  {tracking.shipmentStatus && (
+                    <div className="bg-inset rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-theme-dim uppercase tracking-wider">Shipment Status</p>
+                      <p className="text-sm font-medium text-amber-400 capitalize">{tracking.shipmentStatus.replace(/_/g, ' ')}</p>
+                    </div>
+                  )}
+                  {tracking.estimatedDelivery && (
+                    <div className="bg-inset rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-theme-dim uppercase tracking-wider">Est. Delivery</p>
+                      <p className="text-sm font-medium text-theme-primary">{new Date(tracking.estimatedDelivery).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Scan events */}
+                {tracking.scans?.length > 0 ? (
+                  <div className="space-y-0 max-h-72 overflow-y-auto pr-1">
+                    {tracking.scans.map((scan, i) => {
+                      const isFirst = i === 0;
+                      const isLast = i === tracking.scans.length - 1;
+                      return (
+                        <div key={i} className="flex gap-3">
+                          <div className="flex flex-col items-center">
+                            <div className={`w-3 h-3 rounded-full shrink-0 mt-1 ${isFirst ? 'bg-amber-500' : 'bg-edge'}`} />
+                            {!isLast && <div className="w-px flex-1 bg-edge/40 min-h-[24px]" />}
+                          </div>
+                          <div className="pb-3 min-w-0">
+                            <p className={`text-sm ${isFirst ? 'font-semibold text-theme-primary' : 'text-theme-secondary'}`}>{scan.activity}</p>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                              {scan.location && (
+                                <span className="text-xs text-theme-dim flex items-center gap-1"><Navigation className="w-3 h-3" />{scan.location}</span>
+                              )}
+                              {scan.timestamp && (
+                                <span className="text-xs text-theme-dim">{new Date(scan.timestamp).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-theme-dim">Tracking details will appear once the order is picked up by the courier.</p>
+                )}
+              </div>
+            )}
+
+            {/* Fallback: basic tracking info if no detailed tracking */}
+            {!tracking?.courierName && !tracking?.scans?.length && result.tracking && (
               <div className="p-6 border-b border-edge/30">
                 <h3 className="text-sm font-semibold mb-2">Shipping Details</h3>
                 <div className="grid grid-cols-2 gap-4">

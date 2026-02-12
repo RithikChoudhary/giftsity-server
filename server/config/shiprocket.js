@@ -80,6 +80,17 @@ async function trackByAwb(awbCode) {
   return res.data;
 }
 
+// Get registered pickup locations
+async function getPickupLocations() {
+  const token = await getToken();
+  const res = await axios.get(`${SHIPROCKET_BASE}/settings/company/pickup`, {
+    headers: shiprocketHeaders(token)
+  });
+  // Returns { data: { shipping_address: [ { pickup_location, ... }, ... ] } }
+  const locations = res.data?.data?.shipping_address || res.data?.shipping_address || [];
+  return locations;
+}
+
 // Generate label
 async function generateLabel({ shipmentId }) {
   const token = await getToken();
@@ -106,5 +117,6 @@ module.exports = {
   trackByAwb,
   generateLabel,
   generateManifest,
+  getPickupLocations,
   getToken
 };

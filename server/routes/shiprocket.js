@@ -112,14 +112,36 @@ router.post('/webhook', async (req, res) => {
       try { shipment.estimatedDelivery = new Date(etd); } catch (_) { /* ignore parse error */ }
     }
 
-    // Push tracking event to history
-    const latestScan = payload.scans?.[0] || {};
-    shipment.statusHistory.push({
-      status: currentStatus,
-      description: latestScan.activity || currentStatus,
-      location: latestScan.location || '',
-      timestamp: latestScan.date ? new Date(latestScan.date) : new Date()
-    });
+    // Push ALL scan events to history (deduplicate by timestamp+activity)
+    const existingKeys = new Set(
+      shipment.statusHistory.map(h => `${h.timestamp?.toISOString?.() || ''}|${h.description || ''}`)
+    );
+
+    const scans = payload.scans || [];
+    if (scans.length > 0) {
+      for (const scan of scans) {
+        const ts = scan.date ? new Date(scan.date) : new Date();
+        const desc = scan.activity || currentStatus;
+        const key = `${ts.toISOString()}|${desc}`;
+        if (!existingKeys.has(key)) {
+          shipment.statusHistory.push({
+            status: scan['sr-status-label'] || scan.status || currentStatus,
+            description: desc,
+            location: scan.location || '',
+            timestamp: ts
+          });
+          existingKeys.add(key);
+        }
+      }
+    } else {
+      // No scans array — push a single event for the current status
+      shipment.statusHistory.push({
+        status: currentStatus,
+        description: currentStatus,
+        location: '',
+        timestamp: new Date()
+      });
+    }
 
     // Only advance status forward (don't go backwards)
     const statusOrder = ['created', 'pickup_scheduled', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'rto', 'cancelled'];
