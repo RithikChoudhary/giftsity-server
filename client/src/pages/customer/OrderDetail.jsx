@@ -22,7 +22,7 @@ const statusSteps = ['pending', 'confirmed', 'shipped', 'delivered'];
 
 export default function OrderDetail() {
   const { id } = useParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -35,9 +35,10 @@ export default function OrderDetail() {
   const [trackingLoading, setTrackingLoading] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) return navigate('/auth');
     loadOrder();
-  }, [id]);
+  }, [id, authLoading]);
 
   const loadOrder = async () => {
     try {

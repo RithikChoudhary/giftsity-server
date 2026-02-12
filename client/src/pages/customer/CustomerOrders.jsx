@@ -16,7 +16,7 @@ const statusConfig = {
 };
 
 export default function CustomerOrders() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
@@ -24,6 +24,7 @@ export default function CustomerOrders() {
   const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) return navigate('/auth?redirect=/orders');
 
     // Check if returning from Cashfree payment
@@ -33,7 +34,7 @@ export default function CustomerOrders() {
     } else {
       loadOrders();
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   const verifyPayment = async (orderId) => {
     setVerifying(true);

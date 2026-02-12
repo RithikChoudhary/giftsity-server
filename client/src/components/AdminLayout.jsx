@@ -23,7 +23,7 @@ const navItems = [
 ];
 
 export default function AdminLayout() {
-  const { user, logout } = useAuth();
+  const { user, logout, loading: authLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -31,6 +31,7 @@ export default function AdminLayout() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return; // wait for auth hydration
     let cancelled = false;
     const verify = async () => {
       if (!user) { navigate('/auth'); return; }
@@ -46,7 +47,7 @@ export default function AdminLayout() {
     };
     verify();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, authLoading]);
 
   if (checking || !verified) return (
     <div className="flex items-center justify-center min-h-screen bg-surface">

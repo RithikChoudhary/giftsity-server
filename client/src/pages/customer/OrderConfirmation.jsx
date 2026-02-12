@@ -7,15 +7,16 @@ import API from '../../api';
 
 export default function OrderConfirmation() {
   const { id } = useParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) return navigate('/auth');
     loadOrder();
-  }, [id, user]);
+  }, [id, user, authLoading]);
 
   const loadOrder = async () => {
     try {

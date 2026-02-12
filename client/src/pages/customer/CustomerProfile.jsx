@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import API from '../../api';
 
 export default function CustomerProfile() {
-  const { user, login } = useAuth();
+  const { user, login, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
@@ -18,11 +18,12 @@ export default function CustomerProfile() {
   const [addrForm, setAddrForm] = useState({ name: '', phone: '', street: '', city: '', state: '', pincode: '', isDefault: false });
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) return navigate('/auth?redirect=/profile');
     setName(user.name || '');
     setPhone(user.phone || '');
     setAddresses(user.shippingAddresses || []);
-  }, [user]);
+  }, [user, authLoading]);
 
   const handleSaveProfile = async () => {
     setLoading(true);

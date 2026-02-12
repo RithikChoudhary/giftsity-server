@@ -10,7 +10,7 @@ import API from '../../api';
 import toast from 'react-hot-toast';
 
 export default function Wishlist() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toggleWishlist } = useWishlist();
   const { addItem } = useCart();
   const navigate = useNavigate();
@@ -18,9 +18,10 @@ export default function Wishlist() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) return navigate('/auth?redirect=/wishlist');
     loadWishlist();
-  }, [user]);
+  }, [user, authLoading]);
 
   const loadWishlist = async () => {
     try {
