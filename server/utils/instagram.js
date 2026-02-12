@@ -29,8 +29,10 @@ async function verifyInstagramUsername(username) {
       validateStatus: (status) => status < 500 // Don't throw on 4xx
     });
 
-    // 200 = profile exists, 404 = doesn't exist, 301/302 = redirected (may still exist)
-    const exists = res.status === 200 || res.status === 301 || res.status === 302;
+    // Only a definitive 404 means the account does not exist.
+    // Any other status (200, 301, 302, 401, 403, etc.) could mean Instagram
+    // is blocking/rate-limiting the request, so fail-open to avoid false negatives.
+    const exists = res.status !== 404;
     return { exists, username: clean };
   } catch (err) {
     // Network error or timeout — don't block registration, assume valid
