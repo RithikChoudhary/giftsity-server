@@ -4,6 +4,7 @@ const Product = require('../models/Product');
 const Category = require('../models/Category');
 const { requireAuth } = require('../middleware/auth');
 const { uploadImage } = require('../config/cloudinary');
+const logger = require('../utils/logger');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB per customization image
 
@@ -26,7 +27,7 @@ router.post('/upload-customization', requireAuth, upload.single('image'), async 
 
     res.json({ url: result.url, publicId: result.publicId });
   } catch (err) {
-    console.error('[Customization Upload]', err.message);
+    logger.error('[Customization Upload]', err.message);
     res.status(500).json({ message: 'Image upload failed' });
   }
 });

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const logger = require('../utils/logger');
 
 const connectDB = async () => {
   try {
@@ -16,7 +17,7 @@ const connectDB = async () => {
 
 // Connection event listeners
 mongoose.connection.on('disconnected', () => {
-  console.warn('[MongoDB] Disconnected. Mongoose will attempt to reconnect automatically.');
+  logger.warn('[MongoDB] Disconnected. Mongoose will attempt to reconnect automatically.');
 });
 
 mongoose.connection.on('reconnected', () => {

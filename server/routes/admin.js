@@ -15,6 +15,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { uploadImage, deleteImage } = require('../config/cloudinary');
 const { sendCommissionChangeNotification, sendPayoutNotification, sendCorporateWelcomeEmail, sendCorporateQuoteNotification } = require('../utils/email');
 const { logActivity } = require('../utils/audit');
+const logger = require('../utils/logger');
 const router = express.Router();
 
 router.use(requireAuth, requireAdmin);
@@ -105,7 +106,7 @@ router.get('/sellers', async (req, res) => {
   try {
     const { status, search, page = 1, limit = 20 } = req.query;
     const filter = {};
-    if (status) filter.status = status;
+    if (status && typeof status === 'string') filter.status = status;
     if (search) filter['sellerProfile.businessName'] = { $regex: escapeRegex(search), $options: 'i' };
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -151,7 +152,10 @@ router.put('/sellers/:id/approve', async (req, res) => {
     }
 
     logActivity({ domain: 'admin', action: wasSuspended ? 'seller_unsuspended' : 'seller_approved', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Seller', targetId: seller._id, message: wasSuspended ? `Seller ${seller.name} unsuspended` : `Seller ${seller.name} approved` });
-    res.json({ message: wasSuspended ? 'Seller unsuspended. Products restored.' : 'Seller approved', seller });
+    const sellerResponse = seller.toObject();
+    delete sellerResponse.otp;
+    delete sellerResponse.otpExpiry;
+    res.json({ message: wasSuspended ? 'Seller unsuspended. Products restored.' : 'Seller approved', seller: sellerResponse });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -174,7 +178,10 @@ router.put('/sellers/:id/suspend', async (req, res) => {
     await Product.updateMany({ sellerId: seller._id }, { isActive: false });
 
     logActivity({ domain: 'admin', action: 'seller_suspended', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Seller', targetId: seller._id, message: `Seller ${seller.name} suspended: ${reason || 'No reason'}` });
-    res.json({ message: 'Seller suspended. Products hidden.', seller });
+    const sellerResponse = seller.toObject();
+    delete sellerResponse.otp;
+    delete sellerResponse.otpExpiry;
+    res.json({ message: 'Seller suspended. Products hidden.', seller: sellerResponse });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -200,7 +207,10 @@ router.put('/sellers/:id/commission', async (req, res) => {
     }
 
     logActivity({ domain: 'admin', action: 'commission_changed', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Seller', targetId: seller._id, message: `Commission changed from ${oldRate} to ${commissionRate}`, metadata: { oldRate, newRate: commissionRate } });
-    res.json({ message: 'Commission updated', seller });
+    const sellerResponse = seller.toObject();
+    delete sellerResponse.otp;
+    delete sellerResponse.otpExpiry;
+    res.json({ message: 'Commission updated', seller: sellerResponse });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -266,8 +276,8 @@ router.get('/orders', async (req, res) => {
   try {
     const { status, paymentStatus, page = 1, limit = 20 } = req.query;
     const filter = {};
-    if (status) filter.status = status;
-    if (paymentStatus) filter.paymentStatus = paymentStatus;
+    if (status && typeof status === 'string') filter.status = status;
+    if (paymentStatus && typeof paymentStatus === 'string') filter.paymentStatus = paymentStatus;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const orders = await Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit))
@@ -283,6 +293,18 @@ router.get('/orders', async (req, res) => {
 router.put('/orders/:id', async (req, res) => {
   try {
     const { status, paymentStatus, notes } = req.body;
+
+    // Validate status transition if status is being changed
+    if (status) {
+      const currentOrder = await Order.findById(req.params.id);
+      if (!currentOrder) return res.status(404).json({ message: 'Order not found' });
+
+      const { isValidTransition } = require('../utils/orderStatus');
+      if (!isValidTransition(currentOrder.status, status)) {
+        return res.status(400).json({ message: `Cannot change order status from "${currentOrder.status}" to "${status}"` });
+      }
+    }
+
     const update = { updatedAt: Date.now() };
     if (status) {
       update.status = status;
@@ -332,7 +354,17 @@ router.post('/categories', async (req, res) => {
 
 router.put('/categories/:id', async (req, res) => {
   try {
-    const category = await Category.findByIdAndUpdate(req.params.id, { ...req.body }, { new: true });
+    // Whitelist allowed fields to prevent mass assignment
+    const { name, description, icon, displayOrder, image, isActive } = req.body;
+    const update = {};
+    if (name !== undefined) update.name = name;
+    if (description !== undefined) update.description = description;
+    if (icon !== undefined) update.icon = icon;
+    if (displayOrder !== undefined) update.displayOrder = displayOrder;
+    if (isActive !== undefined) update.isActive = isActive;
+    if (image !== undefined) update.image = image;
+
+    const category = await Category.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!category) return res.status(404).json({ message: 'Category not found' });
     logActivity({ domain: 'admin', action: 'category_updated', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Category', targetId: category._id, message: `Category "${category.name}" updated` });
     res.json({ category, message: 'Category updated' });
@@ -356,7 +388,7 @@ router.get('/payouts', async (req, res) => {
   try {
     const { status } = req.query;
     const filter = {};
-    if (status) filter.status = status;
+    if (status && typeof status === 'string') filter.status = status;
     const payouts = await SellerPayout.find(filter).sort({ createdAt: -1 }).populate('sellerId', 'name email sellerProfile.businessName sellerProfile.bankDetails');
     res.json({ payouts });
   } catch (err) {
@@ -572,7 +604,7 @@ router.get('/customers', async (req, res) => {
       pages: Math.ceil(total / parseInt(limit))
     });
   } catch (err) {
-    console.error('Customer analytics error:', err);
+    logger.error('Customer analytics error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -658,7 +690,7 @@ router.get('/corporate/users', async (req, res) => {
   try {
     const { status, search, page = 1, limit = 20 } = req.query;
     const filter = {};
-    if (status) filter.status = status;
+    if (status && typeof status === 'string') filter.status = status;
     if (search) {
       const safeSearch = escapeRegex(search);
       filter.$or = [
@@ -724,13 +756,13 @@ router.post('/corporate/users/from-inquiry', async (req, res) => {
     // Send welcome email (non-blocking)
     try {
       await sendCorporateWelcomeEmail(inquiry.email, inquiry.companyName, inquiry.contactPerson);
-    } catch (e) { console.error('Corporate welcome email failed:', e.message); }
+    } catch (e) { logger.error('Corporate welcome email failed:', e.message); }
 
     logActivity({ domain: 'admin', action: 'corporate_user_created_from_inquiry', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'CorporateUser', targetId: user._id, message: `Corporate user created from inquiry: ${inquiry.companyName} (${inquiry.email})` });
 
     res.status(201).json({ user, message: 'Corporate account created and welcome email sent' });
   } catch (err) {
-    console.error('Create corporate user from inquiry error:', err);
+    logger.error('Create corporate user from inquiry error:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -843,7 +875,7 @@ router.get('/corporate/quotes', async (req, res) => {
   try {
     const { status } = req.query;
     const filter = {};
-    if (status) filter.status = status;
+    if (status && typeof status === 'string') filter.status = status;
 
     const quotes = await CorporateQuote.find(filter)
       .sort({ createdAt: -1 })
@@ -911,12 +943,12 @@ router.post('/corporate/quotes', async (req, res) => {
     // Send quote notification email
     try {
       await sendCorporateQuoteNotification(contactEmail, quote, 'created');
-    } catch (e) { console.error('Quote notification email error:', e.message); }
+    } catch (e) { logger.error('Quote notification email error:', e.message); }
 
     logActivity({ domain: 'admin', action: 'corporate_quote_created', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'CorporateQuote', targetId: quote._id, message: `Quote ${quoteNumber} created for ${companyName}`, metadata: { quoteNumber, finalAmount } });
     res.status(201).json({ quote, message: 'Quote created and sent' });
   } catch (err) {
-    console.error('Create quote error:', err.message);
+    logger.error('Create quote error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -946,7 +978,7 @@ router.put('/corporate/quotes/:id', async (req, res) => {
     // Send quote update notification email
     try {
       await sendCorporateQuoteNotification(quote.contactEmail, quote, 'updated');
-    } catch (e) { console.error('Quote update notification email error:', e.message); }
+    } catch (e) { logger.error('Quote update notification email error:', e.message); }
 
     logActivity({ domain: 'admin', action: 'corporate_quote_updated', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'CorporateQuote', targetId: quote._id, message: `Quote ${quote.quoteNumber} updated` });
     res.json({ quote, message: 'Quote updated' });
@@ -965,9 +997,9 @@ router.get('/logs/activity', async (req, res) => {
   try {
     const { domain, action, actorRole, page = 1, limit = 50, from, to } = req.query;
     const filter = {};
-    if (domain) filter.domain = domain;
+    if (domain && typeof domain === 'string') filter.domain = domain;
     if (action) filter.action = { $regex: escapeRegex(action), $options: 'i' };
-    if (actorRole) filter.actorRole = actorRole;
+    if (actorRole && typeof actorRole === 'string') filter.actorRole = actorRole;
     if (from || to) {
       filter.createdAt = {};
       if (from) filter.createdAt.$gte = new Date(from);
@@ -989,9 +1021,9 @@ router.get('/logs/auth', async (req, res) => {
   try {
     const { action, email, role, page = 1, limit = 50, from, to } = req.query;
     const filter = {};
-    if (action) filter.action = action;
+    if (action && typeof action === 'string') filter.action = action;
     if (email) filter.email = { $regex: escapeRegex(email), $options: 'i' };
-    if (role) filter.role = role;
+    if (role && typeof role === 'string') filter.role = role;
     if (from || to) {
       filter.createdAt = {};
       if (from) filter.createdAt.$gte = new Date(from);
@@ -1014,8 +1046,8 @@ router.get('/logs/otp', async (req, res) => {
     const { email, event, role, page = 1, limit = 50, from, to } = req.query;
     const filter = {};
     if (email) filter.email = { $regex: escapeRegex(email), $options: 'i' };
-    if (event) filter.event = event;
-    if (role) filter.role = role;
+    if (event && typeof event === 'string') filter.event = event;
+    if (role && typeof role === 'string') filter.role = role;
     if (from || to) {
       filter.createdAt = {};
       if (from) filter.createdAt.$gte = new Date(from);

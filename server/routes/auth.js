@@ -10,6 +10,7 @@ const { cloudinary } = require('../config/cloudinary');
 const { findIdentityByEmail, findAllRolesForEmail, findIdentityByEmailAndRole, signIdentityToken, createAuthSession } = require('../utils/identity');
 const { sanitizeBody } = require('../middleware/sanitize');
 const { logOtpEvent, logAuthEvent } = require('../utils/audit');
+const logger = require('../utils/logger');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -65,7 +66,7 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
       isNewUser: identity.role === 'customer' ? !identity.entity.isProfileComplete : false
     });
   } catch (err) {
-    console.error('Send OTP error:', err);
+    logger.error('Send OTP error:', err);
     await logOtpEvent(req, { email: req.body?.email || '', event: 'failed', metadata: { stage: 'send' } });
     res.status(500).json({ message: 'Failed to send OTP' });
   }
@@ -123,7 +124,7 @@ router.post('/verify-otp', verifyLimiter, async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Verify OTP error:', err);
+    logger.error('Verify OTP error:', err);
     await logAuthEvent(req, { action: 'login_failed', reason: 'server_error', email: req.body?.email || '' });
     res.status(500).json({ message: 'Verification failed' });
   }
@@ -143,6 +144,12 @@ router.post('/upload-avatar', avatarUploadLimiter, upload.single('avatar'), asyn
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
+    // Validate MIME type to prevent non-image uploads
+    const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!ALLOWED_AVATAR_TYPES.includes(req.file.mimetype)) {
+      return res.status(400).json({ message: 'Invalid file type. Only JPEG, PNG, WebP, and GIF allowed.' });
+    }
+
     // Use user-specific folder if authenticated, else generic
     const userId = req.user?._id || 'anonymous';
     const result = await new Promise((resolve, reject) => {
@@ -155,7 +162,7 @@ router.post('/upload-avatar', avatarUploadLimiter, upload.single('avatar'), asyn
 
     res.json({ url: result.secure_url, publicId: result.public_id });
   } catch (err) {
-    console.error('Upload avatar error:', err);
+    logger.error('Upload avatar error:', err);
     res.status(500).json({ message: 'Upload failed' });
   }
 });
@@ -181,7 +188,7 @@ router.post('/register-seller', async (req, res) => {
         return res.status(400).json({ message: `Instagram account @${cleanIg} not found. Please enter a valid username.` });
       }
     } catch (igErr) {
-      console.warn('[Instagram] Verification failed during registration, allowing:', igErr.message);
+      logger.warn('[Instagram] Verification failed during registration, allowing:', igErr.message);
     }
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -254,7 +261,7 @@ router.post('/register-seller', async (req, res) => {
       sellerId: seller._id
     });
   } catch (err) {
-    console.error('Register seller error:', err);
+    logger.error('Register seller error:', err);
     res.status(500).json({ message: 'Registration failed' });
   }
 });
@@ -360,7 +367,7 @@ router.get('/available-roles', requireAuth, async (req, res) => {
     const currentRole = req.user.role || req.user.userType || 'customer';
     res.json({ roles, currentRole });
   } catch (err) {
-    console.error('Available roles error:', err);
+    logger.error('Available roles error:', err);
     res.status(500).json({ message: 'Failed to fetch roles' });
   }
 });
@@ -413,7 +420,7 @@ router.post('/switch-role', requireAuth, async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Switch role error:', err);
+    logger.error('Switch role error:', err);
     res.status(500).json({ message: 'Role switch failed' });
   }
 });

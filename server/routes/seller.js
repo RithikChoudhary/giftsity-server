@@ -234,6 +234,11 @@ router.put('/orders/:id/ship', async (req, res) => {
     const order = await Order.findOne({ _id: req.params.id, sellerId: req.user._id });
     if (!order) return res.status(404).json({ message: 'Order not found' });
 
+    const { isValidTransition } = require('../utils/orderStatus');
+    if (!isValidTransition(order.status, 'shipped')) {
+      return res.status(400).json({ message: `Cannot ship order with status "${order.status}"` });
+    }
+
     order.status = 'shipped';
     order.trackingInfo = {
       courierName: courierName || '',

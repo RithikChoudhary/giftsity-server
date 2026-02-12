@@ -1,4 +1,5 @@
 const cloudinary = require('cloudinary').v2;
+const logger = require('../utils/logger');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -68,7 +69,7 @@ const deleteImage = async (publicId) => {
   try {
     await cloudinary.uploader.destroy(publicId);
   } catch (err) {
-    console.error('Cloudinary delete error:', err.message);
+    logger.error('Cloudinary delete error:', err.message);
   }
 };
 
@@ -81,7 +82,7 @@ const deleteVideo = async (publicId) => {
   try {
     await cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
   } catch (err) {
-    console.error('Cloudinary video delete error:', err.message);
+    logger.error('Cloudinary video delete error:', err.message);
   }
 };
 

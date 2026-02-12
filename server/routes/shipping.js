@@ -2,6 +2,7 @@ const express = require('express');
 const Order = require('../models/Order');
 const Shipment = require('../models/Shipment');
 const Seller = require('../models/Seller');
+const logger = require('../utils/logger');
 const router = express.Router();
 
 // NOTE: All seller-facing shipping routes (serviceability, create, assign-courier,
@@ -12,6 +13,13 @@ const router = express.Router();
 // POST /api/shipping/webhook - Shiprocket status updates
 router.post('/webhook', async (req, res) => {
   try {
+    // Verify webhook secret token to prevent forged requests
+    const webhookSecret = process.env.SHIPROCKET_WEBHOOK_SECRET;
+    if (webhookSecret && req.query.token !== webhookSecret) {
+      logger.warn('[Shipping Webhook] Invalid or missing token');
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
     const { awb, current_status, shipment_id, etd } = req.body;
 
     const shipment = await Shipment.findOne({
@@ -55,7 +63,7 @@ router.post('/webhook', async (req, res) => {
 
     res.json({ message: 'ok' });
   } catch (err) {
-    console.error('Webhook error:', err.message);
+    logger.error('Webhook error:', err.message);
     res.status(200).json({ message: 'ok' }); // Always return 200 for webhooks
   }
 });

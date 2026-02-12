@@ -5,6 +5,7 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { sanitizeBody } = require('../middleware/sanitize');
 const { validateB2BInquiry } = require('../middleware/validators');
 const { sendB2BInquiryNotification } = require('../utils/email');
+const logger = require('../utils/logger');
 const router = express.Router();
 
 // Rate limiter: max 5 B2B inquiries per IP per 15 minutes
@@ -41,7 +42,7 @@ router.post('/inquiries', inquiryLimiter, sanitizeBody, validateB2BInquiry, asyn
     await inquiry.save();
 
     // Notify admin via email (non-blocking)
-    try { await sendB2BInquiryNotification(inquiry); } catch (e) { console.error('B2B notification email failed:', e.message); }
+    try { await sendB2BInquiryNotification(inquiry); } catch (e) { logger.error('B2B notification email failed:', e.message); }
 
     res.status(201).json({ message: 'Thank you! We\'ll get back to you within 24 hours.', inquiry: { _id: inquiry._id } });
   } catch (err) {
@@ -54,7 +55,7 @@ router.get('/inquiries', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
     const filter = {};
-    if (status) filter.status = status;
+    if (status && typeof status === 'string') filter.status = status;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const inquiries = await B2BInquiry.find(filter).sort({ createdAt: -1 }).skip(skip).limit(parseInt(limit));

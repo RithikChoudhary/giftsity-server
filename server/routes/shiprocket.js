@@ -67,8 +67,15 @@ function shipmentToOrderStatus(shipmentStatus) {
  */
 router.post('/webhook', async (req, res) => {
   try {
+    // Verify webhook secret token to prevent forged requests
+    const webhookSecret = process.env.SHIPROCKET_WEBHOOK_SECRET;
+    if (webhookSecret && req.query.token !== webhookSecret) {
+      logger.warn('[Shiprocket Webhook] Invalid or missing token');
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
     const payload = req.body;
-    console.log('[Shiprocket Webhook] Received:', JSON.stringify(payload).substring(0, 500));
+    logger.info('[Shiprocket Webhook] Received:', JSON.stringify(payload).substring(0, 500));
 
     // Extract key fields — Shiprocket can send different formats
     const awb = payload.awb || payload.awb_code || '';
@@ -79,7 +86,7 @@ router.post('/webhook', async (req, res) => {
     const courierName = payload.courier_name || '';
 
     if (!awb && !srOrderId) {
-      console.warn('[Shiprocket Webhook] No AWB or order ID in payload');
+      logger.warn('[Shiprocket Webhook] No AWB or order ID in payload');
       return res.status(200).json({ message: 'No identifiers found, ignored' });
     }
 
@@ -93,7 +100,7 @@ router.post('/webhook', async (req, res) => {
     }
 
     if (!shipment) {
-      console.warn(`[Shiprocket Webhook] No matching shipment for AWB=${awb}, SR Order=${srOrderId}`);
+      logger.warn(`[Shiprocket Webhook] No matching shipment for AWB=${awb}, SR Order=${srOrderId}`);
       return res.status(200).json({ message: 'Shipment not found, ignored' });
     }
 
@@ -191,10 +198,10 @@ router.post('/webhook', async (req, res) => {
       }
     }
 
-    console.log(`[Shiprocket Webhook] Updated shipment ${shipment._id}: ${previousStatus} → ${shipment.status}`);
+    logger.info(`[Shiprocket Webhook] Updated shipment ${shipment._id}: ${previousStatus} → ${shipment.status}`);
     res.status(200).json({ message: 'Webhook processed' });
   } catch (err) {
-    console.error('[Shiprocket Webhook] Error:', err.message);
+    logger.error('[Shiprocket Webhook] Error:', err.message);
     // Always return 200 to prevent Shiprocket from retrying
     res.status(200).json({ message: 'Error processing webhook' });
   }

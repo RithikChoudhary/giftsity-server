@@ -13,6 +13,7 @@ const { logActivity } = require('../utils/audit');
 const { sanitizeBody } = require('../middleware/sanitize');
 const { validateOrderCreation, validatePaymentVerification } = require('../middleware/validators');
 const rateLimit = require('express-rate-limit');
+const logger = require('../utils/logger');
 const router = express.Router();
 
 // Rate limiter: max 10 order creations per user per minute
@@ -224,7 +225,7 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
       env: process.env.CASHFREE_ENV || 'sandbox'
     });
   } catch (err) {
-    console.error('Create order error:', err?.response?.data || err.message || err);
+    logger.error('Create order error:', err?.response?.data || err.message || err);
     res.status(500).json({ message: 'Failed to create order', error: err?.response?.data?.message || err.message });
   }
 });
@@ -255,7 +256,7 @@ router.post('/verify-payment', requireAuth, validatePaymentVerification, async (
     const expectedTotal = orders.reduce((s, o) => s + o.totalAmount, 0);
     const paidAmount = parseFloat(cfOrder.order_amount);
     if (Math.abs(paidAmount - expectedTotal) > 1) {
-      console.error(`[Payment] AMOUNT MISMATCH on verify: paid ${paidAmount}, expected ${expectedTotal}, orderId=${orderId}`);
+      logger.error(`[Payment] AMOUNT MISMATCH on verify: paid ${paidAmount}, expected ${expectedTotal}, orderId=${orderId}`);
       logActivity({ domain: 'payment', action: 'payment_amount_mismatch', actorRole: 'customer', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Order', targetId: orders[0]?._id, message: `Amount mismatch: paid ${paidAmount}, expected ${expectedTotal}` });
       return res.status(400).json({ message: 'Payment amount does not match order total. Please contact support.' });
     }
@@ -276,7 +277,7 @@ router.post('/verify-payment', requireAuth, validatePaymentVerification, async (
           { new: true }
         );
         if (!updated) {
-          console.error(`[Stock] Insufficient stock for product ${item.productId}, order ${order.orderNumber}`);
+          logger.error(`[Stock] Insufficient stock for product ${item.productId}, order ${order.orderNumber}`);
         }
       }
 
@@ -291,21 +292,25 @@ router.post('/verify-payment', requireAuth, validatePaymentVerification, async (
         const seller = await Seller.findById(order.sellerId);
         if (seller) await sendOrderConfirmation(seller.email, order, 'seller');
       } catch (emailErr) {
-        console.error('Email send error:', emailErr.message);
+        logger.error('Email send error:', emailErr.message);
       }
     }
 
-    // Track coupon usage after successful payment
+    // Track coupon usage after successful payment (with race-condition-safe predicate)
     const couponCode = orders.find(o => o.couponCode)?.couponCode;
     if (couponCode) {
       try {
         const Coupon = require('../models/Coupon');
-        await Coupon.findOneAndUpdate(
-          { code: couponCode },
-          { $inc: { usedCount: 1 }, $addToSet: { usedBy: req.user._id } }
-        );
+        const couponDoc = await Coupon.findOne({ code: couponCode });
+        if (couponDoc) {
+          const result = await Coupon.findOneAndUpdate(
+            { code: couponCode, usedCount: { $lt: couponDoc.usageLimit } },
+            { $inc: { usedCount: 1 }, $addToSet: { usedBy: req.user._id } }
+          );
+          if (!result) logger.warn('[Coupon] Usage limit exceeded for', couponCode);
+        }
       } catch (couponErr) {
-        console.error('[Coupon] Failed to track usage:', couponErr.message);
+        logger.error('[Coupon] Failed to track usage:', couponErr.message);
       }
     }
 
@@ -315,7 +320,7 @@ router.post('/verify-payment', requireAuth, validatePaymentVerification, async (
 
     res.json({ message: 'Payment verified', orders });
   } catch (err) {
-    console.error('Verify payment error:', err?.response?.data || err.message);
+    logger.error('Verify payment error:', err?.response?.data || err.message);
     res.status(500).json({ message: 'Verification failed', error: err.message });
   }
 });
@@ -418,7 +423,7 @@ router.get('/track/:orderNumber/details', trackingLimiter, async (req, res) => {
           status: a['sr-status-label'] || a.status || ''
         }));
       } catch (trackErr) {
-        console.warn('[Tracking] Live tracking failed for AWB', shipment.awbCode, trackErr.message);
+        logger.warn('[Tracking] Live tracking failed for AWB', shipment.awbCode, trackErr.message);
       }
     }
 
@@ -442,7 +447,7 @@ router.get('/track/:orderNumber/details', trackingLimiter, async (req, res) => {
       scans
     });
   } catch (err) {
-    console.error('[Tracking] Public tracking error:', err.message);
+    logger.error('[Tracking] Public tracking error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -483,7 +488,7 @@ router.get('/:id/tracking', requireAuth, async (req, res) => {
           status: a['sr-status-label'] || a.status || ''
         }));
       } catch (trackErr) {
-        console.warn('[Tracking] Live tracking failed for AWB', shipment.awbCode, trackErr.message);
+        logger.warn('[Tracking] Live tracking failed for AWB', shipment.awbCode, trackErr.message);
       }
     }
 
@@ -506,7 +511,7 @@ router.get('/:id/tracking', requireAuth, async (req, res) => {
       scans
     });
   } catch (err) {
-    console.error('[Tracking] Authenticated tracking error:', err.message);
+    logger.error('[Tracking] Authenticated tracking error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -523,6 +528,28 @@ router.get('/:id', requireAuth, async (req, res) => {
     res.json({ order });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/orders/:id/invoice - download PDF invoice for paid orders
+router.get('/:id/invoice', requireAuth, async (req, res) => {
+  try {
+    const order = await Order.findOne({ _id: req.params.id, customerId: req.user._id }).lean();
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    if (order.paymentStatus !== 'paid') {
+      return res.status(400).json({ message: 'Invoice is only available for paid orders' });
+    }
+
+    const Customer = require('../models/Customer');
+    const customer = await Customer.findById(req.user._id).lean();
+    const { generateOrderInvoice } = require('../utils/pdf');
+    const pdfBuffer = await generateOrderInvoice(order, customer);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="invoice-${order.orderNumber}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    logger.error('Invoice generation error:', err.message);
+    res.status(500).json({ message: 'Failed to generate invoice' });
   }
 });
 
@@ -558,7 +585,7 @@ router.post('/:id/cancel', requireAuth, sanitizeBody, async (req, res) => {
             refundAmount = Math.min(order.totalAmount, parseFloat(cfOrderData.order_amount));
           }
         } catch (cfErr) {
-          console.warn('[Refund] Could not verify Cashfree amount, using order total:', cfErr.message);
+          logger.warn('[Refund] Could not verify Cashfree amount, using order total:', cfErr.message);
         }
         const refundId = `refund_${order.orderNumber}_${Date.now()}`;
         await createRefund({
@@ -570,7 +597,7 @@ router.post('/:id/cancel', requireAuth, sanitizeBody, async (req, res) => {
         order.paymentStatus = 'refunded';
         order.refundId = refundId;
       } catch (refundErr) {
-        console.error('[Refund] Failed for order', order.orderNumber, refundErr?.response?.data || refundErr.message);
+        logger.error('[Refund] Failed for order', order.orderNumber, refundErr?.response?.data || refundErr.message);
         order.paymentStatus = 'refund_pending';
       }
       await order.save();
@@ -579,7 +606,7 @@ router.post('/:id/cancel', requireAuth, sanitizeBody, async (req, res) => {
     logActivity({ domain: 'order', action: 'order_cancelled', actorRole: 'customer', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Order', targetId: order._id, message: `Order ${order.orderNumber} cancelled by customer`, metadata: { reason: order.cancelReason } });
     res.json({ message: 'Order cancelled successfully', order });
   } catch (err) {
-    console.error('Cancel order error:', err.message);
+    logger.error('Cancel order error:', err.message);
     res.status(500).json({ message: 'Failed to cancel order' });
   }
 });

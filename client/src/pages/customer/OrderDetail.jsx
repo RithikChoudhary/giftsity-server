@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Package, Truck, CheckCircle, Clock, XCircle, MapPin, Star, ArrowLeft, Loader, Camera, X, Navigation } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, XCircle, MapPin, Star, ArrowLeft, Loader, Camera, X, Navigation, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import API from '../../api';
@@ -136,6 +136,21 @@ export default function OrderDetail() {
           <p className="text-sm text-theme-muted">{new Date(order.createdAt).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
         <div className="flex items-center gap-2">
+          {order.paymentStatus === 'paid' && (
+            <button onClick={async () => {
+              try {
+                const response = await API.get(`/orders/${order._id}/invoice`, { responseType: 'blob' });
+                const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `invoice-${order.orderNumber}.pdf`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+              } catch (err) { toast.error('Failed to download invoice'); }
+            }} className="px-3 py-1 rounded-full text-xs font-medium bg-amber-400/10 text-amber-400 hover:bg-amber-400/20 transition-colors flex items-center gap-1">
+              <Download className="w-3 h-3" /> Invoice
+            </button>
+          )}
           {['pending', 'confirmed'].includes(order.status) && (
             <button onClick={() => setShowCancel(true)} className="px-3 py-1 rounded-full text-xs font-medium bg-red-400/10 text-red-400 hover:bg-red-400/20 transition-colors">Cancel Order</button>
           )}

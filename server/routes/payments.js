@@ -6,6 +6,7 @@ const Seller = require('../models/Seller');
 const { getCashfreeOrder, getCashfreePayments } = require('../config/cashfree');
 const { sendOrderConfirmation } = require('../utils/email');
 const { logActivity } = require('../utils/audit');
+const logger = require('../utils/logger');
 const router = express.Router();
 
 /**
@@ -52,7 +53,7 @@ async function processPaymentConfirmation(cashfreeOrderId) {
   const expectedTotal = orders.reduce((s, o) => s + o.totalAmount, 0);
   const paidAmount = parseFloat(cfOrder.order_amount);
   if (Math.abs(paidAmount - expectedTotal) > 1) { // 1 rupee tolerance for rounding
-    console.error(`[Payment] AMOUNT MISMATCH: paid ${paidAmount}, expected ${expectedTotal}, cashfreeOrderId=${cashfreeOrderId}`);
+    logger.error(`[Payment] AMOUNT MISMATCH: paid ${paidAmount}, expected ${expectedTotal}, cashfreeOrderId=${cashfreeOrderId}`);
     logActivity({ domain: 'payment', action: 'payment_amount_mismatch', actorRole: 'system', actorId: null, actorEmail: 'cashfree-webhook', targetType: 'Order', targetId: orders[0]._id, message: `Amount mismatch: paid ${paidAmount}, expected ${expectedTotal}` });
     return { processed: false, reason: `Amount mismatch: paid ${paidAmount}, expected ${expectedTotal}` };
   }
@@ -77,7 +78,7 @@ async function processPaymentConfirmation(cashfreeOrderId) {
         { new: true }
       );
       if (!updated) {
-        console.error(`[Webhook][Stock] Insufficient stock for product ${item.productId}, order ${order.orderNumber}`);
+        logger.error(`[Webhook][Stock] Insufficient stock for product ${item.productId}, order ${order.orderNumber}`);
       }
     }
 
@@ -92,7 +93,7 @@ async function processPaymentConfirmation(cashfreeOrderId) {
       const seller = await Seller.findById(order.sellerId);
       if (seller) await sendOrderConfirmation(seller.email, order, 'seller');
     } catch (emailErr) {
-      console.error('[Webhook] Email send error:', emailErr.message);
+      logger.error('[Webhook] Email send error:', emailErr.message);
     }
 
     logActivity({
@@ -107,18 +108,22 @@ async function processPaymentConfirmation(cashfreeOrderId) {
     });
   }
 
-  // Track coupon usage
+  // Track coupon usage (with race-condition-safe predicate)
   const couponCode = orders.find(o => o.couponCode)?.couponCode;
   if (couponCode && processedCount > 0) {
     try {
       const Coupon = require('../models/Coupon');
       const customerId = orders[0].customerId;
-      await Coupon.findOneAndUpdate(
-        { code: couponCode },
-        { $inc: { usedCount: 1 }, $addToSet: { usedBy: customerId } }
-      );
+      const couponDoc = await Coupon.findOne({ code: couponCode });
+      if (couponDoc) {
+        const result = await Coupon.findOneAndUpdate(
+          { code: couponCode, usedCount: { $lt: couponDoc.usageLimit } },
+          { $inc: { usedCount: 1 }, $addToSet: { usedBy: customerId } }
+        );
+        if (!result) logger.warn('[Webhook][Coupon] Usage limit exceeded for', couponCode);
+      }
     } catch (couponErr) {
-      console.error('[Webhook][Coupon] Failed to track usage:', couponErr.message);
+      logger.error('[Webhook][Coupon] Failed to track usage:', couponErr.message);
     }
   }
 
@@ -134,7 +139,7 @@ router.post('/cashfree/webhook', async (req, res) => {
   try {
     // Verify signature
     if (!verifyCashfreeSignature(req)) {
-      console.error('[Cashfree Webhook] Invalid signature');
+      logger.error('[Cashfree Webhook] Invalid signature');
       return res.status(401).json({ message: 'Invalid signature' });
     }
 
@@ -154,15 +159,15 @@ router.post('/cashfree/webhook', async (req, res) => {
     const result = await processPaymentConfirmation(cashfreeOrderId);
 
     if (result.processed) {
-      console.log(`[Cashfree Webhook] Processed payment for ${cashfreeOrderId}: ${result.processedCount}/${result.totalOrders} orders updated`);
+      logger.info(`[Cashfree Webhook] Processed payment for ${cashfreeOrderId}: ${result.processedCount}/${result.totalOrders} orders updated`);
     } else {
-      console.log(`[Cashfree Webhook] Skipped ${cashfreeOrderId}: ${result.reason}`);
+      logger.info(`[Cashfree Webhook] Skipped ${cashfreeOrderId}: ${result.reason}`);
     }
 
     // Always return 200 to prevent retries
     res.status(200).json({ message: 'Webhook received', ...result });
   } catch (err) {
-    console.error('[Cashfree Webhook] Error:', err.message);
+    logger.error('[Cashfree Webhook] Error:', err.message);
     // Return 200 even on error to prevent infinite retries for malformed data
     // Real errors (like DB issues) will be retried by Cashfree if we return 500
     res.status(500).json({ message: 'Webhook processing failed' });

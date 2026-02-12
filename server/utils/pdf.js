@@ -48,8 +48,9 @@ function generateOrderInvoice(order, corporateUser) {
       doc.on('end', () => resolve(Buffer.concat(buffers)));
 
       // Header
+      const isCorporate = corporateUser && corporateUser.companyName;
       doc.font('Helvetica-Bold').fontSize(22).fillColor('#f5c518').text('Giftsity', 50, 40);
-      doc.font('Helvetica').fontSize(10).fillColor('#888888').text('Corporate Gifting Platform', 50, 65);
+      doc.font('Helvetica').fontSize(10).fillColor('#888888').text(isCorporate ? 'Corporate Gifting Platform' : 'Gift Marketplace', 50, 65);
 
       doc.font('Helvetica-Bold').fontSize(16).fillColor('#333333').text('INVOICE', 400, 40, { align: 'right' });
       doc.font('Helvetica').fontSize(9).fillColor('#666666');
@@ -64,12 +65,20 @@ function generateOrderInvoice(order, corporateUser) {
       doc.font('Helvetica-Bold').fontSize(10).fillColor('#333333').text('Bill To:', 50, y);
       y += 15;
       doc.font('Helvetica').fontSize(9).fillColor('#555555');
-      if (corporateUser) {
+      if (isCorporate) {
         doc.text(corporateUser.companyName || '', 50, y); y += 12;
         doc.text(corporateUser.contactPerson || '', 50, y); y += 12;
         doc.text(corporateUser.email || '', 50, y); y += 12;
         if (corporateUser.phone) { doc.text(`Phone: ${corporateUser.phone}`, 50, y); y += 12; }
         if (corporateUser.gstNumber) { doc.text(`GST: ${corporateUser.gstNumber}`, 50, y); y += 12; }
+      } else {
+        // B2C customer: use shipping address name and order email
+        const addr = order.shippingAddress || {};
+        doc.text(addr.name || corporateUser?.name || '', 50, y); y += 12;
+        const email = order.customerEmail || corporateUser?.email || '';
+        if (email) { doc.text(email, 50, y); y += 12; }
+        const phone = addr.phone || order.customerPhone || corporateUser?.phone || '';
+        if (phone) { doc.text(`Phone: ${phone}`, 50, y); y += 12; }
       }
 
       // Ship To
@@ -143,7 +152,7 @@ function generateOrderInvoice(order, corporateUser) {
       if (y > 720) { doc.addPage(); y = 50; }
       doc.font('Helvetica').fontSize(8).fillColor('#aaaaaa');
       doc.text('This is a computer-generated invoice and does not require a signature.', 50, y, { align: 'center', width: 495 });
-      doc.text('Giftsity - Corporate Gifting Platform | support@giftsity.com', 50, y + 12, { align: 'center', width: 495 });
+      doc.text('Giftsity - Gift Marketplace | support@giftsity.com', 50, y + 12, { align: 'center', width: 495 });
 
       doc.end();
     } catch (err) {

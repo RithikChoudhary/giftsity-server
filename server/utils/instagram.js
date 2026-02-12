@@ -1,4 +1,5 @@
 const axios = require('axios');
+const logger = require('./logger');
 
 /**
  * Verify that an Instagram username exists by checking the public profile.

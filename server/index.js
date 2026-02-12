@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const connectDB = require('./config/db');
+const logger = require('./utils/logger');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -34,6 +35,20 @@ app.use(express.json({
   verify: (req, _res, buf) => { req.rawBody = buf.toString(); }
 }));
 
+// Request logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+    logger[level](`${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`, {
+      method: req.method, url: req.originalUrl, status: res.statusCode, duration,
+      ip: req.ip, userAgent: (req.headers['user-agent'] || '').substring(0, 100)
+    });
+  });
+  next();
+});
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/products', require('./routes/products'));
@@ -60,19 +75,19 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((err, req, res, _next) => {
-  console.error('[Server Error]', err.message);
+  logger.error(`${req.method} ${req.originalUrl} - ${err.message}`, { stack: err.stack, status: err.status });
   res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
 });
 
 // Graceful error handling
 process.on('unhandledRejection', (err) => {
-  console.error('[Unhandled Rejection]', err);
+  logger.error('Unhandled Rejection', { error: err?.message || err, stack: err?.stack });
 });
 
 // Start
 connectDB().then(() => {
   app.listen(PORT, () => {
-    console.log(`Giftsity server running on port ${PORT}`);
+    logger.info(`Giftsity server running on port ${PORT}`);
     // Start cron jobs after server is up
     const { startCronJobs } = require('./cron/sellerHealth');
     startCronJobs();

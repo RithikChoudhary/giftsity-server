@@ -3,6 +3,7 @@ const Seller = require('../models/Seller');
 const Product = require('../models/Product');
 const { sendOTP } = require('../utils/email'); // reuse transporter
 const { logActivity } = require('../utils/audit');
+const logger = require('../utils/logger');
 
 // ==================== CONFIG ====================
 const SHIP_DEADLINE_HOURS = 48;        // Orders must be shipped within 48h
@@ -47,11 +48,11 @@ async function autoCancelUnshippedOrders() {
 
     cancelled++;
     logActivity({ domain: 'cron', action: 'order_auto_cancelled', actorRole: 'system', targetType: 'Order', targetId: order._id, message: `Order ${order.orderNumber} auto-cancelled (not shipped within ${AUTO_CANCEL_HOURS}h)`, metadata: { sellerId: order.sellerId.toString(), orderNumber: order.orderNumber } });
-    console.log(`[AutoCancel] Order ${order.orderNumber} cancelled (seller: ${order.sellerId})`);
+    logger.info(`[AutoCancel] Order ${order.orderNumber} cancelled (seller: ${order.sellerId})`);
   }
 
   if (cancelled > 0) {
-    console.log(`[AutoCancel] Cancelled ${cancelled} unshipped orders`);
+    logger.info(`[AutoCancel] Cancelled ${cancelled} unshipped orders`);
   }
   return cancelled;
 }
@@ -150,7 +151,7 @@ async function calculateSellerMetrics() {
     updated++;
   }
 
-  console.log(`[Metrics] Updated metrics for ${updated} sellers`);
+  logger.info(`[Metrics] Updated metrics for ${updated} sellers`);
   return updated;
 }
 
@@ -196,7 +197,7 @@ async function autoSuspendBadSellers() {
 
       suspended++;
       logActivity({ domain: 'cron', action: 'seller_auto_suspended', actorRole: 'system', targetType: 'Seller', targetId: seller._id, message: `Seller ${seller.sellerProfile.businessName} auto-suspended: ${reason}`, metadata: { businessName: seller.sellerProfile.businessName, healthScore: m.healthScore } });
-      console.log(`[AutoSuspend] Suspended seller ${seller.sellerProfile.businessName}: ${reason}`);
+      logger.info(`[AutoSuspend] Suspended seller ${seller.sellerProfile.businessName}: ${reason}`);
       continue;
     }
 
@@ -215,11 +216,11 @@ async function autoSuspendBadSellers() {
       seller.sellerProfile.metrics.warningCount = (m.warningCount || 0) + 1;
       await seller.save();
       warned++;
-      console.log(`[Warning] Warned seller ${seller.sellerProfile.businessName}: ${warnReason}`);
+      logger.info(`[Warning] Warned seller ${seller.sellerProfile.businessName}: ${warnReason}`);
     }
   }
 
-  console.log(`[AutoSuspend] Suspended: ${suspended}, Warned: ${warned}`);
+  logger.info(`[AutoSuspend] Suspended: ${suspended}, Warned: ${warned}`);
   return { suspended, warned };
 }
 
@@ -232,14 +233,14 @@ async function updateSellerLastActive(sellerId) {
 
 // ==================== RUN ALL CRONS ====================
 async function runAllCrons() {
-  console.log(`\n[Cron] Running seller health checks at ${new Date().toISOString()}`);
+  logger.info(`\n[Cron] Running seller health checks at ${new Date().toISOString()}`);
   try {
     await autoCancelUnshippedOrders();
     await calculateSellerMetrics();
     await autoSuspendBadSellers();
-    console.log('[Cron] All checks complete\n');
+    logger.info('[Cron] All checks complete\n');
   } catch (err) {
-    console.error('[Cron] Error:', err.message);
+    logger.error('[Cron] Error:', err.message);
   }
 }
 
@@ -269,9 +270,9 @@ async function sendReviewRequestEmails() {
         sent++;
       } catch (e) { /* skip failed emails */ }
     }
-    if (sent > 0) console.log(`[Cron] Sent ${sent} review request emails`);
+    if (sent > 0) logger.info(`[Cron] Sent ${sent} review request emails`);
   } catch (err) {
-    console.error('[Cron] Review request email error:', err.message);
+    logger.error('[Cron] Review request email error:', err.message);
   }
 }
 
@@ -292,7 +293,7 @@ function startCronJobs() {
   // Run initial check after 30 seconds (let server start)
   setTimeout(runAllCrons, 30 * 1000);
 
-  console.log('[Cron] Seller health cron jobs scheduled');
+  logger.info('[Cron] Seller health cron jobs scheduled');
 }
 
 module.exports = {

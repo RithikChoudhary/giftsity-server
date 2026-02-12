@@ -4,6 +4,7 @@
 
 const { Resend } = require('resend');
 const { logNotification } = require('./audit');
+const logger = require('./logger');
 const templates = require('./emailTemplates');
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
