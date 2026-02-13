@@ -51,9 +51,9 @@ export default function CorporateLayout() {
     <div className="flex min-h-screen bg-surface text-theme-primary">
       <aside className="w-64 bg-card border-r border-edge/50 flex flex-col shrink-0">
         <div className="p-5 border-b border-edge/50">
-          <Link to="/" className="flex items-center gap-2">
-            <img src="/logo.png" alt="Giftsity" className="h-8 w-8 rounded-lg object-contain" />
-            <span className="text-lg font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Giftsity</span>
+          <Link to="/" className="flex items-center gap-2.5">
+            <img src="/logo.png" alt="Giftsity" className="h-10 w-10 rounded-lg object-contain" />
+            <span className="text-xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Giftsity</span>
           </Link>
           <p className="text-xs text-theme-dim mt-1">Corporate Portal</p>
         </div>

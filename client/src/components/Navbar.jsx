@@ -58,9 +58,9 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <img src="/logo.png" alt="Giftsity" className="h-8 w-8 rounded-lg object-contain group-hover:scale-105 transition-transform" />
-            <span className="text-lg font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Giftsity</span>
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <img src="/logo.png" alt="Giftsity" className="h-10 w-10 rounded-lg object-contain group-hover:scale-105 transition-transform" />
+            <span className="text-xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Giftsity</span>
           </Link>
 
           {/* Desktop links */}
