@@ -110,9 +110,27 @@ async function addPickupLocation({ pickupLocationName, name, email, phone, addre
 }
 
 // Update an existing pickup location
+// Shiprocket PATCH requires pickup_id in the body. If not provided, we look it up.
 async function updatePickupLocation({ pickupLocationId, pickupLocationName, name, email, phone, address, address2, city, state, pinCode, country }) {
   const token = await getToken();
+
+  // Resolve pickup_id if not provided
+  let resolvedId = pickupLocationId;
+  if (!resolvedId && pickupLocationName) {
+    const locations = await getPickupLocations();
+    const match = locations.find(l => l.pickup_location === pickupLocationName);
+    if (match) {
+      resolvedId = match.id;
+    } else {
+      throw new Error(`Pickup location "${pickupLocationName}" not found on Shiprocket — cannot update`);
+    }
+  }
+  if (!resolvedId) {
+    throw new Error('pickup_id is required to update a pickup location');
+  }
+
   const body = {
+    pickup_id: resolvedId,
     pickup_location: pickupLocationName,
     name: name || pickupLocationName,
     email: email || process.env.SHIPROCKET_EMAIL,

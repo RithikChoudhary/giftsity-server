@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { sellerAPI } from '../../api';
-import { Store, CreditCard, MapPin, Loader, AlertTriangle, Send, Camera, ImageIcon, CheckCircle, XCircle, Instagram, ExternalLink, RefreshCw, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Store, CreditCard, MapPin, Loader, AlertTriangle, Send, Camera, ImageIcon, CheckCircle, XCircle, Instagram, RefreshCw, ShieldCheck, ShieldAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
 import API, { SellerAPI } from '../../api';
 import ImageCropper from '../../components/ImageCropper';
@@ -132,13 +132,27 @@ export default function SellerSettings() {
   };
 
   const saveAddress = async () => {
+    // Validate phone is provided for pickup address
+    if (pickupForm.street && !pickupForm.phone) {
+      return toast.error('Phone number is required for pickup address');
+    }
     setLoading(true);
     try {
       const { data } = await SellerAPI.put('/settings', { businessAddress: addressForm, pickupAddress: pickupForm });
       login(data.token, data.user);
       if (data.shiprocketPickupVerified !== undefined) setPickupVerified(data.shiprocketPickupVerified);
-      toast.success('Address saved');
-    } catch (err) { toast.error('Failed to save'); }
+      if (data.shiprocketError) {
+        toast.error(data.shiprocketError);
+      } else if (data.shiprocketPickupStatus === 'registered') {
+        toast.success('Address saved & pickup location registered');
+      } else if (data.shiprocketPickupStatus === 'updated') {
+        toast.success('Address saved & pickup location updated');
+      } else {
+        toast.success('Address saved');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save');
+    }
     setLoading(false);
   };
 
@@ -150,7 +164,7 @@ export default function SellerSettings() {
       if (data.verified) {
         toast.success('Pickup address is verified!');
       } else {
-        toast('Pickup address is not yet verified. Complete the OTP verification on Shiprocket.', { icon: '⚠️' });
+        toast('Pickup address is not yet verified. The Giftsity team will verify it shortly.', { icon: '⚠️' });
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to check verification status');
@@ -385,7 +399,10 @@ export default function SellerSettings() {
               <input type="text" value={pickupForm.city} onChange={e => setPickupForm(f => ({ ...f, city: e.target.value }))} placeholder="City" className="px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
               <input type="text" value={pickupForm.state} onChange={e => setPickupForm(f => ({ ...f, state: e.target.value }))} placeholder="State" className="px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
               <input type="text" value={pickupForm.pincode} onChange={e => setPickupForm(f => ({ ...f, pincode: e.target.value }))} placeholder="Pincode" className="px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
-              <input type="tel" value={pickupForm.phone} onChange={e => setPickupForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone" className="px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
+              <div className="relative">
+                <input type="tel" value={pickupForm.phone} onChange={e => setPickupForm(f => ({ ...f, phone: e.target.value }))} placeholder="Phone *" className={`w-full px-4 py-2.5 bg-inset border rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50 ${pickupForm.street && !pickupForm.phone ? 'border-red-500/50' : 'border-edge'}`} />
+                {pickupForm.street && !pickupForm.phone && <p className="text-[11px] text-red-400 mt-1">Required for shipping</p>}
+              </div>
             </div>
 
             {/* Pickup verification status and actions */}
@@ -394,14 +411,11 @@ export default function SellerSettings() {
                 <div className="flex items-start gap-2">
                   <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-amber-400">Pickup address not verified</p>
-                    <p className="text-xs text-theme-muted mt-1">Your pickup address must be phone-verified on Shiprocket before you can ship orders. Click below to complete the OTP verification.</p>
+                    <p className="text-sm font-medium text-amber-400">Pickup address pending verification</p>
+                    <p className="text-xs text-theme-muted mt-1">Your pickup address will be verified by the Giftsity team. This usually takes a few hours. You'll be able to ship orders once verified.</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-3">
-                  <a href="https://app.shiprocket.in/settings/pickup-address" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-lg text-xs font-semibold transition-colors">
-                    <ExternalLink className="w-3.5 h-3.5" /> Verify on Shiprocket
-                  </a>
                   <button onClick={checkPickupVerification} disabled={checkingVerification} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-inset border border-edge hover:border-amber-500/50 text-theme-primary rounded-lg text-xs font-medium transition-colors">
                     {checkingVerification ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Check Status
                   </button>
