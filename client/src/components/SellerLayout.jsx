@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { authAPI } from '../api';
-import { LayoutDashboard, Package, ShoppingCart, CreditCard, Megaphone, Settings, LogOut, Gift, Sun, Moon, ArrowLeft, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, CreditCard, Megaphone, Settings, LogOut, Sun, Moon, ArrowLeft, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const navItems = [
@@ -55,7 +55,7 @@ export default function SellerLayout() {
       <aside className="w-64 bg-card border-r border-edge/50 flex flex-col shrink-0">
         <div className="p-5 border-b border-edge/50">
           <Link to="/" className="flex items-center gap-2">
-            <Gift className="w-6 h-6 text-amber-400" />
+            <img src="/logo.png" alt="Giftsity" className="h-8 w-8 rounded-lg object-contain" />
             <span className="text-lg font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Giftsity</span>
           </Link>
           <p className="text-xs text-theme-dim mt-1">Seller Dashboard</p>

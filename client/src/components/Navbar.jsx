@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
-import { ShoppingBag, User, Menu, X, LogOut, Package, Sun, Moon, Gift, Search, Heart, ArrowLeftRight } from 'lucide-react';
+import { ShoppingBag, User, Menu, X, LogOut, Package, Sun, Moon, Search, Heart, ArrowLeftRight } from 'lucide-react';
 
 export default function Navbar() {
   const { user, logout, availableRoles, switchRole } = useAuth();
@@ -59,7 +59,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
-            <Gift className="w-6 h-6 text-amber-400 group-hover:rotate-12 transition-transform" />
+            <img src="/logo.png" alt="Giftsity" className="h-8 w-8 rounded-lg object-contain group-hover:scale-105 transition-transform" />
             <span className="text-lg font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Giftsity</span>
           </Link>
 

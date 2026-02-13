@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useCorporateAuth } from '../../context/CorporateAuthContext';
 import { corporateAPI } from '../../api';
-import { Gift, Building2, ArrowRight, Loader2, Mail, KeyRound } from 'lucide-react';
+import { Building2, ArrowRight, Loader2, Mail, KeyRound } from 'lucide-react';
 
 export default function CorporateLogin() {
   const [step, setStep] = useState('email'); // email | otp | register
@@ -73,7 +73,7 @@ export default function CorporateLogin() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 mb-4">
-            <Gift className="w-8 h-8 text-amber-400" />
+            <img src="/logo.png" alt="Giftsity" className="h-10 w-10 rounded-lg object-contain" />
             <span className="text-2xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Giftsity</span>
           </Link>
           <div className="flex items-center justify-center gap-2 mb-2">

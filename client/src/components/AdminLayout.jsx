@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { authAPI } from '../api';
-import { LayoutDashboard, Store, Package, ShoppingCart, Settings, CreditCard, Briefcase, Users, LogOut, Gift, Sun, Moon, ArrowLeft, FolderTree, Building2, ShoppingBag, FileText, ScrollText, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Store, Package, ShoppingCart, Settings, CreditCard, Briefcase, Users, LogOut, Sun, Moon, ArrowLeft, FolderTree, Building2, ShoppingBag, FileText, ScrollText, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const navItems = [
@@ -61,7 +61,7 @@ export default function AdminLayout() {
       <aside className="w-64 bg-card border-r border-edge/50 flex flex-col shrink-0">
         <div className="p-5 border-b border-edge/50">
           <Link to="/" className="flex items-center gap-2">
-            <Gift className="w-6 h-6 text-amber-400" />
+            <img src="/logo.png" alt="Giftsity" className="h-8 w-8 rounded-lg object-contain" />
             <span className="text-lg font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Giftsity</span>
           </Link>
           <p className="text-xs text-theme-dim mt-1">Admin Panel</p>
