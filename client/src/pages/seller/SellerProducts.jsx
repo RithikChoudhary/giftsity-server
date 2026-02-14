@@ -12,7 +12,7 @@ export default function SellerProducts() {
   const [editing, setEditing] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const emptyForm = { title: '', description: '', price: '', category: '', stock: '', weight: '', images: [], isCustomizable: false, customizationOptions: [] };
+  const emptyForm = { title: '', description: '', price: '', category: '', stock: '', weight: '', shippingPaidBy: 'seller', images: [], isCustomizable: false, customizationOptions: [] };
   const [form, setForm] = useState(emptyForm);
   const [mediaFiles, setMediaFiles] = useState([]); // { file, type: 'image'|'video' }
   const [mediaPreviews, setMediaPreviews] = useState([]); // { url, type: 'image'|'video', isExisting: bool }
@@ -61,7 +61,7 @@ export default function SellerProducts() {
   const openForm = (product = null) => {
     if (product) {
       setEditing(product._id);
-      setForm({ title: product.title, description: product.description, price: product.price, category: product.category, stock: product.stock, weight: product.weight || '', images: product.images || [], isCustomizable: product.isCustomizable || false, customizationOptions: product.customizationOptions || [] });
+      setForm({ title: product.title, description: product.description, price: product.price, category: product.category, stock: product.stock, weight: product.weight || '', shippingPaidBy: product.shippingPaidBy || 'seller', images: product.images || [], isCustomizable: product.isCustomizable || false, customizationOptions: product.customizationOptions || [] });
       // Build previews from existing images + media
       const existingPreviews = (product.images || []).map(i => ({ url: i.url, type: 'image', isExisting: true }));
       const existingMedia = (product.media || []).filter(m => m.type === 'video').map(m => ({ url: m.thumbnailUrl || m.url, type: 'video', isExisting: true }));
@@ -110,6 +110,7 @@ export default function SellerProducts() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.title || !form.price || !form.category || !form.stock) return toast.error('Fill required fields');
+    if (!form.weight || Number(form.weight) <= 0) return toast.error('Weight is required for shipping calculation');
     if (form.isCustomizable && form.customizationOptions.length > 0) {
       const emptyLabel = form.customizationOptions.find(opt => !opt.label?.trim());
       if (emptyLabel) return toast.error('All customization options must have a label');
@@ -123,6 +124,7 @@ export default function SellerProducts() {
       formData.append('category', form.category);
       formData.append('stock', form.stock);
       if (form.weight) formData.append('weight', form.weight);
+      formData.append('shippingPaidBy', form.shippingPaidBy || 'seller');
       formData.append('isCustomizable', form.isCustomizable ? 'true' : 'false');
       if (form.isCustomizable && form.customizationOptions.length > 0) {
         formData.append('customizationOptions', JSON.stringify(form.customizationOptions));
@@ -233,8 +235,25 @@ export default function SellerProducts() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs text-theme-muted font-medium mb-1 block">Weight (grams)</label>
-                  <input type="number" value={form.weight} onChange={e => setForm(f => ({ ...f, weight: e.target.value }))} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
+                  <label className="text-xs text-theme-muted font-medium mb-1 block">Weight (grams) *</label>
+                  <input type="number" value={form.weight} onChange={e => setForm(f => ({ ...f, weight: e.target.value }))} min="1" placeholder="e.g. 500" className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" required />
+                  <p className="text-[10px] text-theme-dim mt-1">Required for shipping rate calculation</p>
+                </div>
+              </div>
+              {/* Shipping */}
+              <div className="bg-inset/50 border border-edge/50 rounded-xl p-4">
+                <label className="text-xs text-theme-muted font-medium mb-2 block">Who pays for shipping?</label>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setForm(f => ({ ...f, shippingPaidBy: 'seller' }))}
+                    className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-medium border transition-colors ${form.shippingPaidBy === 'seller' ? 'border-amber-500 bg-amber-500/10 text-amber-400' : 'border-edge bg-inset text-theme-muted hover:text-theme-primary'}`}>
+                    I'll pay
+                    <span className="block text-[10px] mt-0.5 opacity-70">Free shipping for customers</span>
+                  </button>
+                  <button type="button" onClick={() => setForm(f => ({ ...f, shippingPaidBy: 'customer' }))}
+                    className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-medium border transition-colors ${form.shippingPaidBy === 'customer' ? 'border-amber-500 bg-amber-500/10 text-amber-400' : 'border-edge bg-inset text-theme-muted hover:text-theme-primary'}`}>
+                    Customer pays
+                    <span className="block text-[10px] mt-0.5 opacity-70">Shipping fee added at checkout</span>
+                  </button>
                 </div>
               </div>
               {/* Customization */}

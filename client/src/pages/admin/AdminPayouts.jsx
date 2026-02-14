@@ -109,10 +109,11 @@ export default function AdminPayouts() {
                   {p.status === 'paid' ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />} {p.status}
                 </span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm mb-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm mb-3">
                 <div><p className="text-theme-dim text-xs">Total Sales</p><p className="font-medium text-theme-primary">Rs. {(p.totalSales || 0).toLocaleString('en-IN')}</p></div>
                 <div><p className="text-theme-dim text-xs">Commission</p><p className="font-medium text-theme-primary">Rs. {(p.commissionDeducted || 0).toLocaleString('en-IN')}</p></div>
                 <div><p className="text-theme-dim text-xs">Gateway Fees</p><p className="font-medium text-theme-primary">Rs. {(p.gatewayFeesDeducted || 0).toLocaleString('en-IN')}</p></div>
+                <div><p className="text-theme-dim text-xs">Shipping</p><p className="font-medium text-red-400">{(p.shippingDeducted || 0) > 0 ? `-Rs. ${p.shippingDeducted.toLocaleString('en-IN')}` : 'Rs. 0'}</p></div>
                 <div><p className="text-theme-dim text-xs">Net Payout</p><p className="font-bold text-green-400">Rs. {(p.netPayout || 0).toLocaleString('en-IN')}</p></div>
               </div>
               {p.bankDetailsSnapshot && (

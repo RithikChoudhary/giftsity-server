@@ -45,6 +45,7 @@ const orderSchema = new mongoose.Schema({
   // Pricing
   itemTotal: { type: Number, default: 0 },
   shippingCost: { type: Number, default: 0 },
+  shippingPaidBy: { type: String, enum: ['seller', 'customer'], default: 'seller' },
   totalAmount: { type: Number, default: 0 },
 
   // Commission

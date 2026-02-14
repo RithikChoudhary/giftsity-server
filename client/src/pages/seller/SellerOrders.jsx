@@ -226,10 +226,23 @@ export default function SellerOrders() {
                   </div>
 
                   {/* Earnings */}
-                  <div className="flex items-center gap-4 text-xs text-theme-muted bg-inset/50 rounded-lg px-3 py-2 mb-3">
-                    <span>Sale: Rs. {order.totalAmount?.toLocaleString('en-IN')}</span>
-                    <span>Commission: Rs. {(order.commissionAmount || 0).toLocaleString('en-IN')}</span>
-                    <span className="text-green-400">You get: Rs. {(order.sellerAmount || 0).toLocaleString('en-IN')}</span>
+                  <div className="text-xs text-theme-muted bg-inset/50 rounded-lg px-3 py-2 mb-3">
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <span>Sale: Rs. {(order.itemTotal || order.totalAmount || 0).toLocaleString('en-IN')}</span>
+                      {(order.commissionAmount || 0) > 0 && <span>Commission: -Rs. {order.commissionAmount.toLocaleString('en-IN')}</span>}
+                      {(order.paymentGatewayFee || 0) > 0 && <span>Gateway Fee: -Rs. {order.paymentGatewayFee.toLocaleString('en-IN')}</span>}
+                      {order.shippingPaidBy === 'seller' && (order.shippingCost || 0) > 0 && (
+                        <span className="text-red-400">Shipping: -Rs. {order.shippingCost.toLocaleString('en-IN')}</span>
+                      )}
+                      {order.shippingPaidBy === 'customer' && (order.shippingCost || 0) > 0 && (
+                        <span className="text-theme-dim">Shipping: Paid by customer</span>
+                      )}
+                      <span className="text-green-400 font-medium">You get: Rs. {(
+                        order.shippingPaidBy === 'seller'
+                          ? Math.max(0, (order.sellerAmount || 0) - (order.shippingCost || 0))
+                          : (order.sellerAmount || 0) + (order.shippingCost || 0)
+                      ).toLocaleString('en-IN')}</span>
+                    </div>
                   </div>
 
                   {/* Tracking info if shipped */}
@@ -289,6 +302,12 @@ export default function SellerOrders() {
                         {couriers.length > 0 && (
                           <div className="space-y-2">
                             <p className="text-xs text-amber-400 font-medium mb-2">{couriers.length} courier{couriers.length > 1 ? 's' : ''} available — select one to create shipment:</p>
+                            {order.shippingPaidBy === 'seller' && (
+                              <p className="text-[11px] text-red-400 bg-red-500/5 border border-red-500/10 rounded-lg px-3 py-1.5 mb-2">Shipping cost will be deducted from your payout (you offered free shipping)</p>
+                            )}
+                            {order.shippingPaidBy === 'customer' && (
+                              <p className="text-[11px] text-green-400 bg-green-500/5 border border-green-500/10 rounded-lg px-3 py-1.5 mb-2">Shipping is paid by the customer — no deduction from your payout</p>
+                            )}
                             <div className="space-y-2 max-h-60 overflow-y-auto">
                               {couriers.map(c => (
                                 <button key={c.courierId} onClick={() => createShipmentWithCourier(order._id, c.courierId)} disabled={updating === order._id} className="w-full flex items-center justify-between p-3 bg-card border border-edge rounded-lg text-sm hover:border-amber-500/30 transition-colors">
@@ -296,7 +315,12 @@ export default function SellerOrders() {
                                     <p className="font-medium text-theme-primary">{c.courierName}</p>
                                     <p className="text-xs text-theme-muted">Est. {c.estimatedDays} days &middot; Rating: {c.rating}/5</p>
                                   </div>
-                                  <span className="text-amber-400 font-bold whitespace-nowrap ml-3">Rs. {c.rate}</span>
+                                  <div className="text-right shrink-0 ml-3">
+                                    <span className="text-amber-400 font-bold">Rs. {c.rate}</span>
+                                    {order.shippingPaidBy === 'seller' && (
+                                      <p className="text-[10px] text-red-400">deducted from payout</p>
+                                    )}
+                                  </div>
                                 </button>
                               ))}
                             </div>

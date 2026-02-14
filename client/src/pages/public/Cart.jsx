@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
-import { ShoppingBag, Trash2, Minus, Plus, ArrowRight, ArrowLeft, CreditCard, MapPin, Loader, CheckCircle } from 'lucide-react';
+import { ShoppingBag, Trash2, Minus, Plus, ArrowRight, ArrowLeft, CreditCard, MapPin, Loader, CheckCircle, Truck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import API from '../../api';
 
@@ -19,6 +19,8 @@ export default function Cart() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponApplied, setCouponApplied] = useState('');
   const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [shippingEstimates, setShippingEstimates] = useState([]); // [{ sellerId, shippingCost, shippingPaidBy, courierName, estimatedDays }]
+  const [estimatingShipping, setEstimatingShipping] = useState(false);
 
   useEffect(() => {
     // Pre-fill default address from user profile
@@ -43,7 +45,25 @@ export default function Cart() {
   };
 
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const total = Math.max(0, subtotal - couponDiscount);
+  // Customer-paid shipping = sum of shipping costs where customer pays
+  const customerShipping = shippingEstimates
+    .filter(e => e.shippingPaidBy === 'customer' && e.shippingCost > 0)
+    .reduce((s, e) => s + e.shippingCost, 0);
+  const total = Math.max(0, subtotal + customerShipping - couponDiscount);
+
+  const fetchShippingEstimate = async (pincode) => {
+    if (!pincode || pincode.length < 6 || !items.length) return;
+    setEstimatingShipping(true);
+    try {
+      const cartItems = items.map(i => ({ productId: i.productId, quantity: i.quantity }));
+      const { data } = await API.post('/orders/shipping-estimate', { items: cartItems, deliveryPincode: pincode });
+      setShippingEstimates(data.estimates || []);
+    } catch (err) {
+      console.error('Shipping estimate failed:', err);
+      setShippingEstimates([]);
+    }
+    setEstimatingShipping(false);
+  };
 
   const applyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -80,7 +100,12 @@ export default function Cart() {
       try { await API.post('/orders/cancel-pending'); } catch (e) { /* non-critical */ }
 
       const orderItems = items.map(i => ({ productId: i.productId, quantity: i.quantity, customizations: i.customizations || [] }));
-      const { data } = await API.post('/orders', { items: orderItems, shippingAddress: address, couponCode: couponApplied || undefined });
+      // Build shipping estimates map: sellerId -> { shippingCost, shippingPaidBy }
+      const shippingData = {};
+      shippingEstimates.forEach(e => {
+        shippingData[e.sellerId] = { shippingCost: e.shippingCost || 0, shippingPaidBy: e.shippingPaidBy || 'seller' };
+      });
+      const { data } = await API.post('/orders', { items: orderItems, shippingAddress: address, shippingEstimates: shippingData, couponCode: couponApplied || undefined });
 
       // Cart is NOT cleared here — it will be cleared after payment is verified
       // in CustomerOrders.jsx. If payment is abandoned, the cart stays intact.
@@ -176,7 +201,7 @@ export default function Cart() {
             <h3 className="font-semibold text-theme-primary mb-4">Order Summary</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-theme-secondary"><span>Subtotal</span><span className="shrink-0 ml-2">Rs. {subtotal.toLocaleString('en-IN')}</span></div>
-              <div className="flex justify-between text-theme-secondary"><span>Shipping</span><span className="text-green-400 shrink-0 ml-2">Free</span></div>
+              <div className="flex justify-between text-theme-secondary"><span>Shipping</span><span className={`shrink-0 ml-2 ${customerShipping > 0 ? '' : 'text-green-400'}`}>{customerShipping > 0 ? `Rs. ${customerShipping.toLocaleString('en-IN')}` : 'Free'}</span></div>
               {couponDiscount > 0 && (
                 <div className="flex justify-between text-green-400"><span className="min-w-0 truncate">Discount ({couponApplied})</span><span className="shrink-0 ml-2">-Rs. {couponDiscount.toLocaleString('en-IN')}</span></div>
               )}
@@ -265,8 +290,12 @@ export default function Cart() {
                 <input type="text" value={address.pincode} onChange={e => setAddress(a => ({ ...a, pincode: e.target.value }))} className="w-full px-4 py-2.5 bg-card border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
               </div>
             </div>
-            <button onClick={() => setStep('payment')} className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors">
-              Continue to Payment <ArrowRight className="w-4 h-4" />
+            <button onClick={async () => {
+              if (!address.pincode || address.pincode.length < 6) return toast.error('Enter a valid pincode');
+              await fetchShippingEstimate(address.pincode);
+              setStep('payment');
+            }} disabled={estimatingShipping} className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors">
+              {estimatingShipping ? <><Loader className="w-4 h-4 animate-spin" /> Checking shipping...</> : <>Continue to Payment <ArrowRight className="w-4 h-4" /></>}
             </button>
           </div>
         </div>
@@ -280,10 +309,29 @@ export default function Cart() {
             <h3 className="font-semibold text-theme-primary mb-3">Order Summary</h3>
             {items.map(i => (
               <div key={i.cartKey || i.productId} className="flex justify-between text-sm text-theme-secondary py-1">
-                <span>{i.title} x {i.quantity}</span>
-                <span>Rs. {(i.price * i.quantity).toLocaleString('en-IN')}</span>
+                <span className="min-w-0 truncate">{i.title} x {i.quantity}</span>
+                <span className="shrink-0 ml-2">Rs. {(i.price * i.quantity).toLocaleString('en-IN')}</span>
               </div>
             ))}
+            {/* Shipping breakdown */}
+            {shippingEstimates.length > 0 && (
+              <div className="border-t border-edge/50 mt-2 pt-2 space-y-1">
+                {shippingEstimates.map(e => (
+                  <div key={e.sellerId} className="flex justify-between text-xs text-theme-muted">
+                    <span className="flex items-center gap-1"><Truck className="w-3 h-3" /> Shipping{e.courierName ? ` (${e.courierName})` : ''}{e.estimatedDays ? ` · ${e.estimatedDays} days` : ''}</span>
+                    <span className={`shrink-0 ml-2 ${e.shippingPaidBy === 'seller' || !e.shippingCost ? 'text-green-400' : 'text-theme-secondary'}`}>
+                      {e.shippingPaidBy === 'seller' || !e.shippingCost ? 'Free' : `Rs. ${e.shippingCost.toLocaleString('en-IN')}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {couponDiscount > 0 && (
+              <div className="flex justify-between text-sm text-green-400 pt-1">
+                <span className="min-w-0 truncate">Discount ({couponApplied})</span>
+                <span className="shrink-0 ml-2">-Rs. {couponDiscount.toLocaleString('en-IN')}</span>
+              </div>
+            )}
             <div className="border-t border-edge/50 mt-3 pt-3 flex justify-between font-bold text-theme-primary">
               <span>Total</span><span>Rs. {total.toLocaleString('en-IN')}</span>
             </div>
@@ -292,7 +340,7 @@ export default function Cart() {
             </div>
           </div>
           <button onClick={handlePlaceOrder} disabled={loading} className="w-full py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors">
-            {loading ? <Loader className="w-4 h-4 animate-spin" /> : <><CreditCard className="w-4 h-4" /> Pay Rs. {total.toLocaleString('en-IN')}</>}
+            {loading ? <><Loader className="w-4 h-4 animate-spin" /> Processing...</> : <><CreditCard className="w-4 h-4" /> Pay Rs. {total.toLocaleString('en-IN')}</>}
           </button>
         </div>
       )}

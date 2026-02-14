@@ -431,10 +431,15 @@ router.post('/payouts/calculate', async (req, res) => {
     const payouts = [];
     for (const [sellerId, sellerOrders] of Object.entries(sellerMap)) {
       const seller = await Seller.findById(sellerId);
-      const totalSales = sellerOrders.reduce((s, o) => s + o.totalAmount, 0);
+      const totalSales = sellerOrders.reduce((s, o) => s + (o.itemTotal || o.totalAmount), 0);
       const commissionDeducted = sellerOrders.reduce((s, o) => s + o.commissionAmount, 0);
       const gatewayFeesDeducted = sellerOrders.reduce((s, o) => s + o.paymentGatewayFee, 0);
-      const netPayout = sellerOrders.reduce((s, o) => s + o.sellerAmount, 0);
+      // Shipping deducted: only for orders where seller pays shipping
+      const shippingDeducted = sellerOrders.reduce((s, o) => {
+        return s + (o.shippingPaidBy === 'seller' ? (o.shippingCost || 0) : 0);
+      }, 0);
+      const sellerAmountBeforeShipping = sellerOrders.reduce((s, o) => s + o.sellerAmount, 0);
+      const netPayout = Math.max(0, sellerAmountBeforeShipping - shippingDeducted);
 
       const payout = new SellerPayout({
         sellerId,
@@ -446,6 +451,7 @@ router.post('/payouts/calculate', async (req, res) => {
         totalSales,
         commissionDeducted,
         gatewayFeesDeducted,
+        shippingDeducted,
         netPayout,
         bankDetailsSnapshot: seller?.sellerProfile?.bankDetails || {}
       });

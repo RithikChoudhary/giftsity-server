@@ -14,6 +14,7 @@ const sellerPayoutSchema = new mongoose.Schema({
   totalSales: { type: Number, default: 0 },
   commissionDeducted: { type: Number, default: 0 },
   gatewayFeesDeducted: { type: Number, default: 0 },
+  shippingDeducted: { type: Number, default: 0 },
   netPayout: { type: Number, default: 0 },
 
   status: {

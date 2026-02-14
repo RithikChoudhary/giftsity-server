@@ -42,6 +42,7 @@ const productSchema = new mongoose.Schema({
     width: { type: Number, default: 0 },
     height: { type: Number, default: 0 }
   },
+  shippingPaidBy: { type: String, enum: ['seller', 'customer'], default: 'seller' },
 
   isActive: { type: Boolean, default: true },
   isFeatured: { type: Boolean, default: false },

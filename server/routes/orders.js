@@ -47,7 +47,7 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
     if ((req.user.userType || req.user.role) !== 'customer') {
       return res.status(403).json({ message: 'Customer access required' });
     }
-    const { items, shippingAddress, couponCode } = req.body;
+    const { items, shippingAddress, shippingEstimates, couponCode } = req.body;
     if (!items || !items.length) return res.status(400).json({ message: 'No items' });
     if (!shippingAddress) return res.status(400).json({ message: 'Shipping address required' });
 
@@ -148,9 +148,17 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
         const seller = await Seller.findById(sellerId);
         const commissionRate = getCommissionRate(seller, settings);
         const itemTotal = sellerItems.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
-        const shippingCost = 0;
-        const totalAmount = itemTotal + shippingCost;
-        const financials = calculateOrderFinancials(totalAmount, commissionRate, settings.paymentGatewayFeeRate);
+
+        // Get shipping info from estimates (passed from frontend)
+        const sellerShipping = shippingEstimates?.[sellerId] || {};
+        const shippingCost = sellerShipping.shippingCost || 0;
+        const shippingPaidBy = sellerShipping.shippingPaidBy || 'seller';
+
+        // Customer-facing total: includes shipping only if customer pays
+        const totalAmount = shippingPaidBy === 'customer' ? itemTotal + shippingCost : itemTotal;
+
+        // Commission/gateway fees apply to itemTotal only (shipping is pass-through)
+        const financials = calculateOrderFinancials(itemTotal, commissionRate, settings.paymentGatewayFeeRate);
 
         const order = new Order({
           orderNumber: generateOrderNumber(),
@@ -172,6 +180,7 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
           shippingAddress,
           itemTotal,
           shippingCost,
+          shippingPaidBy,
           totalAmount,
           ...financials
         });
@@ -687,6 +696,97 @@ router.post('/:id/cancel', requireAuth, sanitizeBody, async (req, res) => {
   } catch (err) {
     logger.error('Cancel order error:', err.message);
     res.status(500).json({ message: 'Failed to cancel order' });
+  }
+});
+
+// POST /api/orders/shipping-estimate - get shipping rates for cart items
+router.post('/shipping-estimate', requireAuth, async (req, res) => {
+  try {
+    const { items, deliveryPincode } = req.body;
+    if (!items?.length || !deliveryPincode) {
+      return res.status(400).json({ message: 'Items and delivery pincode required' });
+    }
+
+    // Load products with seller info
+    const productIds = items.map(i => i.productId);
+    const products = await Product.find({ _id: { $in: productIds } }).lean();
+
+    // Group products by seller
+    const sellerGroups = {};
+    for (const item of items) {
+      const product = products.find(p => p._id.toString() === item.productId);
+      if (!product) continue;
+      const sid = product.sellerId.toString();
+      if (!sellerGroups[sid]) sellerGroups[sid] = { products: [], totalWeight: 0 };
+      sellerGroups[sid].products.push(product);
+      sellerGroups[sid].totalWeight += (product.weight || 500) * (item.quantity || 1);
+      // Use first product's shippingPaidBy (all items from same seller in one shipment)
+      if (!sellerGroups[sid].shippingPaidBy) sellerGroups[sid].shippingPaidBy = product.shippingPaidBy || 'seller';
+    }
+
+    const estimates = [];
+    for (const [sellerId, group] of Object.entries(sellerGroups)) {
+      const seller = await Seller.findById(sellerId).lean();
+      const pickupPincode = seller?.sellerProfile?.pickupAddress?.pincode;
+
+      if (!pickupPincode) {
+        estimates.push({
+          sellerId,
+          shippingCost: 0,
+          shippingPaidBy: group.shippingPaidBy,
+          courierName: '',
+          estimatedDays: '',
+          error: 'Seller pickup address not configured'
+        });
+        continue;
+      }
+
+      try {
+        const result = await shiprocket.checkServiceability({
+          pickupPincode,
+          deliveryPincode,
+          weight: group.totalWeight,
+          cod: 0
+        });
+
+        const companies = result?.data?.available_courier_companies || result?.available_courier_companies || [];
+        if (companies.length > 0) {
+          // Pick cheapest courier
+          const cheapest = companies.reduce((min, c) => c.rate < min.rate ? c : min, companies[0]);
+          estimates.push({
+            sellerId,
+            shippingCost: Math.round(cheapest.rate),
+            shippingPaidBy: group.shippingPaidBy,
+            courierName: cheapest.courier_name,
+            estimatedDays: cheapest.estimated_delivery_days,
+          });
+        } else {
+          estimates.push({
+            sellerId,
+            shippingCost: 0,
+            shippingPaidBy: group.shippingPaidBy,
+            courierName: '',
+            estimatedDays: '',
+            error: 'No couriers available for this route'
+          });
+        }
+      } catch (err) {
+        logger.error(`Shipping estimate error for seller ${sellerId}:`, err.message);
+        estimates.push({
+          sellerId,
+          shippingCost: 0,
+          shippingPaidBy: group.shippingPaidBy,
+          courierName: '',
+          estimatedDays: '',
+          error: 'Could not estimate shipping'
+        });
+      }
+    }
+
+    res.json({ estimates });
+  } catch (err) {
+    logger.error('Shipping estimate error:', err.message);
+    res.status(500).json({ message: 'Failed to estimate shipping' });
   }
 });
 
