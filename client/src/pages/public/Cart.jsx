@@ -134,56 +134,62 @@ export default function Cart() {
           <div className="md:col-span-2 space-y-3">
             <h1 className="text-xl font-bold text-theme-primary mb-4">Shopping Cart ({items.length})</h1>
             {items.map(item => (
-              <div key={item.cartKey || item.productId} className="bg-card border border-edge/50 rounded-xl p-4 flex gap-4">
-                <div className="w-20 h-20 bg-inset rounded-lg overflow-hidden shrink-0">
-                  {item.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <ShoppingBag className="w-8 h-8 text-theme-dim m-auto mt-6" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <Link to={`/product/${item.slug}`} className="font-medium text-sm text-theme-primary hover:text-amber-400 truncate block">{item.title}</Link>
-                  <p className="text-xs text-theme-muted mt-0.5">{item.sellerName}</p>
-                  {item.customizations?.length > 0 && (
-                    <div className="mt-1 space-y-0.5">
-                      {item.customizations.map((c, ci) => (
-                        <p key={ci} className="text-[11px] text-amber-400/80">
-                          {c.label}: {c.value || `${c.imageUrls?.length || 0} image(s)`}
-                        </p>
-                      ))}
+              <div key={item.cartKey || item.productId} className="bg-card border border-edge/50 rounded-xl p-4">
+                <div className="flex gap-3">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-inset rounded-lg overflow-hidden shrink-0">
+                    {item.image ? <img src={item.image} alt="" className="w-full h-full object-cover" /> : <ShoppingBag className="w-8 h-8 text-theme-dim m-auto mt-4 sm:mt-6" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <Link to={`/product/${item.slug}`} className="font-medium text-sm text-theme-primary hover:text-amber-400 line-clamp-2 block">{item.title}</Link>
+                        <p className="text-xs text-theme-muted mt-0.5">{item.sellerName}</p>
+                      </div>
+                      <button onClick={() => removeItem(item.cartKey || item.productId)} className="text-theme-dim hover:text-red-400 shrink-0 p-1"><Trash2 className="w-4 h-4" /></button>
                     </div>
-                  )}
-                  <p className="text-sm font-bold text-theme-primary mt-1">Rs. {item.price?.toLocaleString('en-IN')}</p>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <button onClick={() => removeItem(item.cartKey || item.productId)} className="text-theme-dim hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => updateQuantity(item.cartKey || item.productId, item.quantity - 1)} className="w-7 h-7 flex items-center justify-center bg-inset rounded-md"><Minus className="w-3 h-3" /></button>
-                    <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                    <button onClick={() => updateQuantity(item.cartKey || item.productId, item.quantity + 1)} disabled={item.quantity >= item.stock} className="w-7 h-7 flex items-center justify-center bg-inset rounded-md disabled:opacity-40"><Plus className="w-3 h-3" /></button>
+                    {item.customizations?.length > 0 && (
+                      <div className="mt-1 space-y-0.5">
+                        {item.customizations.map((c, ci) => (
+                          <p key={ci} className="text-[11px] text-amber-400/80">
+                            {c.label}: {c.value || `${c.imageUrls?.length || 0} image(s)`}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-sm font-bold text-theme-primary">Rs. {item.price?.toLocaleString('en-IN')}</p>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => updateQuantity(item.cartKey || item.productId, item.quantity - 1)} className="w-7 h-7 flex items-center justify-center bg-inset rounded-md"><Minus className="w-3 h-3" /></button>
+                        <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                        <button onClick={() => updateQuantity(item.cartKey || item.productId, item.quantity + 1)} disabled={item.quantity >= item.stock} className="w-7 h-7 flex items-center justify-center bg-inset rounded-md disabled:opacity-40"><Plus className="w-3 h-3" /></button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             ))}
           </div>
-          <div className="bg-card border border-edge/50 rounded-xl p-5 h-fit sticky top-24">
+          <div className="bg-card border border-edge/50 rounded-xl p-4 sm:p-5 h-fit sticky top-24">
             <h3 className="font-semibold text-theme-primary mb-4">Order Summary</h3>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between text-theme-secondary"><span>Subtotal</span><span>Rs. {subtotal.toLocaleString('en-IN')}</span></div>
-              <div className="flex justify-between text-theme-secondary"><span>Shipping</span><span className="text-green-400">Free</span></div>
+              <div className="flex justify-between text-theme-secondary"><span>Subtotal</span><span className="shrink-0 ml-2">Rs. {subtotal.toLocaleString('en-IN')}</span></div>
+              <div className="flex justify-between text-theme-secondary"><span>Shipping</span><span className="text-green-400 shrink-0 ml-2">Free</span></div>
               {couponDiscount > 0 && (
-                <div className="flex justify-between text-green-400"><span>Discount ({couponApplied})</span><span>-Rs. {couponDiscount.toLocaleString('en-IN')}</span></div>
+                <div className="flex justify-between text-green-400"><span className="min-w-0 truncate">Discount ({couponApplied})</span><span className="shrink-0 ml-2">-Rs. {couponDiscount.toLocaleString('en-IN')}</span></div>
               )}
-              <div className="border-t border-edge/50 pt-2 flex justify-between font-bold text-theme-primary"><span>Total</span><span>Rs. {total.toLocaleString('en-IN')}</span></div>
+              <div className="border-t border-edge/50 pt-2 flex justify-between font-bold text-theme-primary"><span>Total</span><span className="shrink-0 ml-2">Rs. {total.toLocaleString('en-IN')}</span></div>
             </div>
             {/* Coupon */}
             <div className="mt-4">
               {couponApplied ? (
                 <div className="flex items-center justify-between bg-green-500/10 border border-green-500/20 rounded-lg px-3 py-2">
                   <span className="text-xs text-green-400 font-medium">{couponApplied} applied</span>
-                  <button onClick={removeCoupon} className="text-xs text-red-400 hover:text-red-300">Remove</button>
+                  <button onClick={removeCoupon} className="text-xs text-red-400 hover:text-red-300 shrink-0 ml-2">Remove</button>
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <input type="text" value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} placeholder="Coupon code" className="flex-1 px-3 py-2 bg-inset border border-edge rounded-lg text-xs text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
-                  <button onClick={applyCoupon} disabled={applyingCoupon || !couponCode} className="px-3 py-2 bg-inset border border-edge hover:border-amber-500/50 rounded-lg text-xs text-theme-muted hover:text-amber-400 transition-colors disabled:opacity-50">
+                  <input type="text" value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())} placeholder="Coupon code" className="flex-1 min-w-0 px-3 py-2 bg-inset border border-edge rounded-lg text-xs text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
+                  <button onClick={applyCoupon} disabled={applyingCoupon || !couponCode} className="px-3 py-2 bg-inset border border-edge hover:border-amber-500/50 rounded-lg text-xs text-theme-muted hover:text-amber-400 transition-colors disabled:opacity-50 shrink-0">
                     {applyingCoupon ? '...' : 'Apply'}
                   </button>
                 </div>
