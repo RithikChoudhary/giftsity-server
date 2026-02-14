@@ -267,6 +267,117 @@ async function updateSellerLastActive(sellerId) {
   });
 }
 
+// ==================== AUTO CALCULATE PAYOUTS ====================
+async function autoCalculatePayouts() {
+  try {
+    const PlatformSettings = require('../models/PlatformSettings');
+    const SellerPayout = require('../models/SellerPayout');
+
+    const settings = await PlatformSettings.getSettings();
+    const schedule = settings.payoutSchedule || 'biweekly';
+
+    // Determine if we should run today based on schedule
+    const now = new Date();
+    const dayOfMonth = now.getDate();
+    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...
+
+    let shouldRun = false;
+    if (schedule === 'weekly') {
+      shouldRun = dayOfWeek === 1; // Every Monday
+    } else if (schedule === 'biweekly') {
+      shouldRun = dayOfMonth === 1 || dayOfMonth === 15; // 1st and 15th
+    } else if (schedule === 'monthly') {
+      shouldRun = dayOfMonth === 1; // 1st of month
+    }
+
+    if (!shouldRun) {
+      logger.info(`[Payout Cron] Skipping - not a payout day (schedule: ${schedule}, day: ${dayOfMonth})`);
+      return { calculated: 0, skipped: true };
+    }
+
+    // Find all delivered, paid orders that haven't been included in a payout
+    const orders = await Order.find({
+      paymentStatus: 'paid',
+      status: 'delivered',
+      payoutStatus: 'pending'
+    });
+
+    if (!orders.length) {
+      logger.info('[Payout Cron] No pending orders to process');
+      return { calculated: 0 };
+    }
+
+    // Group by seller
+    const sellerMap = {};
+    for (const order of orders) {
+      const sid = order.sellerId.toString();
+      if (!sellerMap[sid]) sellerMap[sid] = [];
+      sellerMap[sid].push(order);
+    }
+
+    const periodEnd = new Date();
+    const periodStart = new Date();
+    if (schedule === 'weekly') periodStart.setDate(periodStart.getDate() - 7);
+    else if (schedule === 'biweekly') periodStart.setDate(periodStart.getDate() - 15);
+    else periodStart.setMonth(periodStart.getMonth() - 1);
+
+    let calculated = 0;
+    let onHold = 0;
+
+    for (const [sellerId, sellerOrders] of Object.entries(sellerMap)) {
+      const seller = await Seller.findById(sellerId);
+      if (!seller) continue;
+
+      const totalSales = sellerOrders.reduce((s, o) => s + (o.itemTotal || o.totalAmount), 0);
+      const commissionDeducted = sellerOrders.reduce((s, o) => s + (o.commissionAmount || 0), 0);
+      const gatewayFeesDeducted = sellerOrders.reduce((s, o) => s + (o.paymentGatewayFee || 0), 0);
+      const shippingDeducted = sellerOrders.reduce((s, o) => {
+        return s + (o.shippingPaidBy === 'seller' ? (o.shippingCost || 0) : 0);
+      }, 0);
+      const sellerAmountBeforeShipping = sellerOrders.reduce((s, o) => s + (o.sellerAmount || 0), 0);
+      const netPayout = Math.max(0, sellerAmountBeforeShipping - shippingDeducted);
+
+      // Check bank details
+      const bank = seller.sellerProfile?.bankDetails;
+      const hasBankDetails = bank?.accountHolderName && bank?.accountNumber && bank?.ifscCode && bank?.bankName;
+
+      const payout = new SellerPayout({
+        sellerId,
+        periodStart,
+        periodEnd,
+        periodLabel: `${periodStart.toLocaleDateString('en-IN')} - ${periodEnd.toLocaleDateString('en-IN')}`,
+        orderIds: sellerOrders.map(o => o._id),
+        orderCount: sellerOrders.length,
+        totalSales,
+        commissionDeducted,
+        gatewayFeesDeducted,
+        shippingDeducted,
+        netPayout,
+        status: hasBankDetails ? 'pending' : 'on_hold',
+        holdReason: hasBankDetails ? '' : 'missing_bank_details',
+        bankDetailsSnapshot: bank || {}
+      });
+      await payout.save();
+
+      // Mark orders as included
+      for (const order of sellerOrders) {
+        order.payoutStatus = 'included_in_payout';
+        order.payoutId = payout._id;
+        await order.save();
+      }
+
+      if (hasBankDetails) calculated++;
+      else onHold++;
+    }
+
+    logger.info(`[Payout Cron] Calculated ${calculated} payouts, ${onHold} on hold (missing bank details)`);
+    return { calculated, onHold };
+  } catch (err) {
+    logger.error('[Payout Cron] Error:', err.message);
+    return { error: err.message };
+  }
+}
+
 // ==================== RUN ALL CRONS ====================
 async function runAllCrons() {
   logger.info(`\n[Cron] Running seller health checks at ${new Date().toISOString()}`);
@@ -329,6 +440,9 @@ function startCronJobs() {
   // Send review request emails every 12 hours
   setInterval(sendReviewRequestEmails, 12 * 60 * 60 * 1000);
 
+  // Run payout calculation daily at midnight (cron checks if it's a payout day)
+  setInterval(autoCalculatePayouts, 24 * 60 * 60 * 1000);
+
   // Run initial checks after 30 seconds (let server start)
   setTimeout(runAllCrons, 30 * 1000);
   // Also run unpaid check shortly after start
@@ -344,5 +458,6 @@ module.exports = {
   autoCancelUnpaidOrders,
   calculateSellerMetrics,
   autoSuspendBadSellers,
+  autoCalculatePayouts,
   updateSellerLastActive
 };

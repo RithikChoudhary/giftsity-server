@@ -500,6 +500,50 @@ router.put('/payouts/:id/mark-paid', async (req, res) => {
   }
 });
 
+router.put('/payouts/:id/mark-failed', async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const payout = await SellerPayout.findById(req.params.id);
+    if (!payout) return res.status(404).json({ message: 'Payout not found' });
+
+    payout.status = 'failed';
+    payout.failureDetails = reason || 'Bank transfer failed';
+    payout.retryCount = (payout.retryCount || 0) + 1;
+    await payout.save();
+
+    logActivity({ domain: 'admin', action: 'payout_failed', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'SellerPayout', targetId: payout._id, message: `Payout marked failed: ${reason}`, metadata: { amount: payout.netPayout } });
+    res.json({ message: 'Payout marked as failed', payout });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/payouts/:id/retry', async (req, res) => {
+  try {
+    const payout = await SellerPayout.findById(req.params.id).populate('sellerId', 'sellerProfile.bankDetails');
+    if (!payout) return res.status(404).json({ message: 'Payout not found' });
+    if (!['failed', 'on_hold'].includes(payout.status)) {
+      return res.status(400).json({ message: 'Can only retry failed or on-hold payouts' });
+    }
+
+    // Update bank details snapshot from seller's current data
+    const bank = payout.sellerId?.sellerProfile?.bankDetails;
+    if (bank?.accountNumber && bank?.ifscCode) {
+      payout.bankDetailsSnapshot = bank;
+    }
+
+    payout.status = 'pending';
+    payout.holdReason = '';
+    payout.failureDetails = '';
+    await payout.save();
+
+    logActivity({ domain: 'admin', action: 'payout_retry', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'SellerPayout', targetId: payout._id, message: `Payout retried`, metadata: { amount: payout.netPayout } });
+    res.json({ message: 'Payout moved to pending', payout });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // ---- USERS ----
 router.get('/users', async (req, res) => {
   try {

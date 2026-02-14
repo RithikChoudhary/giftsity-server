@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { DollarSign, ShoppingCart, Package, TrendingUp, ArrowRight, Clock, AlertTriangle } from 'lucide-react';
+import { DollarSign, ShoppingCart, Package, TrendingUp, ArrowRight, Clock, AlertTriangle, Wallet, CalendarDays, Truck, CreditCard } from 'lucide-react';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { SellerAPI } from '../../api';
 
 export default function SellerDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
+  const [dashData, setDashData] = useState({});
   const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -17,6 +18,7 @@ export default function SellerDashboard() {
     try {
       const { data } = await SellerAPI.get('/dashboard');
       setStats(data.stats || data);
+      setDashData(data);
       setRecentOrders(data.recentOrders || []);
     } catch (e) { console.error(e); }
     setLoading(false);
@@ -84,29 +86,76 @@ export default function SellerDashboard() {
         ))}
       </div>
 
-      {/* Earnings card */}
-      {stats?.currentPeriodEarnings && (
+      {/* Bank details warning */}
+      {dashData.bankDetailsComplete === false && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <CreditCard className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-amber-400">Bank Details Missing</p>
+            <p className="text-sm text-theme-muted mt-1">Add your bank details in <Link to="/seller/settings" className="text-amber-400 underline">Settings</Link> to receive payouts. Without bank details, your payouts will be put on hold.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Earnings & Payout Info */}
+      <div className="grid md:grid-cols-3 gap-4 mb-8">
+        {/* Lifetime earnings */}
+        <div className="bg-card border border-edge/50 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-400/10 text-green-400"><Wallet className="w-4 h-4" /></div>
+            <p className="text-xs text-theme-muted">Lifetime Earnings</p>
+          </div>
+          <p className="text-2xl font-bold text-green-400">Rs. {(dashData.lifetimeEarnings || 0).toLocaleString('en-IN')}</p>
+          <p className="text-[11px] text-theme-dim mt-1">Total paid out to you</p>
+        </div>
+
+        {/* Pending payout */}
+        <div className="bg-card border border-edge/50 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-amber-400/10 text-amber-400"><DollarSign className="w-4 h-4" /></div>
+            <p className="text-xs text-theme-muted">Pending Payout</p>
+          </div>
+          <p className="text-2xl font-bold text-amber-400">Rs. {(dashData.currentPeriodEarnings?.pendingAmount || 0).toLocaleString('en-IN')}</p>
+          <p className="text-[11px] text-theme-dim mt-1">{dashData.currentPeriodEarnings?.pendingOrderCount || 0} delivered orders awaiting payout</p>
+        </div>
+
+        {/* Next payout date */}
+        <div className="bg-card border border-edge/50 rounded-xl p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-400/10 text-blue-400"><CalendarDays className="w-4 h-4" /></div>
+            <p className="text-xs text-theme-muted">Next Payout</p>
+          </div>
+          <p className="text-2xl font-bold text-blue-400">{dashData.nextPayoutDate ? new Date(dashData.nextPayoutDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '--'}</p>
+          <p className="text-[11px] text-theme-dim mt-1 capitalize">{dashData.payoutSchedule || 'biweekly'} schedule</p>
+        </div>
+      </div>
+
+      {/* Earnings breakdown */}
+      {dashData.currentPeriodEarnings && (dashData.currentPeriodEarnings.totalSales > 0 || dashData.currentPeriodEarnings.pendingOrderCount > 0) && (
         <div className="bg-card border border-edge/50 rounded-xl p-5 mb-8">
-          <h3 className="font-semibold text-theme-primary mb-4">Current Period Earnings</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <h3 className="font-semibold text-theme-primary mb-4">Pending Earnings Breakdown</h3>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div>
               <p className="text-theme-muted">Total Sales</p>
-              <p className="text-lg font-bold text-theme-primary">Rs. {(stats.currentPeriodEarnings.totalSales || 0).toLocaleString('en-IN')}</p>
+              <p className="text-lg font-bold text-theme-primary">Rs. {(dashData.currentPeriodEarnings.totalSales || 0).toLocaleString('en-IN')}</p>
             </div>
             <div>
               <p className="text-theme-muted">Commission</p>
-              <p className="text-lg font-bold text-theme-primary">Rs. {(stats.currentPeriodEarnings.commissionDeducted || 0).toLocaleString('en-IN')}</p>
+              <p className="text-lg font-bold text-theme-primary">-Rs. {(dashData.currentPeriodEarnings.commissionDeducted || 0).toLocaleString('en-IN')}</p>
             </div>
             <div>
               <p className="text-theme-muted">Gateway Fees</p>
-              <p className="text-lg font-bold text-theme-primary">Rs. {(stats.currentPeriodEarnings.gatewayFees || 0).toLocaleString('en-IN')}</p>
+              <p className="text-lg font-bold text-theme-primary">-Rs. {(dashData.currentPeriodEarnings.gatewayFees || 0).toLocaleString('en-IN')}</p>
+            </div>
+            <div>
+              <p className="text-theme-muted">Shipping</p>
+              <p className="text-lg font-bold text-red-400">{(dashData.currentPeriodEarnings.shippingDeducted || 0) > 0 ? `-Rs. ${dashData.currentPeriodEarnings.shippingDeducted.toLocaleString('en-IN')}` : 'Rs. 0'}</p>
             </div>
             <div>
               <p className="text-theme-muted">Net Earnings</p>
-              <p className="text-lg font-bold text-green-400">Rs. {(stats.currentPeriodEarnings.netEarning || 0).toLocaleString('en-IN')}</p>
+              <p className="text-lg font-bold text-green-400">Rs. {(dashData.currentPeriodEarnings.netEarning || 0).toLocaleString('en-IN')}</p>
             </div>
           </div>
-          <p className="text-xs text-theme-dim mt-3">Commission Rate: {stats.yourCommissionRate ?? 0}%</p>
         </div>
       )}
 

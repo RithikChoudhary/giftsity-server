@@ -144,8 +144,11 @@ export default function AdminSellers() {
                     {actionLoading === s._id ? <Loader className="w-3 h-3 animate-spin" /> : <><RotateCcw className="w-3 h-3" /> Reactivate</>}
                   </button>
                 </div>
-                {s.sellerProfile?.reactivationRequest?.message && (
-                  <p className="text-xs text-theme-secondary bg-inset/50 rounded-lg p-2">"{s.sellerProfile.reactivationRequest.message}"</p>
+                {s.sellerProfile?.suspensionReason && (
+                  <p className="text-xs text-red-400/80 bg-red-500/5 rounded-lg p-2 mb-1">Suspended for: {s.sellerProfile.suspensionReason}</p>
+                )}
+                {s.sellerProfile?.suspensionRemovalReason && (
+                  <p className="text-xs text-theme-secondary bg-inset/50 rounded-lg p-2">Seller's appeal: "{s.sellerProfile.suspensionRemovalReason}"</p>
                 )}
               </div>
             ))}

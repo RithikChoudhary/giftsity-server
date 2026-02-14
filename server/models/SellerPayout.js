@@ -19,9 +19,12 @@ const sellerPayoutSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ['pending', 'processing', 'paid'],
+    enum: ['pending', 'on_hold', 'processing', 'paid', 'failed'],
     default: 'pending'
   },
+  holdReason: { type: String, default: '' }, // e.g. 'missing_bank_details', 'invalid_bank_details'
+  failureDetails: { type: String, default: '' }, // admin notes on why payout failed
+  retryCount: { type: Number, default: 0 },
 
   transactionId: { type: String, default: '' },
   paidAt: { type: Date, default: null },
