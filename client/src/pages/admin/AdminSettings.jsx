@@ -12,9 +12,9 @@ export default function AdminSettings() {
 
   const [form, setForm] = useState({
     globalCommissionRate: 0,
-    paymentGatewayFeeRate: 3,
+    paymentGatewayFeeRate: 2,
     payoutSchedule: 'biweekly',
-    minimumPayoutAmount: 500,
+    minimumPayoutAmount: 0,
     minimumProductPrice: 200,
     maxFeaturedProducts: 10,
     supportEmail: '',
@@ -29,7 +29,7 @@ export default function AdminSettings() {
     try {
       const { data } = await API.get('/admin/settings');
       setSettings(data);
-      setForm(f => ({ ...f, ...data }));
+      setForm(f => ({ ...f, ...data.settings }));
     } catch (e) { console.error(e); }
     setLoading(false);
   };
