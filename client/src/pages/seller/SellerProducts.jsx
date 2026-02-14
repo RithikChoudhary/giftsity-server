@@ -75,10 +75,16 @@ export default function SellerProducts() {
     setShowForm(true);
   };
 
+  const MAX_VIDEO_SIZE = 30 * 1024 * 1024; // 30MB
+
   const handleMediaChange = (e) => {
     const files = Array.from(e.target.files);
     files.forEach(f => {
       const isVideo = f.type.startsWith('video/');
+      if (isVideo && f.size > MAX_VIDEO_SIZE) {
+        toast.error(`Video "${f.name}" is too large (${(f.size / (1024 * 1024)).toFixed(1)}MB). Max 30MB.`);
+        return;
+      }
       setMediaFiles(prev => [...prev, { file: f, type: isVideo ? 'video' : 'image' }]);
       setMediaPreviews(prev => [...prev, { url: URL.createObjectURL(f), type: isVideo ? 'video' : 'image', isExisting: false }]);
     });

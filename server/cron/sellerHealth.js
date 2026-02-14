@@ -57,6 +57,42 @@ async function autoCancelUnshippedOrders() {
   return cancelled;
 }
 
+// ==================== AUTO-CANCEL UNPAID ORDERS ====================
+const UNPAID_CANCEL_MINUTES = 10; // Cancel unpaid orders after 10 minutes
+
+async function autoCancelUnpaidOrders() {
+  const cutoff = new Date(Date.now() - UNPAID_CANCEL_MINUTES * 60 * 1000);
+
+  const unpaidOrders = await Order.find({
+    status: 'pending',
+    paymentStatus: 'pending',
+    createdAt: { $lt: cutoff }
+  });
+
+  let cancelled = 0;
+  for (const order of unpaidOrders) {
+    order.status = 'cancelled';
+    order.cancelledAt = new Date();
+    order.cancelReason = `Auto-cancelled: payment not completed within ${UNPAID_CANCEL_MINUTES} minutes`;
+    await order.save();
+
+    // Restore stock for each item
+    for (const item of order.items) {
+      await Product.findByIdAndUpdate(item.productId, {
+        $inc: { stock: item.quantity }
+      });
+    }
+
+    cancelled++;
+    logger.info(`[AutoCancelUnpaid] Order ${order.orderNumber} cancelled (no payment after ${UNPAID_CANCEL_MINUTES}m)`);
+  }
+
+  if (cancelled > 0) {
+    logger.info(`[AutoCancelUnpaid] Cancelled ${cancelled} unpaid orders`);
+  }
+  return cancelled;
+}
+
 // ==================== CALCULATE SELLER METRICS ====================
 async function calculateSellerMetrics() {
   const lookbackDate = new Date(Date.now() - METRICS_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
@@ -278,7 +314,10 @@ async function sendReviewRequestEmails() {
 
 // ==================== SCHEDULE ====================
 function startCronJobs() {
-  // Run auto-cancel every hour
+  // Run auto-cancel unpaid orders every 5 minutes
+  setInterval(autoCancelUnpaidOrders, 5 * 60 * 1000);
+
+  // Run auto-cancel unshipped every hour
   setInterval(autoCancelUnshippedOrders, 60 * 60 * 1000);
 
   // Run metrics + auto-suspend every 6 hours
@@ -290,8 +329,10 @@ function startCronJobs() {
   // Send review request emails every 12 hours
   setInterval(sendReviewRequestEmails, 12 * 60 * 60 * 1000);
 
-  // Run initial check after 30 seconds (let server start)
+  // Run initial checks after 30 seconds (let server start)
   setTimeout(runAllCrons, 30 * 1000);
+  // Also run unpaid check shortly after start
+  setTimeout(autoCancelUnpaidOrders, 15 * 1000);
 
   logger.info('[Cron] Seller health cron jobs scheduled');
 }
@@ -300,6 +341,7 @@ module.exports = {
   startCronJobs,
   runAllCrons,
   autoCancelUnshippedOrders,
+  autoCancelUnpaidOrders,
   calculateSellerMetrics,
   autoSuspendBadSellers,
   updateSellerLastActive

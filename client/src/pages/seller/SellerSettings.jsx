@@ -136,6 +136,10 @@ export default function SellerSettings() {
     if (pickupForm.street && !pickupForm.phone) {
       return toast.error('Phone number is required for pickup address');
     }
+    // Shiprocket requires house/flat/road number in address line 1
+    if (pickupForm.street && !/\d/.test(pickupForm.street)) {
+      return toast.error('Pickup address must include a house no., flat no., or road no. (e.g., H.No. 12, Karan PG)');
+    }
     setLoading(true);
     try {
       const { data } = await SellerAPI.put('/settings', { businessAddress: addressForm, pickupAddress: pickupForm });
@@ -395,7 +399,10 @@ export default function SellerSettings() {
               )}
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <input type="text" value={pickupForm.street} onChange={e => setPickupForm(f => ({ ...f, street: e.target.value }))} placeholder="Street" className="col-span-2 px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
+              <div className="col-span-2">
+                <input type="text" value={pickupForm.street} onChange={e => setPickupForm(f => ({ ...f, street: e.target.value }))} placeholder="Street (include house/flat no.)" className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
+                <p className="text-[11px] text-theme-dim mt-1">e.g., H.No. 12, Karan PG, Ramphal Chowk</p>
+              </div>
               <input type="text" value={pickupForm.city} onChange={e => setPickupForm(f => ({ ...f, city: e.target.value }))} placeholder="City" className="px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
               <input type="text" value={pickupForm.state} onChange={e => setPickupForm(f => ({ ...f, state: e.target.value }))} placeholder="State" className="px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
               <input type="text" value={pickupForm.pincode} onChange={e => setPickupForm(f => ({ ...f, pincode: e.target.value }))} placeholder="Pincode" className="px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />

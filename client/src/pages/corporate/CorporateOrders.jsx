@@ -16,7 +16,11 @@ export default function CorporateOrders() {
     const cfId = searchParams.get('cf_id');
     if (cfId) {
       corporateAPI.verifyPayment({ orderId: cfId })
-        .then(() => setVerifyMsg('Payment verified successfully!'))
+        .then(() => {
+          // Payment confirmed — clear corporate cart
+          localStorage.removeItem('giftsity_corporate_cart');
+          setVerifyMsg('Payment verified successfully!');
+        })
         .catch(() => setVerifyMsg('Payment verification pending. It may take a few minutes.'));
     }
   }, []);

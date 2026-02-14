@@ -68,7 +68,7 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
       } catch (e) { /* Coupon model may not exist yet, skip */ }
     }
 
-    // Validate products and reserve stock atomically
+    // Validate products and build seller groups
     const sellerGroups = {};
     for (const item of items) {
       const product = await Product.findById(item.productId);
@@ -77,9 +77,8 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
         return res.status(400).json({ message: `${product.title} is unavailable` });
       }
 
-      // Atomic stock check -- ensures no race condition
-      const stockCheck = await Product.findOne({ _id: item.productId, stock: { $gte: item.quantity } });
-      if (!stockCheck) {
+      // Check stock availability (actual reservation happens below)
+      if (product.stock < item.quantity) {
         return res.status(400).json({ message: `${product.title} is out of stock (only ${product.stock} left)` });
       }
 
@@ -115,40 +114,76 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
       sellerGroups[sid].push({ product, quantity: item.quantity, customizations: item.customizations || [] });
     }
 
-    const orders = [];
-    for (const [sellerId, sellerItems] of Object.entries(sellerGroups)) {
-      const seller = await Seller.findById(sellerId);
-      const commissionRate = getCommissionRate(seller, settings);
-      const itemTotal = sellerItems.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
-      const shippingCost = 0;
-      const totalAmount = itemTotal + shippingCost;
-      const financials = calculateOrderFinancials(totalAmount, commissionRate, settings.paymentGatewayFeeRate);
+    // Reserve stock atomically for all items BEFORE creating orders
+    // Track reserved items so we can rollback on failure
+    const reservedItems = []; // { productId, quantity }
+    try {
+      for (const item of items) {
+        const updated = await Product.findOneAndUpdate(
+          { _id: item.productId, stock: { $gte: item.quantity } },
+          { $inc: { stock: -item.quantity } },
+          { new: true }
+        );
+        if (!updated) {
+          // Rollback all previously reserved items
+          for (const ri of reservedItems) {
+            await Product.findByIdAndUpdate(ri.productId, { $inc: { stock: ri.quantity } });
+          }
+          const prod = await Product.findById(item.productId);
+          return res.status(400).json({ message: `${prod?.title || 'Product'} is out of stock` });
+        }
+        reservedItems.push({ productId: item.productId, quantity: item.quantity });
+      }
+    } catch (stockErr) {
+      // Rollback on any error
+      for (const ri of reservedItems) {
+        await Product.findByIdAndUpdate(ri.productId, { $inc: { stock: ri.quantity } });
+      }
+      throw stockErr;
+    }
 
-      const order = new Order({
-        orderNumber: generateOrderNumber(),
-        orderType: 'b2c_marketplace',
-        customerId: req.user._id,
-        customerEmail: req.user.email,
-        customerPhone: req.user.phone || shippingAddress.phone,
-        sellerId,
-        items: sellerItems.map(i => ({
-          productId: i.product._id,
-          title: i.product.title,
-          price: i.product.price,
-          image: i.product.images[0]?.url || '',
-          sku: i.product.sku || '',
-          quantity: i.quantity,
+    const orders = [];
+    try {
+      for (const [sellerId, sellerItems] of Object.entries(sellerGroups)) {
+        const seller = await Seller.findById(sellerId);
+        const commissionRate = getCommissionRate(seller, settings);
+        const itemTotal = sellerItems.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+        const shippingCost = 0;
+        const totalAmount = itemTotal + shippingCost;
+        const financials = calculateOrderFinancials(totalAmount, commissionRate, settings.paymentGatewayFeeRate);
+
+        const order = new Order({
+          orderNumber: generateOrderNumber(),
+          orderType: 'b2c_marketplace',
+          customerId: req.user._id,
+          customerEmail: req.user.email,
+          customerPhone: req.user.phone || shippingAddress.phone,
           sellerId,
-          customizations: i.customizations || []
-        })),
-        shippingAddress,
-        itemTotal,
-        shippingCost,
-        totalAmount,
-        ...financials
-      });
-      await order.save();
-      orders.push(order);
+          items: sellerItems.map(i => ({
+            productId: i.product._id,
+            title: i.product.title,
+            price: i.product.price,
+            image: i.product.images[0]?.url || '',
+            sku: i.product.sku || '',
+            quantity: i.quantity,
+            sellerId,
+            customizations: i.customizations || []
+          })),
+          shippingAddress,
+          itemTotal,
+          shippingCost,
+          totalAmount,
+          ...financials
+        });
+        await order.save();
+        orders.push(order);
+      }
+    } catch (orderErr) {
+      // If order creation fails, rollback reserved stock
+      for (const ri of reservedItems) {
+        await Product.findByIdAndUpdate(ri.productId, { $inc: { stock: ri.quantity } });
+      }
+      throw orderErr;
     }
 
     // Apply coupon discount if valid
@@ -230,6 +265,45 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
   }
 });
 
+// POST /api/orders/cancel-pending - cancel user's unpaid pending orders and restore stock
+// Called from Cart.jsx before creating a new order (cleans up abandoned checkouts)
+router.post('/cancel-pending', requireAuth, async (req, res) => {
+  try {
+    if ((req.user.userType || req.user.role) !== 'customer') {
+      return res.status(403).json({ message: 'Customer access required' });
+    }
+
+    const pendingOrders = await Order.find({
+      customerId: req.user._id,
+      status: 'pending',
+      paymentStatus: 'pending'
+    });
+
+    let cancelled = 0;
+    for (const order of pendingOrders) {
+      // Restore reserved stock for each item
+      for (const item of order.items) {
+        await Product.findByIdAndUpdate(item.productId, {
+          $inc: { stock: item.quantity }
+        });
+      }
+
+      order.status = 'cancelled';
+      order.cancelledAt = new Date();
+      order.cancelReason = 'Replaced by new checkout';
+      await order.save();
+      cancelled++;
+
+      logger.info(`[CancelPending] Cancelled order ${order.orderNumber} for user ${req.user._id}`);
+    }
+
+    res.json({ cancelled });
+  } catch (err) {
+    logger.error('Cancel pending error:', err.message);
+    res.status(500).json({ message: 'Failed to cancel pending orders' });
+  }
+});
+
 // POST /api/orders/verify-payment - verify Cashfree payment
 router.post('/verify-payment', requireAuth, validatePaymentVerification, async (req, res) => {
   try {
@@ -269,16 +343,12 @@ router.post('/verify-payment', requireAuth, validatePaymentVerification, async (
       order.paidAt = new Date();
       await order.save();
 
-      // Atomic stock decrement -- only decrements if sufficient stock
+      // Stock was already reserved at order creation time.
+      // Just increment orderCount now that payment is confirmed.
       for (const item of order.items) {
-        const updated = await Product.findOneAndUpdate(
-          { _id: item.productId, stock: { $gte: item.quantity } },
-          { $inc: { stock: -item.quantity, orderCount: item.quantity } },
-          { new: true }
-        );
-        if (!updated) {
-          logger.error(`[Stock] Insufficient stock for product ${item.productId}, order ${order.orderNumber}`);
-        }
+        await Product.findByIdAndUpdate(item.productId, {
+          $inc: { orderCount: item.quantity }
+        });
       }
 
       // Update seller stats
@@ -328,7 +398,14 @@ router.post('/verify-payment', requireAuth, validatePaymentVerification, async (
 // GET /api/orders/my-orders
 router.get('/my-orders', requireAuth, async (req, res) => {
   try {
-    const orders = await Order.find({ customerId: req.user._id })
+    // Exclude unpaid pending orders (abandoned checkouts) — customers should not see these
+    const orders = await Order.find({
+      customerId: req.user._id,
+      $or: [
+        { paymentStatus: { $ne: 'pending' } },       // Show paid, refunded orders
+        { status: { $in: ['cancelled', 'refunded'] } } // Show cancelled orders even if payment was pending
+      ]
+    })
       .sort({ createdAt: -1 })
       .populate('sellerId', 'sellerProfile.businessName');
     res.json({ orders });
@@ -568,13 +645,15 @@ router.post('/:id/cancel', requireAuth, sanitizeBody, async (req, res) => {
     order.cancelReason = req.body.reason || 'Cancelled by customer';
     await order.save();
 
-    // Restore stock and initiate refund if payment was completed
+    // Restore reserved stock (stock is reserved at order creation)
+    for (const item of order.items) {
+      const stockInc = { stock: item.quantity };
+      if (order.paymentStatus === 'paid') stockInc.orderCount = -item.quantity;
+      await Product.findByIdAndUpdate(item.productId, { $inc: stockInc });
+    }
+
+    // Initiate refund if payment was completed
     if (order.paymentStatus === 'paid') {
-      for (const item of order.items) {
-        await Product.findByIdAndUpdate(item.productId, {
-          $inc: { stock: item.quantity, orderCount: -item.quantity }
-        });
-      }
 
       // Initiate Cashfree refund (verify actual paid amount to prevent over-refund)
       try {

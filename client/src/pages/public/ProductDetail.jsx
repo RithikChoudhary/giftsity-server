@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ShoppingBag, Star, Minus, Plus, Store, Truck, Shield, ArrowLeft, ChevronLeft, ChevronRight, MessageSquare, Upload, X, Palette } from 'lucide-react';
+import { ShoppingBag, Star, Minus, Plus, Store, Truck, Shield, ArrowLeft, ChevronLeft, ChevronRight, MessageSquare, Upload, X, Palette, Play } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -115,7 +115,20 @@ export default function ProductDetail() {
   if (loading) return <LoadingSpinner />;
   if (!product) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-theme-muted">Product not found.</div>;
 
-  const images = product.images || [];
+  // Build unified media array from images + media (which contains videos)
+  const imageItems = (product.images || []).map(img => ({ type: 'image', url: img.url, thumbnailUrl: img.url, publicId: img.publicId }));
+  const mediaItems = (product.media || []).map(m => ({ type: m.type || 'image', url: m.url, thumbnailUrl: m.thumbnailUrl || m.url, publicId: m.publicId }));
+  // Deduplicate by URL (images may appear in both arrays)
+  const seenUrls = new Set();
+  const allMedia = [];
+  for (const item of [...mediaItems, ...imageItems]) {
+    if (!seenUrls.has(item.url)) {
+      seenUrls.add(item.url);
+      allMedia.push(item);
+    }
+  }
+  // Fallback: if no media at all, use images array
+  const media = allMedia.length > 0 ? allMedia : imageItems;
   const seller = product.sellerId;
 
   return (
@@ -123,7 +136,7 @@ export default function ProductDetail() {
       <SEO
         title={product.title}
         description={product.description?.slice(0, 160)}
-        image={images[0]?.url}
+        image={media[0]?.type === 'image' ? media[0]?.url : media[0]?.thumbnailUrl}
         type="product"
         keywords={`${product.title}, ${product.category || 'gifts'}, buy online, Giftsity`}
       />
@@ -132,27 +145,45 @@ export default function ProductDetail() {
       </Link>
 
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
-        {/* Images */}
+        {/* Media Gallery (images + videos) */}
         <div>
           <div className="relative aspect-square bg-card border border-edge/50 rounded-2xl overflow-hidden mb-3">
-            {images.length > 0 ? (
-              <img src={images[imgIdx]?.url} alt={product.title} loading="lazy" className="w-full h-full object-contain" />
+            {media.length > 0 ? (
+              media[imgIdx]?.type === 'video' ? (
+                <video
+                  key={media[imgIdx].url}
+                  src={media[imgIdx].url}
+                  controls
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+              ) : (
+                <img src={media[imgIdx]?.url} alt={product.title} loading="lazy" className="w-full h-full object-contain" />
+              )
             ) : (
               <div className="w-full h-full flex items-center justify-center text-theme-dim"><ShoppingBag className="w-16 h-16" /></div>
             )}
-            {images.length > 1 && (
+            {media.length > 1 && (
               <>
-                <button onClick={() => setImgIdx(i => i > 0 ? i - 1 : images.length - 1)} className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70"><ChevronLeft className="w-4 h-4" /></button>
-                <button onClick={() => setImgIdx(i => i < images.length - 1 ? i + 1 : 0)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70"><ChevronRight className="w-4 h-4" /></button>
+                <button onClick={() => setImgIdx(i => i > 0 ? i - 1 : media.length - 1)} className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70"><ChevronLeft className="w-4 h-4" /></button>
+                <button onClick={() => setImgIdx(i => i < media.length - 1 ? i + 1 : 0)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70"><ChevronRight className="w-4 h-4" /></button>
               </>
             )}
             {product.isFeatured && <span className="absolute top-3 left-3 px-2 py-1 bg-amber-500 text-zinc-950 text-xs font-bold rounded-full">Featured</span>}
           </div>
-          {images.length > 1 && (
+          {media.length > 1 && (
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {images.map((img, i) => (
-                <button key={i} onClick={() => setImgIdx(i)} className={`w-16 h-16 rounded-lg overflow-hidden border-2 shrink-0 transition-colors ${i === imgIdx ? 'border-amber-500' : 'border-edge/50 hover:border-edge-strong'}`}>
-                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+              {media.map((item, i) => (
+                <button key={i} onClick={() => setImgIdx(i)} className={`relative w-16 h-16 rounded-lg overflow-hidden border-2 shrink-0 transition-colors ${i === imgIdx ? 'border-amber-500' : 'border-edge/50 hover:border-edge-strong'}`}>
+                  <img src={item.thumbnailUrl || item.url} alt="" className="w-full h-full object-cover" />
+                  {item.type === 'video' && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                      <Play className="w-4 h-4 text-white fill-white" />
+                    </div>
+                  )}
                 </button>
               ))}
             </div>

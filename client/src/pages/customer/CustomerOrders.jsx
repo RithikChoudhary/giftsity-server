@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
 import { Package, ChevronRight, Star, Clock, Truck, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -17,6 +18,7 @@ const statusConfig = {
 
 export default function CustomerOrders() {
   const { user, loading: authLoading } = useAuth();
+  const { clearCart } = useCart();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
@@ -40,6 +42,8 @@ export default function CustomerOrders() {
     setVerifying(true);
     try {
       const { data } = await API.post('/orders/verify-payment', { orderId });
+      // Payment confirmed — now clear the cart
+      clearCart();
       toast.success('Payment verified! Your order is confirmed.');
       // Redirect to confirmation page
       const confirmedOrder = data.orders?.[0];

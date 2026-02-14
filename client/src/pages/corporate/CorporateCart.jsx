@@ -52,15 +52,15 @@ export default function CorporateCart() {
         shippingAddress
       });
 
-      // Cashfree redirect
+      // Cashfree redirect — cart is NOT cleared here; it will be cleared after payment verification
       if (res.data.cashfreeOrder?.paymentSessionId) {
         const cashfree = await window.Cashfree?.({ mode: res.data.env === 'production' ? 'production' : 'sandbox' });
         if (cashfree) {
           cashfree.checkout({ paymentSessionId: res.data.cashfreeOrder.paymentSessionId, redirectTarget: '_self' });
-          localStorage.removeItem('giftsity_corporate_cart');
           return;
         }
       }
+      // No payment gateway fallback
       localStorage.removeItem('giftsity_corporate_cart');
       navigate('/corporate/orders');
     } catch (err) {

@@ -8,7 +8,7 @@ import API from '../../api';
 
 export default function Cart() {
   const { user } = useAuth();
-  const { items, updateQuantity, removeItem, clearCart } = useCart();
+  const { items, updateQuantity, removeItem } = useCart();
   const navigate = useNavigate();
   const [step, setStep] = useState('cart'); // cart | address | payment
   const [address, setAddress] = useState({ name: '', phone: '', street: '', city: '', state: '', pincode: '' });
@@ -76,11 +76,14 @@ export default function Cart() {
     if (!address.name || !address.phone || !address.street || !address.city || !address.state || !address.pincode) return toast.error('Fill all address fields');
     setLoading(true);
     try {
+      // Cancel any prior abandoned pending orders (releases reserved stock)
+      try { await API.post('/orders/cancel-pending'); } catch (e) { /* non-critical */ }
+
       const orderItems = items.map(i => ({ productId: i.productId, quantity: i.quantity, customizations: i.customizations || [] }));
       const { data } = await API.post('/orders', { items: orderItems, shippingAddress: address, couponCode: couponApplied || undefined });
 
-      // Clear cart immediately
-      clearCart();
+      // Cart is NOT cleared here — it will be cleared after payment is verified
+      // in CustomerOrders.jsx. If payment is abandoned, the cart stays intact.
 
       // If Cashfree payment session returned, redirect to payment
       const paymentSessionId = data.cashfreeOrder?.paymentSessionId || data.paymentSessionId;
