@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { CreditCard, DollarSign, CheckCircle, Clock, Loader, Calculator } from 'lucide-react';
+import { CreditCard, DollarSign, CheckCircle, Clock, Loader, Calculator, CalendarDays } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import API from '../../api';
+
+// Helper to format date as YYYY-MM-DD for input[type=date]
+const toDateStr = (d) => d.toISOString().split('T')[0];
 
 export default function AdminPayouts() {
   const [payouts, setPayouts] = useState([]);
@@ -10,6 +13,12 @@ export default function AdminPayouts() {
   const [calculating, setCalculating] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(null);
   const [txnId, setTxnId] = useState('');
+
+  // Period date range for calculating payouts (default: last 30 days)
+  const [periodStart, setPeriodStart] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 30); return toDateStr(d);
+  });
+  const [periodEnd, setPeriodEnd] = useState(() => toDateStr(new Date()));
 
   useEffect(() => { loadPayouts(); }, []);
 
@@ -22,10 +31,20 @@ export default function AdminPayouts() {
   };
 
   const calculatePayouts = async () => {
+    if (!periodStart || !periodEnd) return toast.error('Select period start and end dates');
     setCalculating(true);
     try {
-      const { data } = await API.post('/admin/payouts/calculate');
-      toast.success(`${data.count || 0} payouts calculated`);
+      const { data } = await API.post('/admin/payouts/calculate', {
+        periodStart,
+        periodEnd,
+        periodLabel: `${new Date(periodStart).toLocaleDateString('en-IN')} - ${new Date(periodEnd).toLocaleDateString('en-IN')}`
+      });
+      const count = data.payouts?.length || data.count || 0;
+      if (count > 0) {
+        toast.success(`${count} payout(s) calculated`);
+      } else {
+        toast.error(data.message || 'No delivered orders found in this period');
+      }
       loadPayouts();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
     setCalculating(false);
@@ -50,9 +69,25 @@ export default function AdminPayouts() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-theme-primary">Payouts</h1>
-        <button onClick={calculatePayouts} disabled={calculating} className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-xl text-sm font-semibold transition-colors">
-          {calculating ? <Loader className="w-4 h-4 animate-spin" /> : <><Calculator className="w-4 h-4" /> Calculate Payouts</>}
-        </button>
+      </div>
+
+      {/* Period selection + Calculate */}
+      <div className="bg-card border border-edge/50 rounded-xl p-4 mb-6">
+        <p className="text-sm font-medium text-theme-secondary mb-3 flex items-center gap-2"><CalendarDays className="w-4 h-4 text-amber-400" /> Select period for delivered orders</p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-xs text-theme-dim mb-1">From</label>
+            <input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} className="px-3 py-2 bg-inset border border-edge rounded-lg text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
+          </div>
+          <div>
+            <label className="block text-xs text-theme-dim mb-1">To</label>
+            <input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} className="px-3 py-2 bg-inset border border-edge rounded-lg text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
+          </div>
+          <button onClick={calculatePayouts} disabled={calculating} className="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-xl text-sm font-semibold transition-colors">
+            {calculating ? <Loader className="w-4 h-4 animate-spin" /> : <><Calculator className="w-4 h-4" /> Calculate Payouts</>}
+          </button>
+        </div>
+        <p className="text-[11px] text-theme-dim mt-2">Only delivered + paid orders not yet included in a payout will be processed.</p>
       </div>
 
       {payouts.length === 0 ? (
