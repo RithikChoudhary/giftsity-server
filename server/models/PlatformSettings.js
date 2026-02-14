@@ -5,7 +5,7 @@ const platformSettingsSchema = new mongoose.Schema({
   globalCommissionRate: { type: Number, default: 0 },
   newSellerCommissionRate: { type: Number, default: null }, // null = use global
   commissionGrandfatherDate: { type: Date, default: null }, // sellers before this date keep old rate
-  paymentGatewayFeeRate: { type: Number, default: 3 },
+  paymentGatewayFeeRate: { type: Number, default: 2 },
 
   // Payouts
   payoutSchedule: {
@@ -13,7 +13,7 @@ const platformSettingsSchema = new mongoose.Schema({
     enum: ['weekly', 'biweekly', 'monthly'],
     default: 'biweekly'
   },
-  minimumPayoutAmount: { type: Number, default: 500 },
+  minimumPayoutAmount: { type: Number, default: 0 },
 
   // Business rules
   minimumProductPrice: { type: Number, default: 200 },
@@ -43,6 +43,17 @@ platformSettingsSchema.statics.getSettings = async function () {
   if (!settings) {
     settings = await this.create({});
   }
+  // One-time migration: update old defaults
+  let needsSave = false;
+  if (settings.minimumPayoutAmount === 500) {
+    settings.minimumPayoutAmount = 0;
+    needsSave = true;
+  }
+  if (settings.paymentGatewayFeeRate === 3) {
+    settings.paymentGatewayFeeRate = 2;
+    needsSave = true;
+  }
+  if (needsSave) await settings.save();
   return settings;
 };
 
