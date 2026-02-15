@@ -19,8 +19,16 @@ export default function SellerProducts() {
   const [csvUploading, setCsvUploading] = useState(false);
   const [csvResult, setCsvResult] = useState(null);
   const csvRef = useRef(null);
+  const [minPrice, setMinPrice] = useState(200); // dynamic from platform settings
 
-  useEffect(() => { loadProducts(); loadCategories(); }, []);
+  useEffect(() => { loadProducts(); loadCategories(); loadMinPrice(); }, []);
+
+  const loadMinPrice = async () => {
+    try {
+      const { data } = await SellerAPI.get('/dashboard');
+      if (data.minimumProductPrice) setMinPrice(data.minimumProductPrice);
+    } catch (e) { /* fallback to default */ }
+  };
 
   const loadProducts = async () => {
     try {
@@ -110,6 +118,7 @@ export default function SellerProducts() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.title || !form.price || !form.category || !form.stock) return toast.error('Fill required fields');
+    if (Number(form.price) < minPrice) return toast.error(`Minimum product price is Rs. ${minPrice}`);
     if (!form.weight || Number(form.weight) <= 0) return toast.error('Weight is required for shipping calculation');
     if (form.isCustomizable && form.customizationOptions.length > 0) {
       const emptyLabel = form.customizationOptions.find(opt => !opt.label?.trim());
@@ -219,7 +228,7 @@ export default function SellerProducts() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-theme-muted font-medium mb-1 block">Price (Rs.) *</label>
-                  <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} min="200" className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" required />
+                  <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} min={minPrice} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" required />
                 </div>
                 <div>
                   <label className="text-xs text-theme-muted font-medium mb-1 block">Stock *</label>

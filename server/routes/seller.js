@@ -95,6 +95,7 @@ router.get('/dashboard', async (req, res) => {
       payoutSchedule: schedule,
       bankDetailsComplete,
       yourCommissionRate: commissionRate,
+      minimumProductPrice: settings.minimumProductPrice || 200,
       recentOrders
     });
   } catch (err) {
@@ -148,6 +149,14 @@ router.post('/products', sanitizeBody, async (req, res) => {
 
     if (uploadedImages.length > 0) data.images = uploadedImages;
     if (uploadedMedia.length > 0) data.media = uploadedMedia;
+
+    // Validate minimum product price
+    if (data.price) {
+      const platformSettings = await PlatformSettings.getSettings();
+      if (Number(data.price) < (platformSettings.minimumProductPrice || 0)) {
+        return res.status(400).json({ message: `Minimum product price is Rs. ${platformSettings.minimumProductPrice}` });
+      }
+    }
 
     const product = new Product(data);
     await product.save();
@@ -213,6 +222,14 @@ router.put('/products/:id', sanitizeBody, async (req, res) => {
         }
       }
       delete data.deletedMediaIds;
+    }
+
+    // Validate minimum product price
+    if (data.price) {
+      const platformSettings = await PlatformSettings.getSettings();
+      if (Number(data.price) < (platformSettings.minimumProductPrice || 0)) {
+        return res.status(400).json({ message: `Minimum product price is Rs. ${platformSettings.minimumProductPrice}` });
+      }
     }
 
     Object.assign(product, data);
