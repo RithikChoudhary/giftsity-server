@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const Customer = require('../models/Customer');
@@ -429,19 +430,37 @@ router.post('/payouts/calculate', async (req, res) => {
     }
 
     const payouts = [];
+    let duplicatesSkipped = 0;
+
     for (const [sellerId, sellerOrders] of Object.entries(sellerMap)) {
       const seller = await Seller.findById(sellerId);
+
+      // Duplicate protection: skip if a payout already exists for overlapping period
+      const existingPayout = await SellerPayout.findOne({
+        sellerId,
+        periodStart: { $lte: end },
+        periodEnd: { $gte: start }
+      });
+      if (existingPayout) {
+        duplicatesSkipped++;
+        continue;
+      }
+
       const totalSales = sellerOrders.reduce((s, o) => s + (o.itemTotal || o.totalAmount), 0);
-      const commissionDeducted = sellerOrders.reduce((s, o) => s + o.commissionAmount, 0);
-      const gatewayFeesDeducted = sellerOrders.reduce((s, o) => s + o.paymentGatewayFee, 0);
+      const commissionDeducted = sellerOrders.reduce((s, o) => s + (o.commissionAmount || 0), 0);
+      const gatewayFeesDeducted = sellerOrders.reduce((s, o) => s + (o.paymentGatewayFee || 0), 0);
       // Shipping deducted: only for orders where seller pays shipping
       const shippingDeducted = sellerOrders.reduce((s, o) => {
         return s + (o.shippingPaidBy === 'seller' ? (o.shippingCost || 0) : 0);
       }, 0);
-      const sellerAmountBeforeShipping = sellerOrders.reduce((s, o) => s + o.sellerAmount, 0);
+      const sellerAmountBeforeShipping = sellerOrders.reduce((s, o) => s + (o.sellerAmount || 0), 0);
       const netPayout = Math.max(0, sellerAmountBeforeShipping - shippingDeducted);
 
-      const payout = new SellerPayout({
+      // Check bank details
+      const bank = seller?.sellerProfile?.bankDetails;
+      const hasBankDetails = bank?.accountHolderName && bank?.accountNumber && bank?.ifscCode && bank?.bankName;
+
+      const payoutData = {
         sellerId,
         periodStart: start,
         periodEnd: end,
@@ -453,21 +472,45 @@ router.post('/payouts/calculate', async (req, res) => {
         gatewayFeesDeducted,
         shippingDeducted,
         netPayout,
-        bankDetailsSnapshot: seller?.sellerProfile?.bankDetails || {}
-      });
-      await payout.save();
+        status: hasBankDetails ? 'pending' : 'on_hold',
+        holdReason: hasBankDetails ? '' : 'missing_bank_details',
+        bankDetailsSnapshot: bank || {}
+      };
 
-      // Mark orders as included
-      for (const order of sellerOrders) {
-        order.payoutStatus = 'included_in_payout';
-        order.payoutId = payout._id;
-        await order.save();
+      // Attempt transactional write; fall back if replica set unavailable
+      let savedPayout;
+      let session = null;
+      try {
+        session = await mongoose.startSession();
+        await session.withTransaction(async () => {
+          savedPayout = new SellerPayout(payoutData);
+          await savedPayout.save({ session });
+          await Order.updateMany(
+            { _id: { $in: sellerOrders.map(o => o._id) } },
+            { payoutStatus: 'included_in_payout', payoutId: savedPayout._id },
+            { session }
+          );
+        });
+      } catch (txErr) {
+        if (txErr.codeName === 'IllegalOperation' || txErr.message?.includes('transaction')) {
+          savedPayout = new SellerPayout(payoutData);
+          await savedPayout.save();
+          await Order.updateMany(
+            { _id: { $in: sellerOrders.map(o => o._id) } },
+            { payoutStatus: 'included_in_payout', payoutId: savedPayout._id }
+          );
+        } else {
+          throw txErr;
+        }
+      } finally {
+        if (session) session.endSession();
       }
 
-      payouts.push(payout);
+      payouts.push(savedPayout);
     }
 
-    res.json({ message: `${payouts.length} payouts calculated`, payouts });
+    const msg = `${payouts.length} payouts calculated` + (duplicatesSkipped ? `, ${duplicatesSkipped} duplicates skipped` : '');
+    res.json({ message: msg, payouts });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
@@ -479,14 +522,32 @@ router.put('/payouts/:id/mark-paid', async (req, res) => {
     const payout = await SellerPayout.findById(req.params.id).populate('sellerId', 'name email');
     if (!payout) return res.status(404).json({ message: 'Payout not found' });
 
-    payout.status = 'paid';
-    payout.transactionId = transactionId || '';
-    payout.paidAt = new Date();
-    payout.paidBy = req.user._id;
-    await payout.save();
-
-    // Update order payout statuses
-    await Order.updateMany({ payoutId: payout._id }, { payoutStatus: 'paid' });
+    // Transactional write: payout status + order statuses must be atomic
+    let session = null;
+    try {
+      session = await mongoose.startSession();
+      await session.withTransaction(async () => {
+        payout.status = 'paid';
+        payout.transactionId = transactionId || '';
+        payout.paidAt = new Date();
+        payout.paidBy = req.user._id;
+        await payout.save({ session });
+        await Order.updateMany({ payoutId: payout._id }, { payoutStatus: 'paid' }, { session });
+      });
+    } catch (txErr) {
+      if (txErr.codeName === 'IllegalOperation' || txErr.message?.includes('transaction')) {
+        payout.status = 'paid';
+        payout.transactionId = transactionId || '';
+        payout.paidAt = new Date();
+        payout.paidBy = req.user._id;
+        await payout.save();
+        await Order.updateMany({ payoutId: payout._id }, { payoutStatus: 'paid' });
+      } else {
+        throw txErr;
+      }
+    } finally {
+      if (session) session.endSession();
+    }
 
     // Notify seller
     if (payout.sellerId?.email) {
@@ -541,6 +602,81 @@ router.put('/payouts/:id/retry', async (req, res) => {
     res.json({ message: 'Payout moved to pending', payout });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// ---- PAYOUT RECONCILIATION ----
+router.get('/payouts/reconciliation', async (req, res) => {
+  try {
+    // Order-level breakdown by payoutStatus
+    const orderStats = await Order.aggregate([
+      { $match: { paymentStatus: 'paid', status: 'delivered' } },
+      { $group: {
+        _id: '$payoutStatus',
+        count: { $sum: 1 },
+        totalAmount: { $sum: { $ifNull: ['$sellerAmount', 0] } }
+      }}
+    ]);
+
+    const ordersByStatus = {};
+    for (const stat of orderStats) {
+      ordersByStatus[stat._id || 'unknown'] = { count: stat.count, totalAmount: stat.totalAmount };
+    }
+
+    // Payout-level breakdown by status
+    const payoutStats = await SellerPayout.aggregate([
+      { $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+        totalNetPayout: { $sum: '$netPayout' }
+      }}
+    ]);
+
+    const payoutsByStatus = {};
+    for (const stat of payoutStats) {
+      payoutsByStatus[stat._id] = { count: stat.count, totalNetPayout: stat.totalNetPayout };
+    }
+
+    // Orphaned orders: included_in_payout but payoutId is null
+    const orphanedNullPayoutId = await Order.countDocuments({
+      payoutStatus: 'included_in_payout',
+      $or: [{ payoutId: null }, { payoutId: { $exists: false } }]
+    });
+
+    // Orphaned orders: payoutId references a non-existent payout
+    const ordersWithPayoutId = await Order.find(
+      { payoutStatus: 'included_in_payout', payoutId: { $ne: null } },
+      { payoutId: 1 }
+    ).lean();
+
+    const payoutIds = [...new Set(ordersWithPayoutId.map(o => o.payoutId?.toString()).filter(Boolean))];
+    let orphanedMissingPayout = 0;
+    if (payoutIds.length) {
+      const existingPayouts = await SellerPayout.find(
+        { _id: { $in: payoutIds } },
+        { _id: 1 }
+      ).lean();
+      const existingIds = new Set(existingPayouts.map(p => p._id.toString()));
+      const missingIds = payoutIds.filter(id => !existingIds.has(id));
+      if (missingIds.length) {
+        orphanedMissingPayout = await Order.countDocuments({
+          payoutStatus: 'included_in_payout',
+          payoutId: { $in: missingIds }
+        });
+      }
+    }
+
+    res.json({
+      orders: ordersByStatus,
+      payouts: payoutsByStatus,
+      orphaned: {
+        nullPayoutId: orphanedNullPayoutId,
+        missingPayout: orphanedMissingPayout,
+        total: orphanedNullPayoutId + orphanedMissingPayout
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 

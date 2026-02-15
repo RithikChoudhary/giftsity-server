@@ -41,7 +41,7 @@ const sellerPayoutSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-sellerPayoutSchema.index({ sellerId: 1, periodStart: 1 });
+sellerPayoutSchema.index({ sellerId: 1, periodStart: 1, periodEnd: 1 }, { unique: true });
 sellerPayoutSchema.index({ status: 1 });
 
 sellerPayoutSchema.pre('save', function (next) {

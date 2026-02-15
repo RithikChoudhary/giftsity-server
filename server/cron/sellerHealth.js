@@ -1,3 +1,5 @@
+const cron = require('node-cron');
+const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Seller = require('../models/Seller');
 const Product = require('../models/Product');
@@ -323,10 +325,23 @@ async function autoCalculatePayouts() {
 
     let calculated = 0;
     let onHold = 0;
+    let duplicatesSkipped = 0;
 
     for (const [sellerId, sellerOrders] of Object.entries(sellerMap)) {
       const seller = await Seller.findById(sellerId);
       if (!seller) continue;
+
+      // Duplicate protection: skip if a payout already exists for overlapping period
+      const existingPayout = await SellerPayout.findOne({
+        sellerId,
+        periodStart: { $lte: periodEnd },
+        periodEnd: { $gte: periodStart }
+      });
+      if (existingPayout) {
+        logger.warn(`[Payout Cron] Duplicate skipped for seller ${sellerId}, existing payout ${existingPayout._id}`);
+        duplicatesSkipped++;
+        continue;
+      }
 
       const totalSales = sellerOrders.reduce((s, o) => s + (o.itemTotal || o.totalAmount), 0);
       const commissionDeducted = sellerOrders.reduce((s, o) => s + (o.commissionAmount || 0), 0);
@@ -341,7 +356,7 @@ async function autoCalculatePayouts() {
       const bank = seller.sellerProfile?.bankDetails;
       const hasBankDetails = bank?.accountHolderName && bank?.accountNumber && bank?.ifscCode && bank?.bankName;
 
-      const payout = new SellerPayout({
+      const payoutData = {
         sellerId,
         periodStart,
         periodEnd,
@@ -356,22 +371,44 @@ async function autoCalculatePayouts() {
         status: hasBankDetails ? 'pending' : 'on_hold',
         holdReason: hasBankDetails ? '' : 'missing_bank_details',
         bankDetailsSnapshot: bank || {}
-      });
-      await payout.save();
+      };
 
-      // Mark orders as included
-      for (const order of sellerOrders) {
-        order.payoutStatus = 'included_in_payout';
-        order.payoutId = payout._id;
-        await order.save();
+      // Attempt transactional write; fall back to non-transactional if replica set unavailable
+      let session = null;
+      try {
+        session = await mongoose.startSession();
+        await session.withTransaction(async () => {
+          const payout = new SellerPayout(payoutData);
+          await payout.save({ session });
+          await Order.updateMany(
+            { _id: { $in: sellerOrders.map(o => o._id) } },
+            { payoutStatus: 'included_in_payout', payoutId: payout._id },
+            { session }
+          );
+        });
+      } catch (txErr) {
+        // If transactions are not supported (e.g. standalone MongoDB), fall back
+        if (txErr.codeName === 'IllegalOperation' || txErr.message?.includes('transaction')) {
+          logger.warn('[Payout Cron] Transactions not supported, falling back to non-transactional write');
+          const payout = new SellerPayout(payoutData);
+          await payout.save();
+          await Order.updateMany(
+            { _id: { $in: sellerOrders.map(o => o._id) } },
+            { payoutStatus: 'included_in_payout', payoutId: payout._id }
+          );
+        } else {
+          throw txErr; // re-throw unexpected errors
+        }
+      } finally {
+        if (session) session.endSession();
       }
 
       if (hasBankDetails) calculated++;
       else onHold++;
     }
 
-    logger.info(`[Payout Cron] Calculated ${calculated} payouts, ${onHold} on hold (missing bank details)`);
-    return { calculated, onHold };
+    logger.info(`[Payout Cron] Calculated ${calculated} payouts, ${onHold} on hold, ${duplicatesSkipped} duplicates skipped`);
+    return { calculated, onHold, duplicatesSkipped };
   } catch (err) {
     logger.error('[Payout Cron] Error:', err.message);
     return { error: err.message };
@@ -425,30 +462,30 @@ async function sendReviewRequestEmails() {
 
 // ==================== SCHEDULE ====================
 function startCronJobs() {
-  // Run auto-cancel unpaid orders every 5 minutes
-  setInterval(autoCancelUnpaidOrders, 5 * 60 * 1000);
+  // Auto-cancel unpaid orders every 5 minutes
+  cron.schedule('*/5 * * * *', autoCancelUnpaidOrders);
 
-  // Run auto-cancel unshipped every hour
-  setInterval(autoCancelUnshippedOrders, 60 * 60 * 1000);
+  // Auto-cancel unshipped orders at the top of every hour
+  cron.schedule('0 * * * *', autoCancelUnshippedOrders);
 
-  // Run metrics + auto-suspend every 6 hours
-  setInterval(async () => {
+  // Metrics + auto-suspend every 6 hours
+  cron.schedule('0 */6 * * *', async () => {
     await calculateSellerMetrics();
     await autoSuspendBadSellers();
-  }, 6 * 60 * 60 * 1000);
+  });
 
   // Send review request emails every 12 hours
-  setInterval(sendReviewRequestEmails, 12 * 60 * 60 * 1000);
+  cron.schedule('0 */12 * * *', sendReviewRequestEmails);
 
-  // Run payout calculation daily at midnight (cron checks if it's a payout day)
-  setInterval(autoCalculatePayouts, 24 * 60 * 60 * 1000);
+  // Payout calculation daily at midnight (function checks if it's a payout day)
+  cron.schedule('0 0 * * *', autoCalculatePayouts);
 
   // Run initial checks after 30 seconds (let server start)
   setTimeout(runAllCrons, 30 * 1000);
   // Also run unpaid check shortly after start
   setTimeout(autoCancelUnpaidOrders, 15 * 1000);
 
-  logger.info('[Cron] Seller health cron jobs scheduled');
+  logger.info('[Cron] Seller health cron jobs scheduled (node-cron)');
 }
 
 module.exports = {
