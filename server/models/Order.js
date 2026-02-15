@@ -44,7 +44,8 @@ const orderSchema = new mongoose.Schema({
 
   // Pricing
   itemTotal: { type: Number, default: 0 },
-  shippingCost: { type: Number, default: 0 },
+  shippingCost: { type: Number, default: 0 }, // what customer sees (includes markup if customer pays)
+  actualShippingCost: { type: Number, default: 0 }, // actual Shiprocket rate (for courier cap)
   shippingPaidBy: { type: String, enum: ['seller', 'customer'], default: 'seller' },
   totalAmount: { type: Number, default: 0 },
 

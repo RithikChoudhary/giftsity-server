@@ -103,7 +103,7 @@ export default function Cart() {
       // Build shipping estimates map: sellerId -> { shippingCost, shippingPaidBy }
       const shippingData = {};
       shippingEstimates.forEach(e => {
-        shippingData[e.sellerId] = { shippingCost: e.shippingCost || 0, shippingPaidBy: e.shippingPaidBy || 'seller' };
+        shippingData[e.sellerId] = { shippingCost: e.shippingCost || 0, actualShippingCost: e.actualShippingCost || e.shippingCost || 0, shippingPaidBy: e.shippingPaidBy || 'seller' };
       });
       const { data } = await API.post('/orders', { items: orderItems, shippingAddress: address, shippingEstimates: shippingData, couponCode: couponApplied || undefined });
 
@@ -201,7 +201,7 @@ export default function Cart() {
             <h3 className="font-semibold text-theme-primary mb-4">Order Summary</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-theme-secondary"><span>Subtotal</span><span className="shrink-0 ml-2">Rs. {subtotal.toLocaleString('en-IN')}</span></div>
-              <div className="flex justify-between text-theme-secondary"><span>Shipping</span><span className={`shrink-0 ml-2 ${customerShipping > 0 ? '' : 'text-green-400'}`}>{customerShipping > 0 ? `Rs. ${customerShipping.toLocaleString('en-IN')}` : 'Free'}</span></div>
+              <div className="flex justify-between text-theme-secondary"><span>Shipping</span><span className={`shrink-0 ml-2 ${customerShipping > 0 ? '' : 'text-theme-dim'}`}>{customerShipping > 0 ? `Rs. ${customerShipping.toLocaleString('en-IN')}` : 'Calculated at checkout'}</span></div>
               {couponDiscount > 0 && (
                 <div className="flex justify-between text-green-400"><span className="min-w-0 truncate">Discount ({couponApplied})</span><span className="shrink-0 ml-2">-Rs. {couponDiscount.toLocaleString('en-IN')}</span></div>
               )}
@@ -287,12 +287,44 @@ export default function Cart() {
               </div>
               <div>
                 <label className="text-xs text-theme-muted font-medium mb-1 block">Pincode *</label>
-                <input type="text" value={address.pincode} onChange={e => setAddress(a => ({ ...a, pincode: e.target.value }))} className="w-full px-4 py-2.5 bg-card border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
+                <input type="text" value={address.pincode} onChange={e => {
+                  const val = e.target.value;
+                  setAddress(a => ({ ...a, pincode: val }));
+                  // Auto-fetch shipping estimate when pincode is 6 digits
+                  if (val.length === 6 && /^\d{6}$/.test(val)) fetchShippingEstimate(val);
+                }} className="w-full px-4 py-2.5 bg-card border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
               </div>
             </div>
+
+            {/* Shipping estimate preview */}
+            {estimatingShipping && (
+              <div className="flex items-center gap-2 text-xs text-theme-muted py-2"><Loader className="w-3 h-3 animate-spin" /> Estimating shipping costs...</div>
+            )}
+            {!estimatingShipping && shippingEstimates.length > 0 && (
+              <div className="bg-card border border-edge/50 rounded-xl p-4">
+                <p className="text-xs font-medium text-theme-muted mb-2 flex items-center gap-1"><Truck className="w-3 h-3" /> Shipping Estimate</p>
+                <div className="space-y-1">
+                  {shippingEstimates.map(e => (
+                    <div key={e.sellerId} className="flex justify-between text-xs">
+                      <span className="text-theme-secondary">{e.courierName || 'Courier'}{e.estimatedDays ? ` · ${e.estimatedDays} days` : ''}</span>
+                      <span className={e.shippingPaidBy === 'seller' || !e.shippingCost ? 'text-green-400' : 'text-theme-primary font-medium'}>
+                        {e.shippingPaidBy === 'seller' || !e.shippingCost ? 'Free' : `Rs. ${e.shippingCost.toLocaleString('en-IN')}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {customerShipping > 0 && (
+                  <div className="border-t border-edge/50 mt-2 pt-2 flex justify-between text-xs font-medium">
+                    <span className="text-theme-muted">Subtotal + Shipping</span>
+                    <span className="text-theme-primary">Rs. {total.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <button onClick={async () => {
               if (!address.pincode || address.pincode.length < 6) return toast.error('Enter a valid pincode');
-              await fetchShippingEstimate(address.pincode);
+              if (!shippingEstimates.length) await fetchShippingEstimate(address.pincode);
               setStep('payment');
             }} disabled={estimatingShipping} className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors">
               {estimatingShipping ? <><Loader className="w-4 h-4 animate-spin" /> Checking shipping...</> : <>Continue to Payment <ArrowRight className="w-4 h-4" /></>}

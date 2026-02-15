@@ -24,11 +24,18 @@ const getCommissionRate = (seller, settings) => {
 
 /**
  * Calculate financial breakdown for an order.
+ * @param {number} itemTotal - product price total (what seller earns from)
+ * @param {number} paymentTotal - full amount charged to customer (itemTotal + customer-paid shipping)
+ * @param {number} commissionRate - platform commission percentage
+ * @param {number} gatewayFeeRate - payment gateway fee percentage
  */
-const calculateOrderFinancials = (totalAmount, commissionRate, gatewayFeeRate) => {
-  const commissionAmount = Math.round((totalAmount * commissionRate) / 100);
-  const paymentGatewayFee = Math.round((totalAmount * gatewayFeeRate) / 100);
-  const sellerAmount = totalAmount - commissionAmount - paymentGatewayFee;
+const calculateOrderFinancials = (itemTotal, paymentTotal, commissionRate, gatewayFeeRate) => {
+  // Commission is on item total only
+  const commissionAmount = Math.round((itemTotal * commissionRate) / 100);
+  // Gateway fee is on the full payment amount (what Cashfree actually charges)
+  const paymentGatewayFee = Math.round((paymentTotal * gatewayFeeRate) / 100);
+  // Seller receives item total minus commission and gateway fee
+  const sellerAmount = itemTotal - commissionAmount - paymentGatewayFee;
 
   return {
     commissionRate,

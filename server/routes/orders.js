@@ -152,13 +152,14 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
         // Get shipping info from estimates (passed from frontend)
         const sellerShipping = shippingEstimates?.[sellerId] || {};
         const shippingCost = sellerShipping.shippingCost || 0;
+        const actualShippingCost = sellerShipping.actualShippingCost || shippingCost; // actual Shiprocket rate
         const shippingPaidBy = sellerShipping.shippingPaidBy || 'seller';
 
         // Customer-facing total: includes shipping only if customer pays
         const totalAmount = shippingPaidBy === 'customer' ? itemTotal + shippingCost : itemTotal;
 
-        // Commission/gateway fees apply to itemTotal only (shipping is pass-through)
-        const financials = calculateOrderFinancials(itemTotal, commissionRate, settings.paymentGatewayFeeRate);
+        // Gateway fee on full payment amount (what Cashfree charges), commission on item total only
+        const financials = calculateOrderFinancials(itemTotal, totalAmount, commissionRate, settings.paymentGatewayFeeRate);
 
         const order = new Order({
           orderNumber: generateOrderNumber(),
@@ -180,6 +181,7 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
           shippingAddress,
           itemTotal,
           shippingCost,
+          actualShippingCost,
           shippingPaidBy,
           totalAmount,
           ...financials
@@ -360,9 +362,9 @@ router.post('/verify-payment', requireAuth, validatePaymentVerification, async (
         });
       }
 
-      // Update seller stats
+      // Update seller stats (use itemTotal so shipping collected from customer isn't counted as seller sales)
       await Seller.findByIdAndUpdate(order.sellerId, {
-        $inc: { 'sellerProfile.totalSales': order.totalAmount, 'sellerProfile.totalOrders': 1 }
+        $inc: { 'sellerProfile.totalSales': order.itemTotal || order.totalAmount, 'sellerProfile.totalOrders': 1 }
       });
 
       // Send emails (non-blocking)
@@ -753,9 +755,14 @@ router.post('/shipping-estimate', requireAuth, async (req, res) => {
         if (companies.length > 0) {
           // Pick cheapest courier
           const cheapest = companies.reduce((min, c) => c.rate < min.rate ? c : min, companies[0]);
+          const actualRate = Math.round(cheapest.rate);
+          // Add Rs. 10 platform shipping markup when customer pays
+          const SHIPPING_MARKUP = 10;
+          const displayRate = group.shippingPaidBy === 'customer' ? actualRate + SHIPPING_MARKUP : actualRate;
           estimates.push({
             sellerId,
-            shippingCost: Math.round(cheapest.rate),
+            shippingCost: displayRate, // what customer sees/pays
+            actualShippingCost: actualRate, // actual Shiprocket rate (for courier cap)
             shippingPaidBy: group.shippingPaidBy,
             courierName: cheapest.courier_name,
             estimatedDays: cheapest.estimated_delivery_days,

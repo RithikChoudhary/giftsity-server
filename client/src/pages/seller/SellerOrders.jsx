@@ -240,7 +240,7 @@ export default function SellerOrders() {
                       <span className="text-green-400 font-medium">You get: Rs. {(
                         order.shippingPaidBy === 'seller'
                           ? Math.max(0, (order.sellerAmount || 0) - (order.shippingCost || 0))
-                          : (order.sellerAmount || 0) + (order.shippingCost || 0)
+                          : (order.sellerAmount || 0)
                       ).toLocaleString('en-IN')}</span>
                     </div>
                   </div>
@@ -306,7 +306,7 @@ export default function SellerOrders() {
                               <p className="text-[11px] text-red-400 bg-red-500/5 border border-red-500/10 rounded-lg px-3 py-1.5 mb-2">Shipping cost will be deducted from your payout (you offered free shipping)</p>
                             )}
                             {order.shippingPaidBy === 'customer' && (
-                              <p className="text-[11px] text-green-400 bg-green-500/5 border border-green-500/10 rounded-lg px-3 py-1.5 mb-2">Shipping is paid by the customer — no deduction from your payout</p>
+                              <p className="text-[11px] text-green-400 bg-green-500/5 border border-green-500/10 rounded-lg px-3 py-1.5 mb-2">Customer paid for shipping. Select a courier within the budget (max Rs. {order.actualShippingCost || order.shippingCost || '—'}).</p>
                             )}
                             <div className="space-y-2 max-h-60 overflow-y-auto">
                               {couriers.map(c => (
