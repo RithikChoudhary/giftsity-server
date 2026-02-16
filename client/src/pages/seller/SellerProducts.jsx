@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, Plus, Edit3, Trash2, Eye, EyeOff, Loader, X, Upload, Image, Film, FileSpreadsheet, CreditCard, ArrowRight } from 'lucide-react';
+import { Package, Plus, Edit3, Trash2, Eye, EyeOff, Loader, X, Upload, Image, Film, FileSpreadsheet, CreditCard, ArrowRight, MapPin } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import API, { SellerAPI, sellerAPI } from '../../api';
@@ -22,14 +22,18 @@ export default function SellerProducts() {
   const csvRef = useRef(null);
   const [minPrice, setMinPrice] = useState(200); // dynamic from platform settings
   const [bankDetailsComplete, setBankDetailsComplete] = useState(true);
+  const [pickupAddressComplete, setPickupAddressComplete] = useState(true);
 
   useEffect(() => { loadProducts(); loadCategories(); loadMinPrice(); }, []);
+
+  const canCreateProduct = bankDetailsComplete && pickupAddressComplete;
 
   const loadMinPrice = async () => {
     try {
       const { data } = await SellerAPI.get('/dashboard');
       if (data.minimumProductPrice) setMinPrice(data.minimumProductPrice);
       if (data.bankDetailsComplete !== undefined) setBankDetailsComplete(data.bankDetailsComplete);
+      if (data.pickupAddressComplete !== undefined) setPickupAddressComplete(data.pickupAddressComplete);
     } catch (e) { /* fallback to default */ }
   };
 
@@ -187,13 +191,13 @@ export default function SellerProducts() {
             {csvUploading ? <Loader className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />}
             Import CSV
           </button>
-          <button onClick={() => { if (!bankDetailsComplete) { toast.error('Add bank details in Settings first'); return; } openForm(); }} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${bankDetailsComplete ? 'bg-amber-500 hover:bg-amber-400 text-zinc-950' : 'bg-zinc-700 text-zinc-400 cursor-not-allowed'}`}>
+          <button onClick={() => { if (!canCreateProduct) { toast.error(!bankDetailsComplete ? 'Add bank details in Settings first' : 'Add pickup address in Settings first'); return; } openForm(); }} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${canCreateProduct ? 'bg-amber-500 hover:bg-amber-400 text-zinc-950' : 'bg-zinc-700 text-zinc-400 cursor-not-allowed'}`}>
             <Plus className="w-4 h-4" /> Add Product
           </button>
         </div>
       </div>
 
-      {/* Bank details required banner */}
+      {/* Setup required banners */}
       {!bankDetailsComplete && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
           <CreditCard className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
@@ -201,6 +205,18 @@ export default function SellerProducts() {
             <p className="font-medium text-red-400">Bank Details Required</p>
             <p className="text-sm text-theme-muted mt-1">You must add your bank account details before you can create products.</p>
             <Link to="/seller/settings" className="inline-flex items-center gap-1 mt-2 px-4 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm font-medium rounded-lg transition-colors">
+              Go to Settings <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+      )}
+      {!pickupAddressComplete && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <MapPin className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-amber-400">Pickup Address Required</p>
+            <p className="text-sm text-theme-muted mt-1">You must add your pickup address before you can create products. This is needed for shipping.</p>
+            <Link to="/seller/settings" className="inline-flex items-center gap-1 mt-2 px-4 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-sm font-medium rounded-lg transition-colors">
               Go to Settings <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>

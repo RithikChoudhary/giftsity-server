@@ -37,7 +37,7 @@ router.post('/conversations', async (req, res) => {
 
     conversation = new Conversation({
       participants: [
-        { userId: req.user._id, userRole: 'customer', name: req.user.name || '' },
+        { userId: req.user._id, userRole: 'customer', name: req.user.name || req.user.email?.split('@')[0] || 'Customer' },
         { userId: sellerId, userRole: 'seller', name: sellerName }
       ],
       productId: productId || null,
@@ -123,7 +123,7 @@ router.post('/conversations/:id/messages', async (req, res) => {
       conversationId: conversation._id,
       senderId: req.user._id,
       senderRole: req.user.role,
-      senderName: req.user.name || '',
+      senderName: req.user.name || req.user.email?.split('@')[0] || 'Customer',
       content: content || '',
       images: images || []
     });
@@ -161,7 +161,7 @@ router.post('/conversations/:id/messages', async (req, res) => {
         userId: otherId,
         userRole: otherParticipant.userRole,
         type: 'new_message',
-        title: `New message from ${req.user.name || 'Someone'}`,
+        title: `New message from ${req.user.name || req.user.email?.split('@')[0] || 'Customer'}`,
         message: (content || '(image)').substring(0, 100),
         link: otherParticipant.userRole === 'seller' ? '/seller/chat' : '/chat',
         metadata: { conversationId: conversation._id.toString() }

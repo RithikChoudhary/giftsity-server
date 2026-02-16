@@ -5,6 +5,7 @@ import { useCart } from '../../context/CartContext';
 import { ShoppingBag, Trash2, Minus, Plus, ArrowRight, ArrowLeft, CreditCard, MapPin, Loader, CheckCircle, Truck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import API from '../../api';
+import ProfileCompleteModal from '../../components/ProfileCompleteModal';
 
 export default function Cart() {
   const { user } = useAuth();
@@ -21,6 +22,7 @@ export default function Cart() {
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [shippingEstimates, setShippingEstimates] = useState([]); // [{ sellerId, shippingCost, shippingPaidBy, courierName, estimatedDays }]
   const [estimatingShipping, setEstimatingShipping] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   useEffect(() => {
     // Pre-fill default address from user profile
@@ -89,6 +91,7 @@ export default function Cart() {
 
   const handleCheckout = () => {
     if (!user) return navigate('/auth?redirect=/cart');
+    if (!user.name || !user.phone) { setShowProfileModal(true); return; }
     setStep('address');
   };
 
@@ -331,6 +334,13 @@ export default function Cart() {
             </button>
           </div>
         </div>
+      )}
+
+      {showProfileModal && (
+        <ProfileCompleteModal
+          onComplete={() => { setShowProfileModal(false); setStep('address'); }}
+          onClose={() => setShowProfileModal(false)}
+        />
       )}
 
       {step === 'payment' && (

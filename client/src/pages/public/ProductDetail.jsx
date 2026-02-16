@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import SEO from '../../components/SEO';
 import API, { chatAPI } from '../../api';
+import ProfileCompleteModal from '../../components/ProfileCompleteModal';
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -409,9 +410,9 @@ function ChatWithSellerButton({ sellerId, productId, productTitle, productImage 
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
-  const handleChat = async () => {
-    if (!user) { navigate('/auth'); return; }
+  const startChat = async () => {
     setLoading(true);
     try {
       await chatAPI.createConversation({ sellerId, productId, productTitle, productImage });
@@ -422,9 +423,23 @@ function ChatWithSellerButton({ sellerId, productId, productTitle, productImage 
     setLoading(false);
   };
 
+  const handleChat = async () => {
+    if (!user) { navigate('/auth'); return; }
+    if (!user.name) { setShowProfileModal(true); return; }
+    startChat();
+  };
+
   return (
-    <button onClick={handleChat} disabled={loading} className="w-full mt-3 py-2.5 border border-amber-500/30 hover:bg-amber-500/10 text-amber-500 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
-      <MessageSquare className="w-4 h-4" /> {loading ? 'Starting chat...' : 'Chat with Seller'}
-    </button>
+    <>
+      <button onClick={handleChat} disabled={loading} className="w-full mt-3 py-2.5 border border-amber-500/30 hover:bg-amber-500/10 text-amber-500 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
+        <MessageSquare className="w-4 h-4" /> {loading ? 'Starting chat...' : 'Chat with Seller'}
+      </button>
+      {showProfileModal && (
+        <ProfileCompleteModal
+          onComplete={() => { setShowProfileModal(false); startChat(); }}
+          onClose={() => setShowProfileModal(false)}
+        />
+      )}
+    </>
   );
 }

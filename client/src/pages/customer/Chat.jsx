@@ -4,6 +4,7 @@ import { chatAPI } from '../../api';
 import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
 import SEO from '../../components/SEO';
+import ProfileCompleteModal from '../../components/ProfileCompleteModal';
 
 export default function Chat() {
   const { user } = useAuth();
@@ -84,6 +85,15 @@ export default function Chat() {
     if (s < 86400) return `${Math.floor(s / 3600)}h`;
     return `${Math.floor(s / 86400)}d`;
   };
+
+  if (user && !user.name) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-6">
+        <SEO title="Messages" noIndex />
+        <ProfileCompleteModal onComplete={() => {}} />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
