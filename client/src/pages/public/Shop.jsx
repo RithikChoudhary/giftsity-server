@@ -74,7 +74,7 @@ export default function Shop() {
       <SEO title="Shop Gifts" description="Browse unique products from verified creators across India. Filter by category, price, and more." />
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-theme-primary mb-2">Gift Shop</h1>
+        <h1 className="text-3xl font-bold text-theme-primary mb-2">Creator's Shop</h1>
         <p className="text-theme-muted">Discover unique products from our creators</p>
       </div>
 
