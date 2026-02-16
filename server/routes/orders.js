@@ -10,6 +10,7 @@ const { requireAuth } = require('../middleware/auth');
 const { getCommissionRate, calculateOrderFinancials } = require('../utils/commission');
 const { sendOrderConfirmation } = require('../utils/email');
 const { logActivity } = require('../utils/audit');
+const { createNotification } = require('../utils/notify');
 const { sanitizeBody } = require('../middleware/sanitize');
 const { validateOrderCreation, validatePaymentVerification } = require('../middleware/validators');
 const rateLimit = require('express-rate-limit');
@@ -367,6 +368,26 @@ router.post('/verify-payment', requireAuth, validatePaymentVerification, async (
         $inc: { 'sellerProfile.totalSales': order.itemTotal || order.totalAmount, 'sellerProfile.totalOrders': 1 }
       });
 
+      // Add status history entry
+      if (!order.statusHistory) order.statusHistory = [];
+      order.statusHistory.push({ status: 'confirmed', timestamp: new Date(), changedByRole: 'system', note: 'Payment confirmed' });
+      await order.save();
+
+      // Notify customer
+      createNotification({
+        userId: order.customerId.toString(), userRole: 'customer',
+        type: 'order_confirmed', title: `Order #${order.orderNumber} confirmed`,
+        message: 'Your payment has been confirmed and order is being processed',
+        link: `/orders/${order._id}`, metadata: { orderId: order._id.toString() }
+      });
+      // Notify seller
+      createNotification({
+        userId: order.sellerId.toString(), userRole: 'seller',
+        type: 'order_confirmed', title: `New order #${order.orderNumber}`,
+        message: `New order worth Rs.${order.itemTotal || order.totalAmount}`,
+        link: '/seller/orders', metadata: { orderId: order._id.toString() }
+      });
+
       // Send emails (non-blocking)
       try {
         await sendOrderConfirmation(order.customerEmail, order, 'customer');
@@ -654,6 +675,8 @@ router.post('/:id/cancel', requireAuth, sanitizeBody, async (req, res) => {
     order.status = 'cancelled';
     order.cancelledAt = new Date();
     order.cancelReason = req.body.reason || 'Cancelled by customer';
+    if (!order.statusHistory) order.statusHistory = [];
+    order.statusHistory.push({ status: 'cancelled', timestamp: new Date(), changedBy: req.user._id, changedByRole: 'customer', note: order.cancelReason });
     await order.save();
 
     // Restore reserved stock (stock is reserved at order creation)
@@ -694,6 +717,15 @@ router.post('/:id/cancel', requireAuth, sanitizeBody, async (req, res) => {
     }
 
     logActivity({ domain: 'order', action: 'order_cancelled', actorRole: 'customer', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Order', targetId: order._id, message: `Order ${order.orderNumber} cancelled by customer`, metadata: { reason: order.cancelReason } });
+
+    // Notify seller about cancellation
+    createNotification({
+      userId: order.sellerId.toString(), userRole: 'seller',
+      type: 'order_cancelled', title: `Order #${order.orderNumber} cancelled`,
+      message: `Customer cancelled order: ${order.cancelReason || 'No reason given'}`,
+      link: '/seller/orders', metadata: { orderId: order._id.toString() }
+    });
+
     res.json({ message: 'Order cancelled successfully', order });
   } catch (err) {
     logger.error('Cancel order error:', err.message);

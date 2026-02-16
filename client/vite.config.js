@@ -19,9 +19,7 @@ export default defineConfig({
         }
       }
     },
-    // Generate source maps for debugging production issues
     sourcemap: false,
-    // Target modern browsers
     target: 'es2020'
   }
 })

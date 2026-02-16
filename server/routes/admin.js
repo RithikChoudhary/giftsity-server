@@ -154,6 +154,17 @@ router.put('/sellers/:id/approve', async (req, res) => {
     }
 
     logActivity({ domain: 'admin', action: wasSuspended ? 'seller_unsuspended' : 'seller_approved', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Seller', targetId: seller._id, message: wasSuspended ? `Seller ${seller.name} unsuspended` : `Seller ${seller.name} approved` });
+
+    const { createNotification: notifyApproved } = require('../utils/notify');
+    notifyApproved({
+      userId: seller._id.toString(), userRole: 'seller',
+      type: 'seller_approved',
+      title: wasSuspended ? 'Account reactivated' : 'Account approved!',
+      message: wasSuspended ? 'Your seller account has been reactivated. Your products are now visible.' : 'Welcome to Giftsity! Your seller account has been approved.',
+      link: '/seller',
+      metadata: {}
+    });
+
     const sellerResponse = seller.toObject();
     delete sellerResponse.otp;
     delete sellerResponse.otpExpiry;
@@ -182,6 +193,17 @@ router.put('/sellers/:id/suspend', async (req, res) => {
     await Product.updateMany({ sellerId: seller._id }, { isActive: false });
 
     logActivity({ domain: 'admin', action: 'seller_suspended', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Seller', targetId: seller._id, message: `Seller ${seller.name} suspended: ${reason || 'No reason'}` });
+
+    const { createNotification: notifySuspend } = require('../utils/notify');
+    notifySuspend({
+      userId: seller._id.toString(), userRole: 'seller',
+      type: 'seller_suspended',
+      title: 'Account suspended',
+      message: `Your account has been suspended: ${reason || 'Policy violation'}. Go to Settings to appeal.`,
+      link: '/seller/settings',
+      metadata: { reason }
+    });
+
     const sellerResponse = seller.toObject();
     delete sellerResponse.otp;
     delete sellerResponse.otpExpiry;
@@ -555,6 +577,19 @@ router.put('/payouts/:id/mark-paid', async (req, res) => {
     }
 
     logActivity({ domain: 'admin', action: 'payout_paid', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'SellerPayout', targetId: payout._id, message: `Payout ${payout._id} marked paid for seller`, metadata: { amount: payout.netPayout, transactionId } });
+
+    // Notify seller about payout
+    const { createNotification: notifySeller } = require('../utils/notify');
+    notifySeller({
+      userId: payout.sellerId._id?.toString() || payout.sellerId.toString(),
+      userRole: 'seller',
+      type: 'payout_processed',
+      title: 'Payout processed',
+      message: `Rs.${payout.netPayout} has been transferred to your bank account`,
+      link: '/seller/payouts',
+      metadata: { payoutId: payout._id.toString(), amount: payout.netPayout }
+    });
+
     res.json({ message: 'Payout marked as paid', payout });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -573,6 +608,15 @@ router.put('/payouts/:id/mark-failed', async (req, res) => {
     await payout.save();
 
     logActivity({ domain: 'admin', action: 'payout_failed', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'SellerPayout', targetId: payout._id, message: `Payout marked failed: ${reason}`, metadata: { amount: payout.netPayout } });
+
+    const { createNotification: notifySeller2 } = require('../utils/notify');
+    notifySeller2({
+      userId: payout.sellerId?.toString(), userRole: 'seller',
+      type: 'payout_failed', title: 'Payout failed',
+      message: `Your payout of Rs.${payout.netPayout} could not be processed: ${reason || 'Please check bank details'}`,
+      link: '/seller/payouts', metadata: { payoutId: payout._id.toString() }
+    });
+
     res.json({ message: 'Payout marked as failed', payout });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -677,6 +721,74 @@ router.get('/payouts/reconciliation', async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// ---- RETURNS ----
+const ReturnRequest = require('../models/ReturnRequest');
+
+router.get('/returns', async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.status) filter.status = req.query.status;
+    const requests = await ReturnRequest.find(filter)
+      .sort({ createdAt: -1 })
+      .populate('orderId', 'orderNumber totalAmount')
+      .populate('customerId', 'name email phone')
+      .populate('sellerId', 'name email sellerProfile.businessName')
+      .lean();
+    res.json({ requests });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.put('/returns/:id/override', async (req, res) => {
+  try {
+    const { action, note } = req.body;
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ message: 'Action must be approve or reject' });
+    }
+
+    const returnReq = await ReturnRequest.findById(req.params.id);
+    if (!returnReq) return res.status(404).json({ message: 'Return request not found' });
+
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    returnReq.status = newStatus;
+    if (action === 'reject') {
+      returnReq.rejectionReason = note || 'Rejected by admin';
+      returnReq.resolvedAt = new Date();
+    }
+    returnReq.adminNotes = note || '';
+    returnReq.statusHistory.push({
+      status: newStatus, timestamp: new Date(),
+      changedBy: req.user._id, changedByRole: 'admin',
+      note: `Admin override: ${note || action}`
+    });
+    await returnReq.save();
+
+    const orderUpdate = {
+      returnStatus: action === 'approve' ? 'approved' : 'rejected',
+      $push: { statusHistory: { status: `return_${newStatus}`, timestamp: new Date(), changedBy: req.user._id, changedByRole: 'admin', note: `Admin override: ${note || action}` } }
+    };
+    await Order.findByIdAndUpdate(returnReq.orderId, orderUpdate);
+
+    const { createNotification } = require('../utils/notify');
+    createNotification({
+      userId: returnReq.customerId.toString(),
+      userRole: 'customer',
+      type: action === 'approve' ? 'return_approved' : 'return_rejected',
+      title: `Return ${newStatus} by admin`,
+      message: note || `Your return request has been ${newStatus}`,
+      link: `/returns/${returnReq._id}`,
+      metadata: { returnRequestId: returnReq._id.toString() }
+    });
+
+    logActivity({ domain: 'admin', action: `return_${newStatus}`, actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'ReturnRequest', targetId: returnReq._id, message: `Admin override: return ${newStatus}`, metadata: { note } });
+
+    res.json({ message: `Return ${newStatus}`, returnRequest: returnReq });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

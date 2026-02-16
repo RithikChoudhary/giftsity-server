@@ -1,10 +1,12 @@
 require('dotenv').config();
+const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const connectDB = require('./config/db');
 const logger = require('./utils/logger');
+const { initSocket } = require('./socket');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -64,6 +66,9 @@ app.use('/api/wishlist', require('./routes/wishlist'));
 app.use('/api/coupons', require('./routes/coupons'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/tracking', require('./routes/shiprocket'));
+app.use('/api/chat', require('./routes/chat'));
+app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/returns', require('./routes/returns'));
 
 app.use('/api', require('./routes/sitemap'));
 
@@ -88,10 +93,18 @@ process.on('unhandledRejection', (err) => {
 
 // Start
 connectDB().then(() => {
-  app.listen(PORT, () => {
+  const server = http.createServer(app);
+
+  // Attach Socket.io to the HTTP server
+  initSocket(server, allowedOrigins);
+  console.log('[Startup] Socket.io initialized');
+
+  server.listen(PORT, () => {
+    console.log(`[Startup] Giftsity server running on port ${PORT}`);
     logger.info(`Giftsity server running on port ${PORT}`);
     // Start cron jobs after server is up
     const { startCronJobs } = require('./cron/sellerHealth');
     startCronJobs();
+    console.log('[Startup] Cron jobs scheduled');
   });
 });

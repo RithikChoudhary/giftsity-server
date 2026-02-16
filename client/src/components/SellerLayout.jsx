@@ -2,7 +2,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { authAPI } from '../api';
-import { LayoutDashboard, Package, ShoppingCart, CreditCard, Megaphone, Settings, LogOut, Sun, Moon, ArrowLeft, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, CreditCard, Megaphone, Settings, LogOut, Sun, Moon, ArrowLeft, Loader2, MessageCircle, RotateCcw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 const navItems = [
@@ -11,6 +11,8 @@ const navItems = [
   { path: '/seller/orders', icon: ShoppingCart, label: 'Orders' },
   { path: '/seller/payouts', icon: CreditCard, label: 'Payouts' },
   { path: '/seller/marketing', icon: Megaphone, label: 'Marketing' },
+  { path: '/seller/chat', icon: MessageCircle, label: 'Messages' },
+  { path: '/seller/returns', icon: RotateCcw, label: 'Returns' },
   { path: '/seller/settings', icon: Settings, label: 'Settings' },
 ];
 

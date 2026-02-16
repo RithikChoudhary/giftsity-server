@@ -66,8 +66,8 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
       isNewUser: identity.role === 'customer' ? !identity.entity.isProfileComplete : false
     });
   } catch (err) {
-    logger.error('Send OTP error:', err);
-    await logOtpEvent(req, { email: req.body?.email || '', event: 'failed', metadata: { stage: 'send' } });
+    logger.error('[send-otp] Failed', { message: err.message, stack: err.stack, email: req.body?.email });
+    await logOtpEvent(req, { email: req.body?.email || '', event: 'failed', metadata: { stage: 'send', error: err.message } });
     res.status(500).json({ message: 'Failed to send OTP' });
   }
 });
@@ -253,15 +253,26 @@ router.post('/register-seller', async (req, res) => {
     seller.otp = otp;
     seller.otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     await seller.save();
-    await sendOTP(normalizedEmail, otp);
-    await logOtpEvent(req, { email: normalizedEmail, role: 'seller', event: 'sent', metadata: { stage: 'register_seller' } });
+
+    // OTP send is non-fatal: seller is already created, they can resend OTP via login
+    let otpSent = false;
+    try {
+      await sendOTP(normalizedEmail, otp);
+      otpSent = true;
+      await logOtpEvent(req, { email: normalizedEmail, role: 'seller', event: 'sent', metadata: { stage: 'register_seller' } });
+    } catch (otpErr) {
+      logger.error('[register-seller] OTP email failed (seller still created)', { message: otpErr.message, email: normalizedEmail });
+      await logOtpEvent(req, { email: normalizedEmail, role: 'seller', event: 'failed', metadata: { stage: 'register_seller', error: otpErr.message } });
+    }
 
     res.status(201).json({
-      message: 'Application submitted! Check your email for the login code. Admin will review your profile.',
+      message: otpSent
+        ? 'Application submitted! Check your email for the login code. Admin will review your profile.'
+        : 'Application submitted! Could not send login code — please try logging in to resend OTP.',
       sellerId: seller._id
     });
   } catch (err) {
-    logger.error('Register seller error:', err);
+    logger.error('[register-seller] Failed', { message: err.message, stack: err.stack });
     res.status(500).json({ message: 'Registration failed' });
   }
 });

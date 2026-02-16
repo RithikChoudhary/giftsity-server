@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
-import { ShoppingBag, User, Menu, X, LogOut, Package, Sun, Moon, Search, Heart, ArrowLeftRight } from 'lucide-react';
+import { ShoppingBag, User, Menu, X, LogOut, Package, Sun, Moon, Search, Heart, ArrowLeftRight, MessageCircle, RotateCcw } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 export default function Navbar() {
   const { user, logout, availableRoles, switchRole } = useAuth();
@@ -120,6 +121,16 @@ export default function Navbar() {
               </Link>
             )}
 
+            {/* Chat */}
+            {user && (
+              <Link to={user.role === 'seller' ? '/seller/chat' : '/chat'} className="p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all" title="Messages">
+                <MessageCircle className="w-4 h-4" />
+              </Link>
+            )}
+
+            {/* Notifications */}
+            {user && <NotificationBell />}
+
             {/* Cart */}
             <Link to="/cart" className="relative p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all">
               <ShoppingBag className="w-5 h-5" />
@@ -142,6 +153,9 @@ export default function Navbar() {
                     </Link>
                     <Link to="/orders" className="flex items-center gap-2 px-4 py-2 text-sm text-theme-secondary hover:bg-inset/50" onClick={() => setUserMenu(false)}>
                       <Package className="w-4 h-4" /> My Orders
+                    </Link>
+                    <Link to="/returns" className="flex items-center gap-2 px-4 py-2 text-sm text-theme-secondary hover:bg-inset/50" onClick={() => setUserMenu(false)}>
+                      <RotateCcw className="w-4 h-4" /> Returns
                     </Link>
                     {canSwitchRole && (
                       <>

@@ -147,6 +147,33 @@ export const b2bAPI = {
   deleteInquiry: (id) => API.delete(`/b2b/inquiries/${id}`),
 };
 
+export const chatAPI = {
+  getConversations: () => API.get('/chat/conversations'),
+  createConversation: (data) => API.post('/chat/conversations', data),
+  getMessages: (id, params) => API.get(`/chat/conversations/${id}/messages`, { params }),
+  sendMessage: (id, data) => API.post(`/chat/conversations/${id}/messages`, data),
+};
+
+export const notificationAPI = {
+  getAll: (params) => API.get('/notifications', { params }),
+  getUnreadCount: () => API.get('/notifications/unread-count'),
+  markRead: (id) => API.put(`/notifications/${id}/read`),
+  markAllRead: () => API.put('/notifications/read-all'),
+};
+
+export const returnAPI = {
+  create: (data) => API.post('/returns', data),
+  getMyRequests: () => API.get('/returns/my-requests'),
+  getById: (id) => API.get(`/returns/${id}`),
+};
+
+export const sellerReturnAPI = {
+  getReturns: (params) => SellerAPI.get('/returns', { params }),
+  approve: (id, data) => SellerAPI.put(`/returns/${id}/approve`, data),
+  reject: (id, data) => SellerAPI.put(`/returns/${id}/reject`, data),
+  markReceived: (id) => SellerAPI.put(`/returns/${id}/received`),
+};
+
 export const storeAPI = {
   getTopSellers: () => API.get('/store/featured/top-sellers'),
   getAllSellers: (params) => API.get('/store/sellers', { params }),

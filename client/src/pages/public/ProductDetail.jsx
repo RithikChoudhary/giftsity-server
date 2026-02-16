@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag, Star, Minus, Plus, Store, Truck, Shield, ArrowLeft, ChevronLeft, ChevronRight, MessageSquare, Upload, X, Palette, Play } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import SEO from '../../components/SEO';
-import API from '../../api';
+import API, { chatAPI } from '../../api';
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -301,6 +302,11 @@ export default function ProductDetail() {
             <div className="py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-center text-red-400 text-sm font-medium">Out of Stock</div>
           )}
 
+          {/* Chat with seller */}
+          {seller && (
+            <ChatWithSellerButton sellerId={seller._id} productId={product._id} productTitle={product.title} productImage={product.images?.[0]?.url} />
+          )}
+
           {/* Trust */}
           <div className="grid grid-cols-2 gap-3 mt-6">
             <div className="flex items-center gap-2 text-xs text-theme-muted">
@@ -396,5 +402,29 @@ export default function ProductDetail() {
         )}
       </section>
     </div>
+  );
+}
+
+function ChatWithSellerButton({ sellerId, productId, productTitle, productImage }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+
+  const handleChat = async () => {
+    if (!user) { navigate('/auth'); return; }
+    setLoading(true);
+    try {
+      await chatAPI.createConversation({ sellerId, productId, productTitle, productImage });
+      navigate('/chat');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not start chat');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <button onClick={handleChat} disabled={loading} className="w-full mt-3 py-2.5 border border-amber-500/30 hover:bg-amber-500/10 text-amber-500 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
+      <MessageSquare className="w-4 h-4" /> {loading ? 'Starting chat...' : 'Chat with Seller'}
+    </button>
   );
 }

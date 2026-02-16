@@ -7,6 +7,7 @@ const { uploadImage } = require('../config/cloudinary');
 const { sanitizeBody } = require('../middleware/sanitize');
 const { validateReviewCreation } = require('../middleware/validators');
 const { cacheMiddleware, invalidateCache } = require('../middleware/cache');
+const { createNotification } = require('../utils/notify');
 const router = express.Router();
 
 // GET /api/reviews/product/:productId
@@ -102,6 +103,16 @@ router.post('/', requireAuth, sanitizeBody, validateReviewCreation, async (req, 
       product.averageRating = Math.round(agg[0].avg * 10) / 10;
       product.reviewCount = agg[0].count;
       await product.save();
+    }
+
+    // Notify seller about the review
+    if (product.sellerId) {
+      createNotification({
+        userId: product.sellerId.toString(), userRole: 'seller',
+        type: 'review_received', title: `New ${rating}-star review`,
+        message: `${req.user.name || 'A customer'} reviewed "${product.title}"`,
+        link: '/seller/products', metadata: { productId: product._id.toString(), rating }
+      });
     }
 
     // Invalidate cached reviews and product data

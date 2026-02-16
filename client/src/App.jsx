@@ -6,6 +6,7 @@ import { CartProvider } from './context/CartContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { WishlistProvider } from './context/WishlistContext';
 import { CorporateAuthProvider } from './context/CorporateAuthContext';
+import { SocketProvider } from './context/SocketContext';
 import LoadingSpinner from './components/LoadingSpinner';
 
 // Layouts (always loaded)
@@ -36,6 +37,9 @@ const OrderDetail = lazy(() => import('./pages/customer/OrderDetail'));
 const CustomerProfile = lazy(() => import('./pages/customer/CustomerProfile'));
 const WishlistPage = lazy(() => import('./pages/customer/Wishlist'));
 const OrderConfirmation = lazy(() => import('./pages/customer/OrderConfirmation'));
+const Chat = lazy(() => import('./pages/customer/Chat'));
+const ReturnRequests = lazy(() => import('./pages/customer/ReturnRequests'));
+const Notifications = lazy(() => import('./pages/customer/Notifications'));
 
 // Seller pages
 const SellerDashboard = lazy(() => import('./pages/seller/SellerDashboard'));
@@ -44,6 +48,8 @@ const SellerOrders = lazy(() => import('./pages/seller/SellerOrders'));
 const SellerPayouts = lazy(() => import('./pages/seller/SellerPayouts'));
 const SellerMarketing = lazy(() => import('./pages/seller/SellerMarketing'));
 const SellerSettings = lazy(() => import('./pages/seller/SellerSettings'));
+const SellerChat = lazy(() => import('./pages/seller/SellerChat'));
+const SellerReturns = lazy(() => import('./pages/seller/SellerReturns'));
 
 // Admin pages
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -86,6 +92,7 @@ export default function App() {
     <BrowserRouter>
       <ScrollToTop />
       <AuthProvider>
+        <SocketProvider>
         <CartProvider>
         <WishlistProvider>
         <CorporateAuthProvider>
@@ -114,6 +121,9 @@ export default function App() {
               <Route path="/orders/:id/confirmation" element={<OrderConfirmation />} />
               <Route path="/profile" element={<CustomerProfile />} />
               <Route path="/wishlist" element={<WishlistPage />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/returns" element={<ReturnRequests />} />
+              <Route path="/notifications" element={<Notifications />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/about" element={<About />} />
@@ -126,6 +136,8 @@ export default function App() {
               <Route path="/seller/payouts" element={<SellerPayouts />} />
               <Route path="/seller/marketing" element={<SellerMarketing />} />
               <Route path="/seller/settings" element={<SellerSettings />} />
+              <Route path="/seller/chat" element={<SellerChat />} />
+              <Route path="/seller/returns" element={<SellerReturns />} />
             </Route>
             <Route element={<AdminLayout />}>
               <Route path="/admin" element={<AdminDashboard />} />
@@ -162,6 +174,7 @@ export default function App() {
         </CorporateAuthProvider>
         </WishlistProvider>
         </CartProvider>
+        </SocketProvider>
       </AuthProvider>
     </BrowserRouter>
     </ThemeProvider>

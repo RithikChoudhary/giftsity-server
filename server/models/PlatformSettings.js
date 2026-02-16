@@ -19,6 +19,7 @@ const platformSettingsSchema = new mongoose.Schema({
   minimumProductPrice: { type: Number, default: 200 },
   maxFeaturedProducts: { type: Number, default: 10 },
   maxImagesPerProduct: { type: Number, default: 5 },
+  returnWindowDays: { type: Number, default: 7 },
 
   // Contact
   supportEmail: { type: String, default: '' },

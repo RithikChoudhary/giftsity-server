@@ -3,6 +3,7 @@ const Order = require('../models/Order');
 const Shipment = require('../models/Shipment');
 const Seller = require('../models/Seller');
 const logger = require('../utils/logger');
+const { createNotification } = require('../utils/notify');
 const router = express.Router();
 
 // NOTE: All seller-facing shipping routes (serviceability, create, assign-courier,
@@ -51,6 +52,13 @@ router.post('/webhook', async (req, res) => {
         order.status = 'delivered';
         order.deliveredAt = new Date();
         await Seller.findByIdAndUpdate(order.sellerId, { $inc: { 'sellerProfile.deliveredOrders': 1 } });
+
+        createNotification({
+          userId: order.customerId.toString(), userRole: 'customer',
+          type: 'order_delivered', title: `Order #${order.orderNumber} delivered`,
+          message: 'Your order has been delivered!',
+          link: `/orders/${order._id}`, metadata: { orderId: order._id.toString() }
+        });
       } else if (mappedStatus === 'rto' || mappedStatus === 'cancelled') {
         await Seller.findByIdAndUpdate(order.sellerId, { $inc: { 'sellerProfile.failedOrders': 1 } });
       }
@@ -58,6 +66,8 @@ router.post('/webhook', async (req, res) => {
         order.trackingInfo.trackingNumber = shipment.awbCode;
         order.trackingInfo.courierName = shipment.courierName;
       }
+      if (!order.statusHistory) order.statusHistory = [];
+      order.statusHistory.push({ status: mappedStatus, timestamp: new Date(), changedByRole: 'system', note: 'Shipping webhook' });
       await order.save();
     }
 

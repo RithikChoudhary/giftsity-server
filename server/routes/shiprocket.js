@@ -2,6 +2,7 @@ const express = require('express');
 const Shipment = require('../models/Shipment');
 const Order = require('../models/Order');
 const { logActivity } = require('../utils/audit');
+const { createNotification } = require('../utils/notify');
 const router = express.Router();
 
 /**
@@ -183,7 +184,26 @@ router.post('/webhook', async (req, res) => {
         if (orderStatus === 'delivered') {
           order.deliveredAt = new Date();
         }
+        if (!order.statusHistory) order.statusHistory = [];
+        order.statusHistory.push({ status: orderStatus, timestamp: new Date(), changedByRole: 'system', note: `Shiprocket webhook (AWB: ${awb})` });
         await order.save();
+
+        // Notify customer about delivery status
+        if (orderStatus === 'delivered') {
+          createNotification({
+            userId: order.customerId.toString(), userRole: 'customer',
+            type: 'order_delivered', title: `Order #${order.orderNumber} delivered`,
+            message: 'Your order has been delivered!',
+            link: `/orders/${order._id}`, metadata: { orderId: order._id.toString() }
+          });
+        } else if (orderStatus === 'shipped') {
+          createNotification({
+            userId: order.customerId.toString(), userRole: 'customer',
+            type: 'order_shipped', title: `Order #${order.orderNumber} shipped`,
+            message: `Your order is on the way (AWB: ${awb})`,
+            link: `/orders/${order._id}`, metadata: { orderId: order._id.toString() }
+          });
+        }
 
         logActivity({
           domain: 'shipping',

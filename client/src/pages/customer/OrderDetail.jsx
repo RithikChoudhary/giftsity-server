@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Package, Truck, CheckCircle, Clock, XCircle, MapPin, Star, ArrowLeft, Loader, Camera, X, Navigation, Download } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, XCircle, MapPin, Star, ArrowLeft, Loader, Camera, X, Navigation, Download, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import API from '../../api';
+import API, { returnAPI } from '../../api';
 
 function StarRating({ rating, onRate, interactive = false }) {
   return (
@@ -31,6 +31,11 @@ export default function OrderDetail() {
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [showReturn, setShowReturn] = useState(false);
+  const [returnType, setReturnType] = useState('return');
+  const [returnReason, setReturnReason] = useState('');
+  const [returnDetails, setReturnDetails] = useState('');
+  const [submittingReturn, setSubmittingReturn] = useState(false);
   const [tracking, setTracking] = useState(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
 
@@ -155,6 +160,14 @@ export default function OrderDetail() {
           {['pending', 'confirmed'].includes(order.status) && (
             <button onClick={() => setShowCancel(true)} className="px-3 py-1 rounded-full text-xs font-medium bg-red-400/10 text-red-400 hover:bg-red-400/20 transition-colors">Cancel Order</button>
           )}
+          {order.status === 'delivered' && (!order.returnStatus || order.returnStatus === 'none') && (
+            <button onClick={() => setShowReturn(true)} className="px-3 py-1 rounded-full text-xs font-medium bg-amber-400/10 text-amber-400 hover:bg-amber-400/20 transition-colors flex items-center gap-1">
+              <RotateCcw className="w-3 h-3" /> Request Return
+            </button>
+          )}
+          {order.returnStatus && order.returnStatus !== 'none' && (
+            <span className="px-3 py-1 rounded-full text-xs font-medium bg-purple-400/10 text-purple-400">Return: {order.returnStatus}</span>
+          )}
           <span className={`px-3 py-1 rounded-full text-xs font-medium ${order.status === 'delivered' ? 'bg-green-400/10 text-green-400' : order.status === 'cancelled' ? 'bg-red-400/10 text-red-400' : 'bg-amber-400/10 text-amber-400'}`}>{order.status}</span>
         </div>
       </div>
@@ -179,6 +192,53 @@ export default function OrderDetail() {
               {cancelling ? <Loader className="w-4 h-4 animate-spin" /> : 'Yes, Cancel Order'}
             </button>
             <button onClick={() => setShowCancel(false)} className="px-4 py-2 bg-inset text-theme-muted rounded-lg text-sm">Keep Order</button>
+          </div>
+        </div>
+      )}
+
+      {/* Return request form */}
+      {showReturn && (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-5 mb-6">
+          <h3 className="font-semibold text-amber-400 mb-3">Request Return / Exchange</h3>
+          <div className="space-y-3">
+            <div className="flex gap-3">
+              <label className="flex items-center gap-2 text-sm text-theme-primary">
+                <input type="radio" name="returnType" value="return" checked={returnType === 'return'} onChange={() => setReturnType('return')} className="accent-amber-500" /> Return & Refund
+              </label>
+              <label className="flex items-center gap-2 text-sm text-theme-primary">
+                <input type="radio" name="returnType" value="exchange" checked={returnType === 'exchange'} onChange={() => setReturnType('exchange')} className="accent-amber-500" /> Exchange
+              </label>
+            </div>
+            <select value={returnReason} onChange={e => setReturnReason(e.target.value)} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50">
+              <option value="">Select a reason</option>
+              <option value="defective">Defective / Damaged</option>
+              <option value="wrong_item">Wrong item received</option>
+              <option value="not_as_described">Not as described</option>
+              <option value="size_issue">Size issue</option>
+              <option value="changed_mind">Changed my mind</option>
+              <option value="other">Other</option>
+            </select>
+            <textarea value={returnDetails} onChange={e => setReturnDetails(e.target.value)} rows={2} placeholder="Describe the issue (optional)" className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50 resize-none" />
+            <div className="flex gap-3">
+              <button
+                onClick={async () => {
+                  if (!returnReason) return toast.error('Please select a reason');
+                  setSubmittingReturn(true);
+                  try {
+                    await returnAPI.create({ orderId: order._id, type: returnType, reason: returnReason, reasonDetails: returnDetails });
+                    toast.success('Return request submitted');
+                    setShowReturn(false);
+                    window.location.reload();
+                  } catch (err) { toast.error(err.response?.data?.message || 'Failed to submit'); }
+                  setSubmittingReturn(false);
+                }}
+                disabled={submittingReturn}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-lg text-sm font-semibold flex items-center gap-2"
+              >
+                {submittingReturn ? <Loader className="w-4 h-4 animate-spin" /> : 'Submit Return Request'}
+              </button>
+              <button onClick={() => setShowReturn(false)} className="px-4 py-2 bg-inset text-theme-muted rounded-lg text-sm">Cancel</button>
+            </div>
           </div>
         </div>
       )}

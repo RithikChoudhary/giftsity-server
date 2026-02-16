@@ -94,6 +94,23 @@ const orderSchema = new mongoose.Schema({
   },
   payoutId: { type: mongoose.Schema.Types.ObjectId, ref: 'SellerPayout', default: null },
 
+  // Returns
+  returnRequestId: { type: mongoose.Schema.Types.ObjectId, ref: 'ReturnRequest', default: null },
+  returnStatus: {
+    type: String,
+    enum: ['none', 'requested', 'approved', 'completed', 'rejected'],
+    default: 'none'
+  },
+
+  // Status change audit trail
+  statusHistory: [{
+    status: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now },
+    changedBy: { type: mongoose.Schema.Types.ObjectId },
+    changedByRole: { type: String, enum: ['customer', 'seller', 'admin', 'system'], default: 'system' },
+    note: { type: String, default: '' }
+  }],
+
   // Coupon/discount
   couponCode: { type: String, default: '' },
   discountAmount: { type: Number, default: 0 },
