@@ -3,23 +3,16 @@ const logger = require('../utils/logger');
 
 const PAYOUT_ENV = process.env.CASHFREE_PAYOUT_ENV || 'test';
 const BASE_URL = PAYOUT_ENV === 'production'
-  ? 'https://payout-api.cashfree.com'
-  : 'https://payout-gamma.cashfree.com';
+  ? 'https://api.cashfree.com/payout'
+  : 'https://sandbox.cashfree.com/payout';
 
-// Token cache
-let cachedToken = null;
-let tokenExpiresAt = 0;
+const API_VERSION = '2024-01-01';
 
 /**
- * Authorize with Cashfree Payouts and get a Bearer token.
- * Token is cached and reused until 1 minute before expiry (6 min total).
+ * Build auth headers for Cashfree Payouts V2.
+ * V2 uses x-client-id + x-client-secret directly on every request (no token step).
  */
-async function authorize() {
-  // Return cached token if still valid (with 60s buffer)
-  if (cachedToken && Date.now() < tokenExpiresAt - 60000) {
-    return cachedToken;
-  }
-
+function getHeaders() {
   const clientId = process.env.CASHFREE_PAYOUT_CLIENT_ID;
   const clientSecret = process.env.CASHFREE_PAYOUT_CLIENT_SECRET;
 
@@ -27,38 +20,21 @@ async function authorize() {
     throw new Error('Cashfree Payout credentials not configured (CASHFREE_PAYOUT_CLIENT_ID / CASHFREE_PAYOUT_CLIENT_SECRET)');
   }
 
-  try {
-    const res = await axios.post(`${BASE_URL}/payout/v1/authorize`, {}, {
-      headers: {
-        'X-Client-Id': clientId,
-        'X-Client-Secret': clientSecret,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (res.data?.status === 'SUCCESS' && res.data?.data?.token) {
-      cachedToken = res.data.data.token;
-      // Token valid for ~6 minutes; cache for 5 minutes
-      tokenExpiresAt = Date.now() + 5 * 60 * 1000;
-      logger.info('[CashfreePayout] Authorized successfully');
-      return cachedToken;
-    }
-
-    throw new Error(res.data?.message || 'Authorization failed');
-  } catch (err) {
-    cachedToken = null;
-    tokenExpiresAt = 0;
-    const msg = err.response?.data?.message || err.message;
-    logger.error('[CashfreePayout] Auth failed:', msg);
-    throw new Error(`Cashfree Payout auth failed: ${msg}`);
-  }
+  return {
+    'x-client-id': clientId,
+    'x-client-secret': clientSecret,
+    'x-api-version': API_VERSION,
+    'Content-Type': 'application/json'
+  };
 }
 
 /**
- * Direct Transfer -- send money to a beneficiary without pre-registration.
+ * Standard Transfer V2 -- send money to a beneficiary without pre-registration.
+ * Uses POST /transfers with inline beneficiary_instrument_details.
+ *
  * @param {Object} params
  * @param {number} params.amount - Amount in INR (min 1.00, bank transfer practical min 100)
- * @param {string} params.transferId - Unique ID for this transfer (max 40 chars)
+ * @param {string} params.transferId - Unique ID for this transfer (max 40 chars, alphanumeric + underscore)
  * @param {string} params.bankAccount - Beneficiary bank account number
  * @param {string} params.ifsc - IFSC code
  * @param {string} params.name - Account holder name
@@ -68,48 +44,46 @@ async function authorize() {
  * @returns {Object} { status, subCode, message, referenceId, utr, acknowledged }
  */
 async function directTransfer({ amount, transferId, bankAccount, ifsc, name, phone, email, remarks }) {
-  const token = await authorize();
-
   try {
-    const res = await axios.post(`${BASE_URL}/payout/v1/directTransfer`, {
-      amount: parseFloat(amount),
-      transferId,
-      transferMode: 'banktransfer',
-      beneDetails: {
-        bankAccount,
-        ifsc,
-        name: name || 'Seller',
-        phone: phone || '9999999999',
-        email: email || 'seller@giftsity.com',
-        address1: 'India'
+    const res = await axios.post(`${BASE_URL}/transfers`, {
+      transfer_id: transferId,
+      transfer_amount: parseFloat(amount),
+      transfer_mode: 'banktransfer',
+      beneficiary_details: {
+        beneficiary_name: name || 'Seller',
+        beneficiary_instrument_details: {
+          bank_account_number: bankAccount,
+          bank_ifsc: ifsc
+        },
+        beneficiary_contact_details: {
+          beneficiary_phone: phone || '9999999999',
+          beneficiary_email: email || 'seller@giftsity.com'
+        }
       },
-      remarks: remarks || `Giftsity payout ${transferId}`
-    }, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+      transfer_remarks: (remarks || `Giftsity payout ${transferId}`).substring(0, 70)
+    }, { headers: getHeaders() });
 
     const data = res.data;
-    logger.info(`[CashfreePayout] DirectTransfer ${transferId}: status=${data.status}, subCode=${data.subCode}`);
+    const isCompleted = data.status === 'SUCCESS' && data.status_code === 'COMPLETED';
+
+    logger.info(`[CashfreePayout] Transfer ${transferId}: status=${data.status}, status_code=${data.status_code || ''}`);
 
     return {
       status: data.status,
-      subCode: data.subCode,
-      message: data.message,
-      referenceId: data.data?.referenceId || '',
-      utr: data.data?.utr || '',
-      acknowledged: data.data?.acknowledged || 0
+      subCode: data.status_code || data.status,
+      message: data.status_description || '',
+      referenceId: data.cf_transfer_id || '',
+      utr: data.transfer_utr || '',
+      acknowledged: isCompleted ? 1 : 0
     };
   } catch (err) {
     const errData = err.response?.data;
     const msg = errData?.message || err.message;
-    logger.error(`[CashfreePayout] DirectTransfer ${transferId} failed:`, msg);
+    logger.error(`[CashfreePayout] Transfer ${transferId} failed:`, msg);
 
     return {
       status: errData?.status || 'ERROR',
-      subCode: errData?.subCode || '500',
+      subCode: errData?.code || '500',
       message: msg,
       referenceId: '',
       utr: '',
@@ -119,32 +93,31 @@ async function directTransfer({ amount, transferId, bankAccount, ifsc, name, pho
 }
 
 /**
- * Get the status of a previously initiated transfer.
- * @param {string} transferId - The transferId used when initiating the transfer
+ * Get Transfer Status V2 -- check the status of a previously initiated transfer.
+ * Uses GET /transfers/{transferId}/status
+ *
+ * @param {string} transferId - The transfer_id used when initiating the transfer
  * @returns {Object} Transfer details including status, utr, acknowledged, reason
  */
 async function getTransferStatus(transferId) {
-  const token = await authorize();
-
   try {
-    const res = await axios.get(`${BASE_URL}/payout/v1.1/getTransferStatus`, {
-      params: { transferId },
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+    const res = await axios.get(`${BASE_URL}/transfers/${encodeURIComponent(transferId)}/status`, {
+      headers: getHeaders()
     });
 
-    const transfer = res.data?.data?.transfer || {};
-    logger.info(`[CashfreePayout] Status ${transferId}: ${transfer.status}, ack=${transfer.acknowledged}`);
+    const data = res.data;
+    const isCompleted = data.status === 'SUCCESS' && data.status_code === 'COMPLETED';
+    const isFailed = ['FAILED', 'REVERSED', 'REJECTED'].includes(data.status);
+
+    logger.info(`[CashfreePayout] Status ${transferId}: status=${data.status}, code=${data.status_code || ''}`);
 
     return {
-      status: transfer.status || 'UNKNOWN',
-      utr: transfer.utr || '',
-      acknowledged: transfer.acknowledged || 0,
-      reason: transfer.reason || '',
-      processedOn: transfer.processedOn || '',
-      transferMode: transfer.transferMode || ''
+      status: data.status || 'UNKNOWN',
+      utr: data.transfer_utr || '',
+      acknowledged: isCompleted ? 1 : 0,
+      reason: isFailed ? (data.status_code || data.status_description || '') : '',
+      processedOn: data.updated_on || '',
+      transferMode: data.transfer_mode || ''
     };
   } catch (err) {
     const msg = err.response?.data?.message || err.message;
@@ -153,4 +126,4 @@ async function getTransferStatus(transferId) {
   }
 }
 
-module.exports = { authorize, directTransfer, getTransferStatus, BASE_URL };
+module.exports = { directTransfer, getTransferStatus, BASE_URL };
