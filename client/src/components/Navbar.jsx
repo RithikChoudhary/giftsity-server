@@ -225,31 +225,6 @@ export default function Navbar() {
             )}
             {isSeller && <Link to="/seller" className="block py-2 text-sm text-theme-secondary" onClick={() => setMenuOpen(false)}>Seller Dashboard</Link>}
             {isAdmin && <Link to="/admin" className="block py-2 text-sm text-theme-secondary" onClick={() => setMenuOpen(false)}>Admin Dashboard</Link>}
-            {user && (
-              <>
-                <div className="border-t border-edge/50 my-2" />
-                <Link to="/wishlist" className="flex items-center gap-2 py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>
-                  <Heart className="w-4 h-4" /> Wishlist
-                </Link>
-                <Link to={isSeller ? '/seller/chat' : '/chat'} className="flex items-center gap-2 py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>
-                  <MessageCircle className="w-4 h-4" /> Messages
-                </Link>
-                <Link to="/notifications" className="flex items-center gap-2 py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>
-                  <Bell className="w-4 h-4" /> Notifications
-                  {unreadNotifications > 0 && (
-                    <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                      {unreadNotifications > 99 ? '99+' : unreadNotifications}
-                    </span>
-                  )}
-                </Link>
-                <Link to="/returns" className="flex items-center gap-2 py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>
-                  <RotateCcw className="w-4 h-4" /> Returns
-                </Link>
-                <Link to="/orders" className="flex items-center gap-2 py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>
-                  <Package className="w-4 h-4" /> My Orders
-                </Link>
-              </>
-            )}
             {canSwitchRole && (
               <>
                 <div className="border-t border-edge/50 my-2" />
