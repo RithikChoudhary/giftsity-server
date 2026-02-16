@@ -543,6 +543,97 @@ async function pollPayoutStatuses() {
   }
 }
 
+// ==================== AUTO-DISBURSE PENDING PAYOUTS ====================
+async function autoDisbursePayouts() {
+  try {
+    const SellerPayout = require('../models/SellerPayout');
+    const { directTransfer } = require('../config/cashfreePayout');
+    const { createNotification } = require('../utils/notify');
+
+    const pendingPayouts = await SellerPayout.find({
+      status: 'pending',
+      netPayout: { $gte: 100 }
+    }).populate('sellerId', 'email name sellerProfile.businessName sellerProfile.bankDetails phone');
+
+    if (!pendingPayouts.length) {
+      logger.info('[Auto-Disburse] No pending payouts to disburse');
+      return { disbursed: 0, failed: 0, skipped: 0 };
+    }
+
+    let disbursed = 0, failed = 0, skipped = 0;
+
+    for (const payout of pendingPayouts) {
+      try {
+        const bank = payout.bankDetailsSnapshot || payout.sellerId?.sellerProfile?.bankDetails;
+        const hasBankDetails = bank?.accountHolderName && bank?.accountNumber && bank?.ifscCode && bank?.bankName;
+
+        if (!hasBankDetails) {
+          payout.status = 'on_hold';
+          payout.holdReason = 'missing_bank_details';
+          await payout.save();
+          skipped++;
+          continue;
+        }
+
+        const transferId = `GFTY_${payout._id}_${Date.now()}`.substring(0, 40);
+
+        const result = await directTransfer({
+          amount: payout.netPayout,
+          transferId,
+          bankAccount: bank.accountNumber,
+          ifsc: bank.ifscCode,
+          name: bank.accountHolderName,
+          phone: payout.sellerId?.phone || '9999999999',
+          email: payout.sellerId?.email || 'seller@giftsity.com',
+          remarks: `Giftsity payout ${payout.periodLabel || payout._id}`
+        });
+
+        payout.cashfreeTransferId = transferId;
+        payout.cashfreeReferenceId = result.referenceId || '';
+        payout.cashfreeUtr = result.utr || '';
+        payout.cashfreeStatus = result.status;
+        payout.cashfreeAcknowledged = result.acknowledged;
+        payout.disbursedAt = new Date();
+
+        if (result.status === 'ERROR' || result.acknowledged === 0 && result.status !== 'SUCCESS' && result.status !== 'PENDING') {
+          payout.status = 'failed';
+          payout.cashfreeFailureReason = result.message;
+          payout.failureDetails = `Auto-disburse failed: ${result.message}`;
+          payout.retryCount = (payout.retryCount || 0) + 1;
+          failed++;
+
+          createNotification({
+            userId: payout.sellerId?._id?.toString() || payout.sellerId?.toString(),
+            userRole: 'seller',
+            type: 'payout_failed',
+            title: 'Payout transfer failed',
+            message: `Your payout of Rs.${payout.netPayout} could not be processed: ${result.message}. Please verify your bank details in Settings.`,
+            link: '/seller/settings',
+            metadata: { payoutId: payout._id.toString() }
+          });
+        } else {
+          payout.status = 'processing';
+          disbursed++;
+        }
+
+        await payout.save();
+      } catch (err) {
+        logger.error(`[Auto-Disburse] Error processing payout ${payout._id}:`, err.message);
+        failed++;
+      }
+
+      // Small delay between API calls to avoid rate limiting
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    logger.info(`[Auto-Disburse] Complete: ${disbursed} sent, ${failed} failed, ${skipped} skipped`);
+    return { disbursed, failed, skipped };
+  } catch (err) {
+    logger.error('[Auto-Disburse] Error:', err.message);
+    return { disbursed: 0, failed: 0, skipped: 0, error: err.message };
+  }
+}
+
 // ==================== SCHEDULE ====================
 function startCronJobs() {
   // Auto-cancel unpaid orders every 5 minutes
@@ -563,6 +654,9 @@ function startCronJobs() {
   // Payout calculation daily at midnight (function checks if it's a payout day)
   cron.schedule('0 0 * * *', autoCalculatePayouts);
 
+  // Auto-disburse pending payouts at 00:05 (5 min after calculation)
+  cron.schedule('5 0 * * *', autoDisbursePayouts);
+
   // Poll Cashfree payout statuses every 5 minutes
   cron.schedule('*/5 * * * *', pollPayoutStatuses);
 
@@ -582,5 +676,6 @@ module.exports = {
   calculateSellerMetrics,
   autoSuspendBadSellers,
   autoCalculatePayouts,
+  autoDisbursePayouts,
   updateSellerLastActive
 };
