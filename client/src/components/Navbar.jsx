@@ -3,13 +3,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
-import { ShoppingBag, User, Menu, X, LogOut, Package, Sun, Moon, Search, Heart, ArrowLeftRight, MessageCircle, RotateCcw } from 'lucide-react';
-import NotificationBell from './NotificationBell';
+import { ShoppingBag, User, Menu, X, LogOut, Package, Sun, Moon, Search, Heart, ArrowLeftRight, MessageCircle, RotateCcw, Bell } from 'lucide-react';
+import { useSocket } from '../context/SocketContext';
+import { notificationAPI } from '../api';
 
 export default function Navbar() {
   const { user, logout, availableRoles, switchRole } = useAuth();
   const { items } = useCart();
   const { theme, toggleTheme } = useTheme();
+  const { unreadNotifications, setUnreadNotifications } = useSocket();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
@@ -21,6 +23,14 @@ export default function Navbar() {
   useEffect(() => {
     if (searchOpen && searchRef.current) searchRef.current.focus();
   }, [searchOpen]);
+
+  useEffect(() => {
+    if (user) {
+      notificationAPI.getUnreadCount()
+        .then(res => setUnreadNotifications(res.data.count))
+        .catch(() => {});
+    }
+  }, [user]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -114,23 +124,6 @@ export default function Navbar() {
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
-            {/* Wishlist */}
-            {user && (
-              <Link to="/wishlist" className="p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all" title="Wishlist">
-                <Heart className="w-4 h-4" />
-              </Link>
-            )}
-
-            {/* Chat */}
-            {user && (
-              <Link to={user.role === 'seller' ? '/seller/chat' : '/chat'} className="p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all" title="Messages">
-                <MessageCircle className="w-4 h-4" />
-              </Link>
-            )}
-
-            {/* Notifications */}
-            {user && <NotificationBell />}
-
             {/* Cart */}
             <Link to="/cart" className="relative p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all">
               <ShoppingBag className="w-5 h-5" />
@@ -142,8 +135,11 @@ export default function Navbar() {
             {/* User */}
             {user ? (
               <div className="relative">
-                <button onClick={() => setUserMenu(!userMenu)} className="flex items-center gap-2 p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all">
+                <button onClick={() => setUserMenu(!userMenu)} className="relative flex items-center gap-2 p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all">
                   <User className="w-5 h-5" />
+                  {unreadNotifications > 0 && (
+                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-surface" />
+                  )}
                   <span className="hidden sm:block text-sm">{user.name?.split(' ')[0]}</span>
                 </button>
                 {userMenu && (
@@ -153,6 +149,20 @@ export default function Navbar() {
                     </Link>
                     <Link to="/orders" className="flex items-center gap-2 px-4 py-2 text-sm text-theme-secondary hover:bg-inset/50" onClick={() => setUserMenu(false)}>
                       <Package className="w-4 h-4" /> My Orders
+                    </Link>
+                    <Link to="/wishlist" className="flex items-center gap-2 px-4 py-2 text-sm text-theme-secondary hover:bg-inset/50" onClick={() => setUserMenu(false)}>
+                      <Heart className="w-4 h-4" /> Wishlist
+                    </Link>
+                    <Link to={user.role === 'seller' ? '/seller/chat' : '/chat'} className="flex items-center gap-2 px-4 py-2 text-sm text-theme-secondary hover:bg-inset/50" onClick={() => setUserMenu(false)}>
+                      <MessageCircle className="w-4 h-4" /> Messages
+                    </Link>
+                    <Link to="/notifications" className="flex items-center gap-2 px-4 py-2 text-sm text-theme-secondary hover:bg-inset/50" onClick={() => setUserMenu(false)}>
+                      <Bell className="w-4 h-4" /> Notifications
+                      {unreadNotifications > 0 && (
+                        <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                          {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                        </span>
+                      )}
                     </Link>
                     <Link to="/returns" className="flex items-center gap-2 px-4 py-2 text-sm text-theme-secondary hover:bg-inset/50" onClick={() => setUserMenu(false)}>
                       <RotateCcw className="w-4 h-4" /> Returns
@@ -215,6 +225,31 @@ export default function Navbar() {
             )}
             {isSeller && <Link to="/seller" className="block py-2 text-sm text-theme-secondary" onClick={() => setMenuOpen(false)}>Seller Dashboard</Link>}
             {isAdmin && <Link to="/admin" className="block py-2 text-sm text-theme-secondary" onClick={() => setMenuOpen(false)}>Admin Dashboard</Link>}
+            {user && (
+              <>
+                <div className="border-t border-edge/50 my-2" />
+                <Link to="/wishlist" className="flex items-center gap-2 py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>
+                  <Heart className="w-4 h-4" /> Wishlist
+                </Link>
+                <Link to={isSeller ? '/seller/chat' : '/chat'} className="flex items-center gap-2 py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>
+                  <MessageCircle className="w-4 h-4" /> Messages
+                </Link>
+                <Link to="/notifications" className="flex items-center gap-2 py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>
+                  <Bell className="w-4 h-4" /> Notifications
+                  {unreadNotifications > 0 && (
+                    <span className="ml-auto bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                      {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                    </span>
+                  )}
+                </Link>
+                <Link to="/returns" className="flex items-center gap-2 py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>
+                  <RotateCcw className="w-4 h-4" /> Returns
+                </Link>
+                <Link to="/orders" className="flex items-center gap-2 py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>
+                  <Package className="w-4 h-4" /> My Orders
+                </Link>
+              </>
+            )}
             {canSwitchRole && (
               <>
                 <div className="border-t border-edge/50 my-2" />
