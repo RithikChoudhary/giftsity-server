@@ -388,6 +388,21 @@ router.post('/verify-payment', requireAuth, validatePaymentVerification, async (
         link: '/seller/orders', metadata: { orderId: order._id.toString() }
       });
 
+      // Remind seller to add bank details if missing
+      try {
+        const sellerForBank = await Seller.findById(order.sellerId).select('sellerProfile.bankDetails');
+        const bank = sellerForBank?.sellerProfile?.bankDetails;
+        const hasBankDetails = bank?.accountHolderName && bank?.accountNumber && bank?.ifscCode && bank?.bankName;
+        if (!hasBankDetails) {
+          createNotification({
+            userId: order.sellerId.toString(), userRole: 'seller',
+            type: 'bank_details_reminder', title: 'Add bank details to receive payouts',
+            message: 'You have a new order! Please add your bank account details in Settings to receive payouts.',
+            link: '/seller/settings', metadata: { orderId: order._id.toString() }
+          });
+        }
+      } catch (bankCheckErr) { /* non-critical */ }
+
       // Send emails (non-blocking)
       try {
         await sendOrderConfirmation(order.customerEmail, order, 'customer');

@@ -88,11 +88,14 @@ export default function SellerDashboard() {
 
       {/* Bank details warning */}
       {dashData.bankDetailsComplete === false && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6 flex items-start gap-3">
-          <CreditCard className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <CreditCard className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
           <div>
-            <p className="font-medium text-amber-400">Bank Details Missing</p>
-            <p className="text-sm text-theme-muted mt-1">Add your bank details in <Link to="/seller/settings" className="text-amber-400 underline">Settings</Link> to receive payouts. Without bank details, your payouts will be put on hold.</p>
+            <p className="font-medium text-red-400">Bank Details Required</p>
+            <p className="text-sm text-theme-muted mt-1">You must add your bank account details before you can create products or receive payouts.</p>
+            <Link to="/seller/settings" className="inline-flex items-center gap-1 mt-2 px-4 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm font-medium rounded-lg transition-colors">
+              Add Bank Details <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
         </div>
       )}

@@ -356,6 +356,17 @@ async function autoCalculatePayouts() {
       const bank = seller.sellerProfile?.bankDetails;
       const hasBankDetails = bank?.accountHolderName && bank?.accountNumber && bank?.ifscCode && bank?.bankName;
 
+      // Determine payout status
+      let payoutStatus = 'pending';
+      let holdReason = '';
+      if (!hasBankDetails) {
+        payoutStatus = 'on_hold';
+        holdReason = 'missing_bank_details';
+      } else if (netPayout < 100) {
+        payoutStatus = 'on_hold';
+        holdReason = 'below_minimum_transfer';
+      }
+
       const payoutData = {
         sellerId,
         periodStart,
@@ -368,8 +379,8 @@ async function autoCalculatePayouts() {
         gatewayFeesDeducted,
         shippingDeducted,
         netPayout,
-        status: hasBankDetails ? 'pending' : 'on_hold',
-        holdReason: hasBankDetails ? '' : 'missing_bank_details',
+        status: payoutStatus,
+        holdReason,
         bankDetailsSnapshot: bank || {}
       };
 
@@ -460,6 +471,78 @@ async function sendReviewRequestEmails() {
   }
 }
 
+// ==================== POLL CASHFREE PAYOUT STATUSES ====================
+async function pollPayoutStatuses() {
+  try {
+    const SellerPayout = require('../models/SellerPayout');
+    const processingPayouts = await SellerPayout.find({ status: 'processing', cashfreeTransferId: { $ne: '' } });
+
+    if (!processingPayouts.length) return;
+
+    const { getTransferStatus } = require('../config/cashfreePayout');
+    const { createNotification } = require('../utils/notify');
+    let paid = 0, failed = 0, pending = 0;
+
+    for (const payout of processingPayouts) {
+      try {
+        const result = await getTransferStatus(payout.cashfreeTransferId);
+
+        payout.cashfreeStatus = result.status;
+        payout.cashfreeUtr = result.utr || payout.cashfreeUtr;
+        payout.cashfreeAcknowledged = result.acknowledged;
+
+        if (result.status === 'SUCCESS' && result.acknowledged === 1) {
+          payout.status = 'paid';
+          payout.paidAt = new Date();
+          await Order.updateMany({ payoutId: payout._id }, { payoutStatus: 'paid' });
+          paid++;
+
+          createNotification({
+            userId: payout.sellerId?.toString(), userRole: 'seller',
+            type: 'payout_processed', title: 'Payout received',
+            message: `Rs.${payout.netPayout} has been transferred to your bank account (UTR: ${result.utr || 'N/A'})`,
+            link: '/seller/payouts', metadata: { payoutId: payout._id.toString(), amount: payout.netPayout, utr: result.utr }
+          });
+        } else if (['FAILED', 'REVERSED'].includes(result.status)) {
+          payout.status = 'failed';
+          payout.cashfreeFailureReason = result.reason;
+          payout.failureDetails = `Cashfree: ${result.reason || result.status}`;
+          payout.retryCount = (payout.retryCount || 0) + 1;
+          failed++;
+
+          createNotification({
+            userId: payout.sellerId?.toString(), userRole: 'seller',
+            type: 'payout_failed', title: 'Payout failed',
+            message: `Your payout of Rs.${payout.netPayout} failed: ${result.reason || 'Bank transfer issue'}. Please verify your bank details.`,
+            link: '/seller/payouts', metadata: { payoutId: payout._id.toString() }
+          });
+        } else {
+          pending++;
+          // Flag for admin review if pending > 48 hours
+          const hoursSinceDisbursed = payout.disbursedAt ? (Date.now() - payout.disbursedAt.getTime()) / (1000 * 60 * 60) : 0;
+          if (hoursSinceDisbursed > 48 && !payout.holdReason) {
+            payout.holdReason = 'pending_too_long';
+            logger.warn(`[Payout Poll] Payout ${payout._id} pending for ${Math.round(hoursSinceDisbursed)}h, flagged for review`);
+          }
+        }
+
+        await payout.save();
+      } catch (pollErr) {
+        logger.error(`[Payout Poll] Error checking payout ${payout._id}:`, pollErr.message);
+      }
+
+      // Small delay between API calls
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    if (paid || failed) {
+      logger.info(`[Payout Poll] ${paid} paid, ${failed} failed, ${pending} still pending`);
+    }
+  } catch (err) {
+    logger.error('[Payout Poll] Error:', err.message);
+  }
+}
+
 // ==================== SCHEDULE ====================
 function startCronJobs() {
   // Auto-cancel unpaid orders every 5 minutes
@@ -479,6 +562,9 @@ function startCronJobs() {
 
   // Payout calculation daily at midnight (function checks if it's a payout day)
   cron.schedule('0 0 * * *', autoCalculatePayouts);
+
+  // Poll Cashfree payout statuses every 5 minutes
+  cron.schedule('*/5 * * * *', pollPayoutStatuses);
 
   // Run initial checks after 30 seconds (let server start)
   setTimeout(runAllCrons, 30 * 1000);

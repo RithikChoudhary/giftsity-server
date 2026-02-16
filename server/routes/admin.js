@@ -649,6 +649,218 @@ router.put('/payouts/:id/retry', async (req, res) => {
   }
 });
 
+// ---- CASHFREE PAYOUT DISBURSEMENT ----
+router.put('/payouts/:id/disburse', async (req, res) => {
+  try {
+    const payout = await SellerPayout.findById(req.params.id).populate('sellerId', 'name email phone sellerProfile.bankDetails');
+    if (!payout) return res.status(404).json({ message: 'Payout not found' });
+    if (payout.status !== 'pending') {
+      return res.status(400).json({ message: `Cannot disburse payout with status "${payout.status}". Must be "pending".` });
+    }
+    if (payout.netPayout < 100) {
+      return res.status(400).json({ message: `Payout amount Rs.${payout.netPayout} is below the minimum Rs.100 for bank transfer.` });
+    }
+
+    const bank = payout.bankDetailsSnapshot;
+    if (!bank?.accountNumber || !bank?.ifscCode || !bank?.accountHolderName) {
+      return res.status(400).json({ message: 'Bank details are incomplete on this payout. Ask seller to update bank details and retry.' });
+    }
+
+    const { directTransfer } = require('../config/cashfreePayout');
+    const transferId = `GFTY_${payout._id}_${Date.now()}`.substring(0, 40);
+
+    const result = await directTransfer({
+      amount: payout.netPayout,
+      transferId,
+      bankAccount: bank.accountNumber,
+      ifsc: bank.ifscCode,
+      name: bank.accountHolderName,
+      phone: payout.sellerId?.phone || '9999999999',
+      email: payout.sellerId?.email || 'seller@giftsity.com',
+      remarks: `Giftsity payout ${payout._id}`
+    });
+
+    if (result.status === 'SUCCESS' || result.status === 'PENDING') {
+      payout.status = 'processing';
+      payout.cashfreeTransferId = transferId;
+      payout.cashfreeReferenceId = result.referenceId;
+      payout.cashfreeUtr = result.utr;
+      payout.cashfreeStatus = result.status;
+      payout.cashfreeAcknowledged = result.acknowledged;
+      payout.disbursedAt = new Date();
+
+      if (result.acknowledged === 1) {
+        payout.status = 'paid';
+        payout.paidAt = new Date();
+        payout.paidBy = req.user._id;
+        await Order.updateMany({ payoutId: payout._id }, { payoutStatus: 'paid' });
+      }
+      await payout.save();
+
+      logActivity({ domain: 'admin', action: 'payout_disbursed', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'SellerPayout', targetId: payout._id, message: `Payout disbursed via Cashfree: ${result.status}`, metadata: { amount: payout.netPayout, transferId, referenceId: result.referenceId } });
+
+      res.json({ message: `Payout disbursed (${result.status})`, payout, cashfreeResult: result });
+    } else {
+      payout.status = 'failed';
+      payout.cashfreeTransferId = transferId;
+      payout.cashfreeStatus = result.status;
+      payout.cashfreeFailureReason = result.message;
+      payout.failureDetails = `Cashfree: ${result.message}`;
+      payout.retryCount = (payout.retryCount || 0) + 1;
+      await payout.save();
+
+      logActivity({ domain: 'admin', action: 'payout_disburse_failed', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'SellerPayout', targetId: payout._id, message: `Payout disburse failed: ${result.message}`, metadata: { amount: payout.netPayout, transferId } });
+
+      const { createNotification: notifyFail } = require('../utils/notify');
+      notifyFail({
+        userId: payout.sellerId._id?.toString() || payout.sellerId.toString(),
+        userRole: 'seller', type: 'payout_failed', title: 'Payout failed',
+        message: `Your payout of Rs.${payout.netPayout} could not be processed. Please verify your bank details.`,
+        link: '/seller/payouts', metadata: { payoutId: payout._id.toString() }
+      });
+
+      res.status(400).json({ message: `Disburse failed: ${result.message}`, payout, cashfreeResult: result });
+    }
+  } catch (err) {
+    logger.error('[Admin] Disburse error:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+router.post('/payouts/batch-disburse', async (req, res) => {
+  try {
+    const { payoutIds } = req.body;
+    let payouts;
+
+    if (payoutIds && Array.isArray(payoutIds) && payoutIds.length > 0) {
+      payouts = await SellerPayout.find({ _id: { $in: payoutIds }, status: 'pending', netPayout: { $gte: 100 } })
+        .populate('sellerId', 'name email phone');
+    } else {
+      payouts = await SellerPayout.find({ status: 'pending', netPayout: { $gte: 100 } })
+        .populate('sellerId', 'name email phone');
+    }
+
+    if (!payouts.length) return res.json({ message: 'No eligible payouts to disburse', results: [] });
+
+    const { directTransfer } = require('../config/cashfreePayout');
+    const results = [];
+
+    for (const payout of payouts) {
+      const bank = payout.bankDetailsSnapshot;
+      if (!bank?.accountNumber || !bank?.ifscCode || !bank?.accountHolderName) {
+        results.push({ payoutId: payout._id, status: 'skipped', reason: 'Incomplete bank details' });
+        continue;
+      }
+
+      const transferId = `GFTY_${payout._id}_${Date.now()}`.substring(0, 40);
+
+      try {
+        const result = await directTransfer({
+          amount: payout.netPayout,
+          transferId,
+          bankAccount: bank.accountNumber,
+          ifsc: bank.ifscCode,
+          name: bank.accountHolderName,
+          phone: payout.sellerId?.phone || '9999999999',
+          email: payout.sellerId?.email || 'seller@giftsity.com'
+        });
+
+        if (result.status === 'SUCCESS' || result.status === 'PENDING') {
+          payout.status = result.acknowledged === 1 ? 'paid' : 'processing';
+          payout.cashfreeTransferId = transferId;
+          payout.cashfreeReferenceId = result.referenceId;
+          payout.cashfreeUtr = result.utr;
+          payout.cashfreeStatus = result.status;
+          payout.cashfreeAcknowledged = result.acknowledged;
+          payout.disbursedAt = new Date();
+          if (result.acknowledged === 1) {
+            payout.paidAt = new Date();
+            payout.paidBy = req.user._id;
+            await Order.updateMany({ payoutId: payout._id }, { payoutStatus: 'paid' });
+          }
+          await payout.save();
+          results.push({ payoutId: payout._id, status: 'disbursed', cashfreeStatus: result.status });
+        } else {
+          payout.status = 'failed';
+          payout.cashfreeTransferId = transferId;
+          payout.cashfreeStatus = result.status;
+          payout.cashfreeFailureReason = result.message;
+          payout.failureDetails = `Cashfree: ${result.message}`;
+          payout.retryCount = (payout.retryCount || 0) + 1;
+          await payout.save();
+          results.push({ payoutId: payout._id, status: 'failed', reason: result.message });
+        }
+      } catch (transferErr) {
+        results.push({ payoutId: payout._id, status: 'error', reason: transferErr.message });
+      }
+
+      // Rate limit: 100ms delay between transfers
+      await new Promise(r => setTimeout(r, 100));
+    }
+
+    const disbursed = results.filter(r => r.status === 'disbursed').length;
+    const failed = results.filter(r => r.status === 'failed').length;
+    const skipped = results.filter(r => r.status === 'skipped').length;
+
+    logActivity({ domain: 'admin', action: 'batch_disburse', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'SellerPayout', message: `Batch disburse: ${disbursed} disbursed, ${failed} failed, ${skipped} skipped`, metadata: { total: payouts.length, disbursed, failed, skipped } });
+
+    res.json({ message: `${disbursed} disbursed, ${failed} failed, ${skipped} skipped`, results });
+  } catch (err) {
+    logger.error('[Admin] Batch disburse error:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+router.get('/payouts/:id/check-status', async (req, res) => {
+  try {
+    const payout = await SellerPayout.findById(req.params.id);
+    if (!payout) return res.status(404).json({ message: 'Payout not found' });
+    if (!payout.cashfreeTransferId) {
+      return res.status(400).json({ message: 'No Cashfree transfer found for this payout' });
+    }
+
+    const { getTransferStatus } = require('../config/cashfreePayout');
+    const result = await getTransferStatus(payout.cashfreeTransferId);
+
+    payout.cashfreeStatus = result.status;
+    payout.cashfreeUtr = result.utr || payout.cashfreeUtr;
+    payout.cashfreeAcknowledged = result.acknowledged;
+
+    if (result.status === 'SUCCESS' && result.acknowledged === 1 && payout.status !== 'paid') {
+      payout.status = 'paid';
+      payout.paidAt = new Date();
+      payout.paidBy = req.user._id;
+      await Order.updateMany({ payoutId: payout._id }, { payoutStatus: 'paid' });
+
+      const { createNotification: notifyPaid } = require('../utils/notify');
+      notifyPaid({
+        userId: payout.sellerId?.toString(), userRole: 'seller',
+        type: 'payout_processed', title: 'Payout received',
+        message: `Rs.${payout.netPayout} has been transferred to your bank account`,
+        link: '/seller/payouts', metadata: { payoutId: payout._id.toString(), amount: payout.netPayout }
+      });
+    } else if (['FAILED', 'REVERSED'].includes(result.status) && payout.status !== 'failed') {
+      payout.status = 'failed';
+      payout.cashfreeFailureReason = result.reason;
+      payout.failureDetails = `Cashfree: ${result.reason || result.status}`;
+
+      const { createNotification: notifyFail2 } = require('../utils/notify');
+      notifyFail2({
+        userId: payout.sellerId?.toString(), userRole: 'seller',
+        type: 'payout_failed', title: 'Payout failed',
+        message: `Your payout of Rs.${payout.netPayout} failed: ${result.reason || 'Bank transfer issue'}`,
+        link: '/seller/payouts', metadata: { payoutId: payout._id.toString() }
+      });
+    }
+
+    await payout.save();
+    res.json({ message: 'Status updated', payout, cashfreeResult: result });
+  } catch (err) {
+    logger.error('[Admin] Check status error:', err.message);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // ---- PAYOUT RECONCILIATION ----
 router.get('/payouts/reconciliation', async (req, res) => {
   try {

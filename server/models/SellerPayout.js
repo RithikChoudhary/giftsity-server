@@ -30,6 +30,15 @@ const sellerPayoutSchema = new mongoose.Schema({
   paidAt: { type: Date, default: null },
   paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
 
+  // Cashfree Payouts tracking
+  cashfreeTransferId: { type: String, default: '' },
+  cashfreeReferenceId: { type: String, default: '' },
+  cashfreeUtr: { type: String, default: '' },
+  cashfreeStatus: { type: String, default: '' },
+  cashfreeAcknowledged: { type: Number, default: 0 },
+  cashfreeFailureReason: { type: String, default: '' },
+  disbursedAt: { type: Date, default: null },
+
   bankDetailsSnapshot: {
     accountHolderName: { type: String, default: '' },
     accountNumber: { type: String, default: '' },
