@@ -222,7 +222,7 @@ export default function SellerJoin() {
 
           {step === 'info' && (
             <form onSubmit={handleSendOTP} className="space-y-4">
-              <h2 className="text-lg font-bold text-theme-primary mb-2">Create Seller Account</h2>
+              <h2 className="text-lg font-bold text-theme-primary mb-2">Create Creator Account</h2>
               <div>
                 <label className="text-xs text-theme-muted font-medium mb-1 block">Full Name *</label>
                 <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" required />
@@ -355,7 +355,7 @@ export default function SellerJoin() {
         <div className="grid md:grid-cols-3 gap-6">
           {[
             { title: 'Zero Commission', desc: 'Start selling with 0% platform fee. You keep 97% of every sale.' },
-            { title: 'Easy Setup', desc: 'List products in minutes. Manage from your seller dashboard.' },
+            { title: 'Easy Setup', desc: 'List products in minutes. Manage from your creator dashboard.' },
             { title: 'Growing Audience', desc: 'Reach thousands of customers beyond your followers. We drive traffic to your products.' },
           ].map((b, i) => (
             <div key={i} className="bg-card border border-edge/50 rounded-xl p-5 text-center">

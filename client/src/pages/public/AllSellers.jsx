@@ -38,15 +38,15 @@ export default function AllSellers() {
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
       <SEO
-        title="All Sellers - Giftsity"
-        description="Browse all gift sellers on Giftsity. Find unique handcrafted and curated gifts from verified sellers across India."
+        title="All Creators - Giftsity"
+        description="Browse all creators on Giftsity. Find unique handcrafted and curated products from verified creators across India."
       />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-theme-primary">Our Sellers</h1>
-          <p className="text-sm text-theme-muted mt-1">{total} sellers on Giftsity</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-theme-primary">Our Creators</h1>
+          <p className="text-sm text-theme-muted mt-1">{total} creators on Giftsity</p>
         </div>
         <div className="flex items-center gap-2">
           <ArrowUpDown className="w-4 h-4 text-theme-dim" />
@@ -65,8 +65,8 @@ export default function AllSellers() {
       {loading ? <LoadingSpinner /> : sellers.length === 0 ? (
         <div className="text-center py-20">
           <Store className="w-16 h-16 text-theme-dim mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-theme-primary mb-2">No sellers found</h2>
-          <p className="text-theme-muted">Check back later for new sellers.</p>
+          <h2 className="text-xl font-bold text-theme-primary mb-2">No creators found</h2>
+          <p className="text-theme-muted">Check back later for new creators.</p>
         </div>
       ) : (
         <>

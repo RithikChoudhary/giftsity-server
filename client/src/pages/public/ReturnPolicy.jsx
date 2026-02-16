@@ -13,7 +13,7 @@ export default function ReturnPolicy() {
       <div className="prose-sm space-y-6 text-theme-secondary leading-relaxed">
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">1. Overview</h2>
-          <p>Giftsity is a multi-vendor marketplace. Products are sold by independent creators and sellers. Each seller is responsible for the quality and accuracy of their products. This Return &amp; Refund Policy outlines the process for returning products purchased through our platform.</p>
+          <p>Giftsity is a multi-vendor marketplace. Products are sold by independent creators and sellers. Each creator is responsible for the quality and accuracy of their products. This Return &amp; Refund Policy outlines the process for returning products purchased through our platform.</p>
         </section>
 
         <section>
@@ -35,7 +35,7 @@ export default function ReturnPolicy() {
             <li><strong>Perishable goods</strong> &mdash; food items, flowers, and other items with a limited shelf life.</li>
             <li><strong>Intimate / hygiene products</strong> &mdash; items that cannot be resold for hygiene reasons.</li>
             <li><strong>Digital products</strong> &mdash; downloadable content or digital gift cards.</li>
-            <li><strong>Products marked as "Final Sale"</strong> by the seller.</li>
+            <li><strong>Products marked as "Final Sale"</strong> by the creator.</li>
           </ul>
         </section>
 
@@ -47,17 +47,17 @@ export default function ReturnPolicy() {
             <li>Select the order containing the item you wish to return.</li>
             <li>Click <strong>"Request Return"</strong> and select the reason for return.</li>
             <li>Upload photos of the product (required for damaged/defective items).</li>
-            <li>Submit your request. The seller will review it within 2-3 business days.</li>
+            <li>Submit your request. The creator will review it within 2-3 business days.</li>
           </ol>
-          <p className="mt-2">Once the seller approves the return, you will receive shipping instructions. The return shipping cost may be borne by the customer or the seller depending on the reason for return.</p>
+          <p className="mt-2">Once the creator approves the return, you will receive shipping instructions. The return shipping cost may be borne by the customer or the creator depending on the reason for return.</p>
         </section>
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">5. Refund Process</h2>
-          <p>Once the returned item is received and inspected by the seller:</p>
+          <p>Once the returned item is received and inspected by the creator:</p>
           <ul className="list-disc pl-5 mt-2 space-y-1">
             <li><strong>Approved refunds</strong> will be processed within <strong>5-7 business days</strong> to your original payment method (via Cashfree).</li>
-            <li>The refund amount will include the product price. Shipping charges are non-refundable unless the return is due to a seller error or defective product.</li>
+            <li>The refund amount will include the product price. Shipping charges are non-refundable unless the return is due to a creator error or defective product.</li>
             <li>You will receive an email notification when the refund is initiated.</li>
           </ul>
           <p className="mt-2">Please note that your bank or card issuer may take additional time to reflect the refund in your account.</p>
@@ -65,7 +65,7 @@ export default function ReturnPolicy() {
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">6. Exchanges</h2>
-          <p>If you wish to exchange a product for a different size, colour, or variant, you may request an exchange through the same return process. Select <strong>"Exchange"</strong> as the return type and specify the desired replacement. Exchanges are subject to product availability with the seller.</p>
+          <p>If you wish to exchange a product for a different size, colour, or variant, you may request an exchange through the same return process. Select <strong>"Exchange"</strong> as the return type and specify the desired replacement. Exchanges are subject to product availability with the creator.</p>
         </section>
 
         <section>
@@ -85,12 +85,12 @@ export default function ReturnPolicy() {
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">9. Auto-Cancellation</h2>
-          <p>If a seller fails to ship your order within 72 hours of order confirmation, the order will be <strong>automatically cancelled</strong> and a full refund will be initiated to your original payment method.</p>
+          <p>If a creator fails to ship your order within 72 hours of order confirmation, the order will be <strong>automatically cancelled</strong> and a full refund will be initiated to your original payment method.</p>
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-theme-primary mb-2">10. Seller Disputes</h2>
-          <p>If a seller rejects your return request and you believe it is unjustified, you may contact Giftsity support. We will mediate the dispute and take appropriate action, which may include overriding the seller's decision.</p>
+          <h2 className="text-lg font-semibold text-theme-primary mb-2">10. Creator Disputes</h2>
+          <p>If a creator rejects your return request and you believe it is unjustified, you may contact Giftsity support. We will mediate the dispute and take appropriate action, which may include overriding the creator's decision.</p>
         </section>
 
         <section>

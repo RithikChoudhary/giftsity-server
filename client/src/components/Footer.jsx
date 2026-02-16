@@ -55,7 +55,7 @@ export default function Footer() {
             <h4 className="text-sm font-semibold text-theme-secondary mb-3">Shop</h4>
             <div className="space-y-2">
               <Link to="/shop" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">All Gifts</Link>
-              <Link to="/sellers" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">All Sellers</Link>
+              <Link to="/sellers" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">All Creators</Link>
               <Link to="/shop?category=tech-gadgets" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">Tech Gadgets</Link>
               <Link to="/shop?category=gift-hampers" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">Gift Hampers</Link>
             </div>

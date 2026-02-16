@@ -124,7 +124,7 @@ export default function Chat() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-theme-primary truncate">{other?.name || 'Seller'}</p>
+                      <p className="text-sm font-medium text-theme-primary truncate">{other?.name || 'Creator'}</p>
                       <span className="text-[10px] text-theme-dim">{timeSince(conv.lastMessage?.sentAt)}</span>
                     </div>
                     <p className="text-xs text-theme-muted truncate mt-0.5">{conv.lastMessage?.content || 'No messages yet'}</p>
@@ -154,7 +154,7 @@ export default function Chat() {
                   {(otherParticipant(activeConv)?.name || 'S')[0].toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-theme-primary">{otherParticipant(activeConv)?.name || 'Seller'}</p>
+                  <p className="text-sm font-medium text-theme-primary">{otherParticipant(activeConv)?.name || 'Creator'}</p>
                   {activeConv.productTitle && <p className="text-[10px] text-amber-500">Re: {activeConv.productTitle}</p>}
                 </div>
               </div>

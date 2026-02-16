@@ -13,7 +13,7 @@ export default function Privacy() {
       <div className="prose-sm space-y-6 text-theme-secondary leading-relaxed">
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">1. Information We Collect</h2>
-          <p><strong className="text-theme-primary">Account Information:</strong> When you create an account, we collect your name, email address, and phone number. Sellers additionally provide business details, Instagram profile, bank information, and a profile photo.</p>
+          <p><strong className="text-theme-primary">Account Information:</strong> When you create an account, we collect your name, email address, and phone number. Creators additionally provide business details, Instagram profile, bank information, and a profile photo.</p>
           <p><strong className="text-theme-primary">Order Information:</strong> When you place an order, we collect your shipping address and payment details (processed securely by Cashfree -- we do not store your card/UPI details).</p>
           <p><strong className="text-theme-primary">Usage Data:</strong> We collect information about how you interact with our Platform, including pages viewed and actions taken.</p>
         </section>
@@ -24,7 +24,7 @@ export default function Privacy() {
             <li>To create and manage your account</li>
             <li>To process orders and facilitate deliveries</li>
             <li>To send transactional emails (OTP codes, order confirmations, shipping updates)</li>
-            <li>To calculate and process seller payouts</li>
+            <li>To calculate and process creator payouts</li>
             <li>To improve the Platform and user experience</li>
             <li>To prevent fraud and ensure security</li>
             <li>To comply with legal obligations</li>
@@ -35,7 +35,7 @@ export default function Privacy() {
           <h2 className="text-lg font-semibold text-theme-primary mb-2">3. Information Sharing</h2>
           <p>We share your information only in the following cases:</p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><strong className="text-theme-primary">With Sellers:</strong> Your name, shipping address, and phone number are shared with the seller when you place an order so they can fulfill it.</li>
+            <li><strong className="text-theme-primary">With Creators:</strong> Your name, shipping address, and phone number are shared with the creator when you place an order so they can fulfill it.</li>
             <li><strong className="text-theme-primary">Payment Processor:</strong> Cashfree processes your payment data under their own privacy policy.</li>
             <li><strong className="text-theme-primary">Shipping Partners:</strong> Shiprocket and courier partners receive the information needed to deliver your order.</li>
             <li><strong className="text-theme-primary">Legal Requirements:</strong> We may disclose information if required by law or to protect our rights.</li>
@@ -45,7 +45,7 @@ export default function Privacy() {
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">4. Data Storage &amp; Security</h2>
-          <p>Your data is stored on secure MongoDB Atlas servers. We use JWT tokens for authentication (no passwords are stored). All communications are encrypted via HTTPS. Bank account details for sellers are stored with appropriate security measures.</p>
+          <p>Your data is stored on secure MongoDB Atlas servers. We use JWT tokens for authentication (no passwords are stored). All communications are encrypted via HTTPS. Bank account details for creators are stored with appropriate security measures.</p>
         </section>
 
         <section>

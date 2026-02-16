@@ -106,7 +106,7 @@ export default function ProductDetail() {
       price: product.price + getCustomizationExtraPrice(),
       image: product.images?.[0]?.url,
       sellerId: product.sellerId?._id || product.sellerId,
-      sellerName: product.sellerId?.sellerProfile?.businessName || 'Seller',
+      sellerName: product.sellerId?.sellerProfile?.businessName || 'Creator',
       stock: product.stock,
       slug: product.slug,
       quantity: qty,
@@ -432,7 +432,7 @@ function ChatWithSellerButton({ sellerId, productId, productTitle, productImage 
   return (
     <>
       <button onClick={handleChat} disabled={loading} className="w-full mt-3 py-2.5 border border-amber-500/30 hover:bg-amber-500/10 text-amber-500 rounded-xl text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50">
-        <MessageSquare className="w-4 h-4" /> {loading ? 'Starting chat...' : 'Chat with Seller'}
+        <MessageSquare className="w-4 h-4" /> {loading ? 'Starting chat...' : 'Chat with Creator'}
       </button>
       {showProfileModal && (
         <ProfileCompleteModal

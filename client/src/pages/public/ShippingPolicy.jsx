@@ -29,17 +29,17 @@ export default function ShippingPolicy() {
             <li><strong>Tier 2 cities</strong>: 5-7 business days</li>
             <li><strong>Remote / rural areas</strong>: 7-10 business days</li>
           </ul>
-          <p className="mt-2">These are estimates and may vary depending on the seller's location, courier availability, and unforeseen circumstances (weather, holidays, etc.). Sellers are required to ship orders within 48-72 hours of order confirmation.</p>
+          <p className="mt-2">These are estimates and may vary depending on the creator's location, courier availability, and unforeseen circumstances (weather, holidays, etc.). Creators are required to ship orders within 48-72 hours of order confirmation.</p>
         </section>
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">4. Shipping Costs</h2>
-          <p>Shipping costs depend on the seller's shipping policy for each product:</p>
+          <p>Shipping costs depend on the creator's shipping policy for each product:</p>
           <ul className="list-disc pl-5 mt-2 space-y-1">
-            <li><strong>Seller-paid shipping</strong>: The seller absorbs the shipping cost. You pay only the product price.</li>
+            <li><strong>Creator-paid shipping</strong>: The creator absorbs the shipping cost. You pay only the product price.</li>
             <li><strong>Customer-paid shipping</strong>: The shipping charge is calculated based on the package weight, dimensions, and delivery pincode. The exact amount is shown at checkout before you pay.</li>
           </ul>
-          <p className="mt-2">Each product listing clearly indicates whether shipping is paid by the seller or the customer.</p>
+          <p className="mt-2">Each product listing clearly indicates whether shipping is paid by the creator or the customer.</p>
         </section>
 
         <section>
@@ -53,7 +53,7 @@ export default function ShippingPolicy() {
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">6. Undeliverable Packages</h2>
-          <p>If a package cannot be delivered due to an incorrect or incomplete address, the recipient being unavailable after multiple delivery attempts, or the package being refused, the shipment will be returned to the seller. In such cases:</p>
+          <p>If a package cannot be delivered due to an incorrect or incomplete address, the recipient being unavailable after multiple delivery attempts, or the package being refused, the shipment will be returned to the creator. In such cases:</p>
           <ul className="list-disc pl-5 mt-2 space-y-1">
             <li>The customer will be notified via email.</li>
             <li>A refund may be issued minus any applicable return shipping charges.</li>
@@ -63,7 +63,7 @@ export default function ShippingPolicy() {
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">7. Packaging</h2>
-          <p>Sellers are responsible for securely packaging products to prevent damage during transit. Giftsity encourages sellers to use eco-friendly packaging materials where possible. If you receive a damaged package, please report it immediately through the <Link to="/returns" className="text-amber-400 hover:text-amber-300">Returns</Link> section.</p>
+          <p>Creators are responsible for securely packaging products to prevent damage during transit. Giftsity encourages creators to use eco-friendly packaging materials where possible. If you receive a damaged package, please report it immediately through the <Link to="/returns" className="text-amber-400 hover:text-amber-300">Returns</Link> section.</p>
         </section>
 
         <section>

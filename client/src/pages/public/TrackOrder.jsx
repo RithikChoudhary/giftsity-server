@@ -91,7 +91,7 @@ export default function TrackOrder() {
                 </span>
               </div>
               {result.sellerName && (
-                <p className="text-xs text-theme-dim mt-2">Seller: {result.sellerName}</p>
+                <p className="text-xs text-theme-dim mt-2">Creator: {result.sellerName}</p>
               )}
             </div>
 

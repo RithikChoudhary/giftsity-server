@@ -137,7 +137,7 @@ export default function Cart() {
       <div className="max-w-lg mx-auto px-4 py-20 text-center">
         <ShoppingBag className="w-16 h-16 text-theme-dim mx-auto mb-4" />
         <h2 className="text-xl font-bold text-theme-primary mb-2">Your cart is empty</h2>
-        <p className="text-theme-muted mb-6">Discover unique gifts from our sellers.</p>
+        <p className="text-theme-muted mb-6">Discover unique products from our creators.</p>
         <Link to="/shop" className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-xl font-semibold">
           Start Shopping <ArrowRight className="w-4 h-4" />
         </Link>

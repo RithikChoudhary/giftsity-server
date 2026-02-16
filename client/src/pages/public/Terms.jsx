@@ -23,17 +23,17 @@ export default function Terms() {
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">3. Marketplace Model</h2>
-          <p>Giftsity operates as a multi-vendor marketplace. Products listed on the Platform are sold by independent third-party sellers. Giftsity facilitates the transaction but is not the seller of record. We do not guarantee, endorse, or assume responsibility for any product offered by sellers.</p>
+          <p>Giftsity operates as a multi-vendor marketplace. Products listed on the Platform are sold by independent third-party creators. Giftsity facilitates the transaction but is not the creator of record. We do not guarantee, endorse, or assume responsibility for any product offered by creators.</p>
         </section>
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">4. Orders &amp; Payments</h2>
-          <p>All payments are processed through our payment gateway partner (Cashfree). By placing an order, you authorize us to charge the specified amount. Prices are listed in Indian Rupees (INR) and include applicable taxes unless otherwise stated. Orders are subject to product availability and seller acceptance.</p>
+          <p>All payments are processed through our payment gateway partner (Cashfree). By placing an order, you authorize us to charge the specified amount. Prices are listed in Indian Rupees (INR) and include applicable taxes unless otherwise stated. Orders are subject to product availability and creator acceptance.</p>
         </section>
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">5. Shipping &amp; Delivery</h2>
-          <p>Shipping is handled by third-party logistics partners coordinated through the Platform. Delivery timelines are estimates and may vary based on location and courier availability. Sellers are responsible for packaging and dispatching orders within the specified timeframe.</p>
+          <p>Shipping is handled by third-party logistics partners coordinated through the Platform. Delivery timelines are estimates and may vary based on location and courier availability. Creators are responsible for packaging and dispatching orders within the specified timeframe.</p>
         </section>
 
         <section>
@@ -42,18 +42,18 @@ export default function Terms() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-theme-primary mb-2">7. Seller Obligations</h2>
-          <p>Sellers must provide accurate product descriptions, images, and pricing. Products must comply with all applicable laws and regulations. Sellers are responsible for fulfilling orders in a timely manner. Giftsity reserves the right to suspend or terminate seller accounts that violate these terms or receive consistent negative feedback.</p>
+          <h2 className="text-lg font-semibold text-theme-primary mb-2">7. Creator Obligations</h2>
+          <p>Creators must provide accurate product descriptions, images, and pricing. Products must comply with all applicable laws and regulations. Creators are responsible for fulfilling orders in a timely manner. Giftsity reserves the right to suspend or terminate creator accounts that violate these terms or receive consistent negative feedback.</p>
         </section>
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">8. Commission &amp; Fees</h2>
-          <p>Giftsity charges a platform commission on sales made through the marketplace. Commission rates are set by the Platform and may vary. Payment gateway processing fees are deducted from seller earnings. Detailed commission breakdowns are visible in the seller dashboard.</p>
+          <p>Giftsity charges a platform commission on sales made through the marketplace. Commission rates are set by the Platform and may vary. Payment gateway processing fees are deducted from creator earnings. Detailed commission breakdowns are visible in the creator dashboard.</p>
         </section>
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">9. Intellectual Property</h2>
-          <p>All content on the Platform, including logos, designs, and text, is owned by Giftsity or its licensors. Sellers retain ownership of their product images and descriptions but grant Giftsity a license to display them on the Platform.</p>
+          <p>All content on the Platform, including logos, designs, and text, is owned by Giftsity or its licensors. Creators retain ownership of their product images and descriptions but grant Giftsity a license to display them on the Platform.</p>
         </section>
 
         <section>

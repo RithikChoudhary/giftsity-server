@@ -143,7 +143,7 @@ export default function OrderConfirmation() {
             <div className="w-6 h-6 bg-amber-500/10 rounded-full flex items-center justify-center shrink-0 mt-0.5">
               <span className="text-xs font-bold text-amber-400">1</span>
             </div>
-            <p className="text-sm text-theme-muted">The seller will confirm and prepare your order for shipping.</p>
+            <p className="text-sm text-theme-muted">The creator will confirm and prepare your order for shipping.</p>
           </div>
           <div className="flex items-start gap-3">
             <div className="w-6 h-6 bg-amber-500/10 rounded-full flex items-center justify-center shrink-0 mt-0.5">

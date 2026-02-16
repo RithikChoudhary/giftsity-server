@@ -50,7 +50,7 @@ export default function Wishlist() {
       images: product.images,
       image: product.images?.[0]?.url,
       sellerId: product.sellerId?._id || product.sellerId,
-      sellerName: product.sellerId?.sellerProfile?.businessName || 'Seller',
+      sellerName: product.sellerId?.sellerProfile?.businessName || 'Creator',
       stock: product.stock,
       slug: product.slug
     });
@@ -91,7 +91,7 @@ export default function Wishlist() {
                   </div>
                 </Link>
                 <div className="p-4">
-                  <p className="text-xs text-amber-400/80 font-medium mb-1">{product.sellerId?.sellerProfile?.businessName || 'Seller'}</p>
+                  <p className="text-xs text-amber-400/80 font-medium mb-1">{product.sellerId?.sellerProfile?.businessName || 'Creator'}</p>
                   <Link to={`/product/${product.slug}`}><h3 className="font-semibold text-theme-primary text-sm line-clamp-2 mb-2 hover:text-amber-400 transition-colors">{product.title}</h3></Link>
                   <p className="text-lg font-bold text-theme-primary mb-3">Rs. {product.price?.toLocaleString('en-IN')}</p>
                   <div className="flex gap-2">

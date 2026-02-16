@@ -77,7 +77,7 @@ export default function Navbar() {
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-6">
             <Link to="/shop" className="text-sm text-theme-muted hover:text-theme-primary transition-colors">Shop</Link>
-            <Link to="/sellers" className="text-sm text-theme-muted hover:text-theme-primary transition-colors">Sellers</Link>
+            <Link to="/sellers" className="text-sm text-theme-muted hover:text-theme-primary transition-colors">Creators</Link>
             <Link to="/about" className="text-sm text-theme-muted hover:text-theme-primary transition-colors">About</Link>
             {(!user || isAdmin) && (
               <Link to="/b2b" className="text-sm text-theme-muted hover:text-theme-primary transition-colors">Corporate</Link>
@@ -181,7 +181,7 @@ export default function Navbar() {
                             className="flex items-center gap-2 px-4 py-2 text-sm text-amber-400 hover:bg-inset/50 w-full text-left disabled:opacity-50"
                           >
                             <ArrowLeftRight className="w-4 h-4" />
-                            {targetRole === 'seller' ? 'Seller Dashboard' : targetRole === 'admin' ? 'Admin Dashboard' : 'Customer'}
+                            {targetRole === 'seller' ? 'Creator Dashboard' : targetRole === 'admin' ? 'Admin Dashboard' : 'Customer'}
                           </button>
                         ))}
                       </>
@@ -214,7 +214,7 @@ export default function Navbar() {
               <button type="submit" className="px-3 py-2 bg-amber-500 text-zinc-950 rounded-lg"><Search className="w-4 h-4" /></button>
             </form>
             <Link to="/shop" className="block py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>Shop</Link>
-            <Link to="/sellers" className="block py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>Sellers</Link>
+            <Link to="/sellers" className="block py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>Creators</Link>
             <Link to="/about" className="block py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>About</Link>
             <Link to="/contact" className="block py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>Contact</Link>
             {(!user || isAdmin) && (
@@ -223,7 +223,7 @@ export default function Navbar() {
                 <Link to="/seller/join" className="block py-2 text-sm text-amber-400" onClick={() => setMenuOpen(false)}>Sell on Giftsity</Link>
               </>
             )}
-            {isSeller && <Link to="/seller" className="block py-2 text-sm text-theme-secondary" onClick={() => setMenuOpen(false)}>Seller Dashboard</Link>}
+            {isSeller && <Link to="/seller" className="block py-2 text-sm text-theme-secondary" onClick={() => setMenuOpen(false)}>Creator Dashboard</Link>}
             {isAdmin && <Link to="/admin" className="block py-2 text-sm text-theme-secondary" onClick={() => setMenuOpen(false)}>Admin Dashboard</Link>}
             {canSwitchRole && (
               <>
@@ -237,7 +237,7 @@ export default function Navbar() {
                     className="flex items-center gap-2 py-2 text-sm text-amber-400 hover:text-amber-300 disabled:opacity-50 w-full text-left"
                   >
                     <ArrowLeftRight className="w-4 h-4" />
-                    {targetRole === 'seller' ? 'Seller Dashboard' : targetRole === 'admin' ? 'Admin Dashboard' : 'Customer'}
+                    {targetRole === 'seller' ? 'Creator Dashboard' : targetRole === 'admin' ? 'Admin Dashboard' : 'Customer'}
                   </button>
                 ))}
               </>

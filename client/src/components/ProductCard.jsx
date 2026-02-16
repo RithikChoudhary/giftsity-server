@@ -30,7 +30,7 @@ export default function ProductCard({ product }) {
       price: product.price,
       image: product.images?.[0]?.url,
       sellerId: product.sellerId?._id || product.sellerId,
-      sellerName: product.sellerId?.sellerProfile?.businessName || 'Seller',
+      sellerName: product.sellerId?.sellerProfile?.businessName || 'Creator',
       stock: product.stock,
       slug: product.slug
     });
@@ -59,7 +59,7 @@ export default function ProductCard({ product }) {
           </button>
         </div>
         <div className="p-4">
-          <p className="text-xs text-amber-400/80 font-medium mb-1">{product.sellerId?.sellerProfile?.businessName || 'Seller'}</p>
+          <p className="text-xs text-amber-400/80 font-medium mb-1">{product.sellerId?.sellerProfile?.businessName || 'Creator'}</p>
           <h3 className="font-semibold text-theme-primary text-sm line-clamp-2 mb-2 group-hover:text-amber-400 transition-colors">{product.title}</h3>
           <div className="flex items-center justify-between">
             <span className="text-lg font-bold text-theme-primary">Rs. {product.price?.toLocaleString('en-IN')}</span>
