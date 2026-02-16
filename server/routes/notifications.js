@@ -1,6 +1,7 @@
 const express = require('express');
 const Notification = require('../models/Notification');
 const { requireAuth } = require('../middleware/auth');
+const logger = require('../utils/logger');
 const router = express.Router();
 
 router.use(requireAuth);
@@ -22,6 +23,7 @@ router.get('/', async (req, res) => {
 
     res.json({ notifications, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
+    logger.error('[Notifications] List error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -32,6 +34,7 @@ router.get('/unread-count', async (req, res) => {
     const count = await Notification.countDocuments({ userId: req.user._id, isRead: false });
     res.json({ count });
   } catch (err) {
+    logger.error('[Notifications] Unread count error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -47,6 +50,7 @@ router.put('/:id/read', async (req, res) => {
     if (!notification) return res.status(404).json({ message: 'Notification not found' });
     res.json({ notification });
   } catch (err) {
+    logger.error('[Notifications] Mark read error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -60,6 +64,7 @@ router.put('/read-all', async (req, res) => {
     );
     res.json({ message: 'All notifications marked as read', modifiedCount: result.modifiedCount });
   } catch (err) {
+    logger.error('[Notifications] Mark all read error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });

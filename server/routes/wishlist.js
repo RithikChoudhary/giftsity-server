@@ -2,6 +2,7 @@ const express = require('express');
 const Wishlist = require('../models/Wishlist');
 const Product = require('../models/Product');
 const { requireAuth } = require('../middleware/auth');
+const logger = require('../utils/logger');
 const router = express.Router();
 
 const requireCustomer = (req, res, next) => {
@@ -27,6 +28,7 @@ router.get('/', async (req, res) => {
     const valid = items.filter(i => i.productId && i.productId.isActive);
     res.json({ items: valid.map(i => ({ _id: i._id, product: i.productId, addedAt: i.createdAt })) });
   } catch (err) {
+    logger.error('[Wishlist] Get wishlist error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -37,6 +39,7 @@ router.get('/ids', async (req, res) => {
     const items = await Wishlist.find({ userId: req.user._id }).select('productId');
     res.json({ productIds: items.map(i => i.productId.toString()) });
   } catch (err) {
+    logger.error('[Wishlist] Get IDs error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -56,6 +59,7 @@ router.post('/', async (req, res) => {
     await Wishlist.create({ userId: req.user._id, productId });
     res.status(201).json({ message: 'Added to wishlist' });
   } catch (err) {
+    logger.error('[Wishlist] Add error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -66,6 +70,7 @@ router.delete('/:productId', async (req, res) => {
     await Wishlist.deleteOne({ userId: req.user._id, productId: req.params.productId });
     res.json({ message: 'Removed from wishlist' });
   } catch (err) {
+    logger.error('[Wishlist] Remove error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });

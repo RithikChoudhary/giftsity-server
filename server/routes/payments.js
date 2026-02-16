@@ -70,16 +70,12 @@ async function processPaymentConfirmation(cashfreeOrderId) {
     await order.save();
     processedCount++;
 
-    // Atomic stock decrement
+    // Stock was already reserved at order creation time.
+    // Only increment orderCount now that payment is confirmed.
     for (const item of order.items) {
-      const updated = await Product.findOneAndUpdate(
-        { _id: item.productId, stock: { $gte: item.quantity } },
-        { $inc: { stock: -item.quantity, orderCount: item.quantity } },
-        { new: true }
-      );
-      if (!updated) {
-        logger.error(`[Webhook][Stock] Insufficient stock for product ${item.productId}, order ${order.orderNumber}`);
-      }
+      await Product.findByIdAndUpdate(item.productId, {
+        $inc: { orderCount: item.quantity }
+      });
     }
 
     // Update seller stats
@@ -168,9 +164,8 @@ router.post('/cashfree/webhook', async (req, res) => {
     res.status(200).json({ message: 'Webhook received', ...result });
   } catch (err) {
     logger.error('[Cashfree Webhook] Error:', err.message);
-    // Return 200 even on error to prevent infinite retries for malformed data
-    // Real errors (like DB issues) will be retried by Cashfree if we return 500
-    res.status(500).json({ message: 'Webhook processing failed' });
+    // Return 200 to prevent Cashfree from retrying endlessly on non-transient errors
+    res.status(200).json({ message: 'Webhook processing failed', error: err.message });
   }
 });
 

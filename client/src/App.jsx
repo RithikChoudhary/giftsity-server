@@ -28,6 +28,8 @@ const SellerStore = lazy(() => import('./pages/public/SellerStore'));
 const AllSellers = lazy(() => import('./pages/public/AllSellers'));
 const Terms = lazy(() => import('./pages/public/Terms'));
 const Privacy = lazy(() => import('./pages/public/Privacy'));
+const ReturnPolicy = lazy(() => import('./pages/public/ReturnPolicy'));
+const ShippingPolicy = lazy(() => import('./pages/public/ShippingPolicy'));
 const About = lazy(() => import('./pages/public/About'));
 const Contact = lazy(() => import('./pages/public/Contact'));
 
@@ -126,6 +128,8 @@ export default function App() {
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
+              <Route path="/return-policy" element={<ReturnPolicy />} />
+              <Route path="/shipping-policy" element={<ShippingPolicy />} />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
             </Route>

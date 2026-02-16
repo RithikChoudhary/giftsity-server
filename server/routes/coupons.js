@@ -1,6 +1,8 @@
 const express = require('express');
 const Coupon = require('../models/Coupon');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { logActivity } = require('../utils/audit');
+const logger = require('../utils/logger');
 const router = express.Router();
 
 // POST /api/coupons/apply -- validate and return discount
@@ -42,6 +44,7 @@ router.post('/apply', requireAuth, async (req, res) => {
       maxDiscount: coupon.maxDiscount
     });
   } catch (err) {
+    logger.error('[Coupons] Apply coupon error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -54,6 +57,7 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
     const coupons = await Coupon.find().sort({ createdAt: -1 });
     res.json({ coupons });
   } catch (err) {
+    logger.error('[Coupons] List coupons error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -77,8 +81,10 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
       usageLimit: usageLimit || 100,
       expiresAt
     });
+    logActivity({ domain: 'admin', action: 'coupon_created', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Coupon', targetId: coupon._id, message: `Coupon "${coupon.code}" created` });
     res.status(201).json({ coupon, message: 'Coupon created' });
   } catch (err) {
+    logger.error('[Coupons] Create coupon error:', err.message);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -103,6 +109,7 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
     if (!coupon) return res.status(404).json({ message: 'Coupon not found' });
     res.json({ coupon, message: 'Coupon updated' });
   } catch (err) {
+    logger.error('[Coupons] Update coupon error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -111,8 +118,10 @@ router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
 router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     await Coupon.findByIdAndDelete(req.params.id);
+    logActivity({ domain: 'admin', action: 'coupon_deleted', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Coupon', targetId: req.params.id, message: `Coupon deleted` });
     res.json({ message: 'Coupon deleted' });
   } catch (err) {
+    logger.error('[Coupons] Delete coupon error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });

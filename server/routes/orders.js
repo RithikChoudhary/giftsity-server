@@ -272,6 +272,15 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
       env: process.env.CASHFREE_ENV || 'sandbox'
     });
   } catch (err) {
+    // Rollback reserved stock on any failure (Cashfree error, DB error, etc.)
+    if (reservedItems && reservedItems.length) {
+      for (const ri of reservedItems) {
+        try { await Product.findByIdAndUpdate(ri.productId, { $inc: { stock: ri.quantity } }); } catch (rollbackErr) {
+          logger.error(`[Order] Stock rollback failed for product ${ri.productId}:`, rollbackErr.message);
+        }
+      }
+      logger.info(`[Order] Rolled back stock for ${reservedItems.length} item(s) due to order creation failure`);
+    }
     logger.error('Create order error:', err?.response?.data || err.message || err);
     res.status(500).json({ message: 'Failed to create order', error: err?.response?.data?.message || err.message });
   }
@@ -316,8 +325,18 @@ router.post('/cancel-pending', requireAuth, async (req, res) => {
   }
 });
 
+// Rate limiter for payment verification
+const paymentVerifyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyGenerator: (req) => req.user?._id?.toString() || req.ip,
+  message: { message: 'Too many verification attempts. Please try again in a minute.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 // POST /api/orders/verify-payment - verify Cashfree payment
-router.post('/verify-payment', requireAuth, validatePaymentVerification, async (req, res) => {
+router.post('/verify-payment', requireAuth, paymentVerifyLimiter, validatePaymentVerification, async (req, res) => {
   try {
     if ((req.user.userType || req.user.role) !== 'customer') {
       return res.status(403).json({ message: 'Customer access required' });

@@ -6,6 +6,7 @@ const Review = require('../models/Review');
 const Order = require('../models/Order');
 const PlatformSettings = require('../models/PlatformSettings');
 const { cacheMiddleware } = require('../middleware/cache');
+const logger = require('../utils/logger');
 const router = express.Router();
 
 // Helper: find seller by businessSlug OR ObjectId
@@ -32,6 +33,7 @@ router.get('/info', cacheMiddleware(600), async (req, res) => {
       whatsappNumber: settings.whatsappNumber || ''
     });
   } catch (err) {
+    logger.error('[Store] Platform info error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -47,25 +49,31 @@ router.get('/featured/top-sellers', cacheMiddleware(300), async (req, res) => {
       .limit(6)
       .select('name sellerProfile.businessName sellerProfile.businessSlug sellerProfile.avatar sellerProfile.bio sellerProfile.rating sellerProfile.isVerified sellerProfile.totalOrders sellerProfile.businessAddress.city');
 
-    const formatted = await Promise.all(sellers.map(async s => {
-      const productCount = await Product.countDocuments({ sellerId: s._id, isActive: true });
-      return {
-        _id: s._id,
-        name: s.name,
-        businessName: s.sellerProfile.businessName,
-        businessSlug: s.sellerProfile.businessSlug,
-        avatar: s.sellerProfile.avatar,
-        bio: s.sellerProfile.bio,
-        rating: s.sellerProfile.rating,
-        isVerified: s.sellerProfile.isVerified,
-        totalOrders: s.sellerProfile.totalOrders,
-        city: s.sellerProfile.businessAddress?.city,
-        productCount
-      };
+    // Batch product counts in a single aggregation instead of N queries
+    const sellerIds = sellers.map(s => s._id);
+    const counts = await Product.aggregate([
+      { $match: { sellerId: { $in: sellerIds }, isActive: true } },
+      { $group: { _id: '$sellerId', count: { $sum: 1 } } }
+    ]);
+    const countMap = Object.fromEntries(counts.map(c => [c._id.toString(), c.count]));
+
+    const formatted = sellers.map(s => ({
+      _id: s._id,
+      name: s.name,
+      businessName: s.sellerProfile.businessName,
+      businessSlug: s.sellerProfile.businessSlug,
+      avatar: s.sellerProfile.avatar,
+      bio: s.sellerProfile.bio,
+      rating: s.sellerProfile.rating,
+      isVerified: s.sellerProfile.isVerified,
+      totalOrders: s.sellerProfile.totalOrders,
+      city: s.sellerProfile.businessAddress?.city,
+      productCount: countMap[s._id.toString()] || 0
     }));
 
     res.json({ sellers: formatted });
   } catch (err) {
+    logger.error('[Store] Top sellers error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -97,26 +105,32 @@ router.get('/sellers', cacheMiddleware(120), async (req, res) => {
       .limit(limitNum)
       .select('name sellerProfile.businessName sellerProfile.businessSlug sellerProfile.avatar sellerProfile.bio sellerProfile.rating sellerProfile.isVerified sellerProfile.totalOrders sellerProfile.businessAddress.city createdAt');
 
-    const formatted = await Promise.all(sellers.map(async s => {
-      const productCount = await Product.countDocuments({ sellerId: s._id, isActive: true });
-      return {
-        _id: s._id,
-        name: s.name,
-        businessName: s.sellerProfile.businessName,
-        businessSlug: s.sellerProfile.businessSlug,
-        avatar: s.sellerProfile.avatar,
-        bio: s.sellerProfile.bio,
-        rating: s.sellerProfile.rating,
-        isVerified: s.sellerProfile.isVerified,
-        totalOrders: s.sellerProfile.totalOrders,
-        city: s.sellerProfile.businessAddress?.city,
-        productCount,
-        joinedAt: s.createdAt
-      };
+    // Batch product counts in a single aggregation instead of N queries
+    const sellerIds = sellers.map(s => s._id);
+    const counts = await Product.aggregate([
+      { $match: { sellerId: { $in: sellerIds }, isActive: true } },
+      { $group: { _id: '$sellerId', count: { $sum: 1 } } }
+    ]);
+    const countMap = Object.fromEntries(counts.map(c => [c._id.toString(), c.count]));
+
+    const formatted = sellers.map(s => ({
+      _id: s._id,
+      name: s.name,
+      businessName: s.sellerProfile.businessName,
+      businessSlug: s.sellerProfile.businessSlug,
+      avatar: s.sellerProfile.avatar,
+      bio: s.sellerProfile.bio,
+      rating: s.sellerProfile.rating,
+      isVerified: s.sellerProfile.isVerified,
+      totalOrders: s.sellerProfile.totalOrders,
+      city: s.sellerProfile.businessAddress?.city,
+      productCount: countMap[s._id.toString()] || 0,
+      joinedAt: s.createdAt
     }));
 
     res.json({ sellers: formatted, total, page: pageNum, pages: Math.ceil(total / limitNum) });
   } catch (err) {
+    logger.error('[Store] Sellers list error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -163,6 +177,7 @@ router.get('/:slug', cacheMiddleware(120), async (req, res) => {
       }
     });
   } catch (err) {
+    logger.error('[Store] Store page error:', err.message);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -185,6 +200,7 @@ router.get('/:slug/products', cacheMiddleware(60), async (req, res) => {
 
     res.json({ products, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
   } catch (err) {
+    logger.error('[Store] Store products error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -215,6 +231,7 @@ router.get('/:slug/reviews', cacheMiddleware(120), async (req, res) => {
 
     res.json({ reviews, total, ratingDistribution: ratingDist, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
   } catch (err) {
+    logger.error('[Store] Store reviews error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });

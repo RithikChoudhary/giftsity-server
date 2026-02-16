@@ -8,6 +8,8 @@ const { sanitizeBody } = require('../middleware/sanitize');
 const { validateReviewCreation } = require('../middleware/validators');
 const { cacheMiddleware, invalidateCache } = require('../middleware/cache');
 const { createNotification } = require('../utils/notify');
+const { logActivity } = require('../utils/audit');
+const logger = require('../utils/logger');
 const router = express.Router();
 
 // GET /api/reviews/product/:productId
@@ -40,6 +42,7 @@ router.get('/product/:productId', cacheMiddleware(120), async (req, res) => {
 
     res.json({ reviews, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)), ratingBreakdown });
   } catch (err) {
+    logger.error('[Reviews] Get product reviews error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -120,8 +123,10 @@ router.post('/', requireAuth, sanitizeBody, validateReviewCreation, async (req, 
     invalidateCache('/api/products/' + (await Product.findById(productId).select('slug').lean())?.slug);
     invalidateCache('/api/store/');
 
+    logActivity({ domain: 'review', action: 'review_created', actorRole: 'customer', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Product', targetId: productId, message: `${rating}-star review on "${product.title}"` });
     res.status(201).json({ review, message: 'Review submitted' });
   } catch (err) {
+    logger.error('[Reviews] Create review error:', err.message);
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -153,8 +158,10 @@ router.put('/:id/hide', requireAuth, requireAdmin, async (req, res) => {
     invalidateCache('/api/reviews/product/' + review.productId);
     invalidateCache('/api/store/');
 
+    logActivity({ domain: 'admin', action: review.isHidden ? 'review_hidden' : 'review_shown', actorRole: 'admin', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Review', targetId: review._id, message: `Review ${review.isHidden ? 'hidden' : 'shown'}${reason ? ': ' + reason : ''}` });
     res.json({ review, message: review.isHidden ? 'Review hidden' : 'Review shown' });
   } catch (err) {
+    logger.error('[Reviews] Hide review error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 });

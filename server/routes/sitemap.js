@@ -34,6 +34,8 @@ router.get('/sitemap.xml', async (req, res) => {
       { loc: '/seller/join', priority: '0.8', changefreq: 'monthly' },
       { loc: '/terms', priority: '0.3', changefreq: 'yearly' },
       { loc: '/privacy', priority: '0.3', changefreq: 'yearly' },
+      { loc: '/return-policy', priority: '0.5', changefreq: 'yearly' },
+      { loc: '/shipping-policy', priority: '0.5', changefreq: 'yearly' },
     ];
 
     // Dynamic product pages

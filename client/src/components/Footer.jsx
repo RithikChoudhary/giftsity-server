@@ -60,6 +60,8 @@ export default function Footer() {
               {info.supportPhone && <a href={`tel:${info.supportPhone}`} className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">{info.supportPhone}</a>}
               <Link to="/terms" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">Terms &amp; Conditions</Link>
               <Link to="/privacy" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">Privacy Policy</Link>
+              <Link to="/return-policy" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">Return &amp; Refund Policy</Link>
+              <Link to="/shipping-policy" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">Shipping Policy</Link>
             </div>
           </div>
         </div>

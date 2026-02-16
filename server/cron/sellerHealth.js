@@ -5,6 +5,8 @@ const Seller = require('../models/Seller');
 const Product = require('../models/Product');
 const { sendOTP } = require('../utils/email'); // reuse transporter
 const { logActivity } = require('../utils/audit');
+const { createRefund, getCashfreeOrder } = require('../config/cashfree');
+const { createNotification } = require('../utils/notify');
 const logger = require('../utils/logger');
 
 // ==================== CONFIG ====================
@@ -33,7 +35,36 @@ async function autoCancelUnshippedOrders() {
     order.status = 'cancelled';
     order.cancelledAt = new Date();
     order.cancelReason = `Auto-cancelled: not shipped within ${AUTO_CANCEL_HOURS} hours`;
-    order.paymentStatus = 'refunded';
+
+    // Initiate Cashfree refund for paid orders
+    if (order.cashfreeOrderId && order.totalAmount > 0) {
+      try {
+        let refundAmount = order.totalAmount;
+        try {
+          const cfOrderData = await getCashfreeOrder(order.cashfreeOrderId);
+          if (cfOrderData.order_amount) {
+            refundAmount = Math.min(order.totalAmount, parseFloat(cfOrderData.order_amount));
+          }
+        } catch (cfErr) {
+          logger.warn(`[AutoCancel] Could not verify Cashfree order amount for ${order.orderNumber}, using order total`);
+        }
+        const refundId = `refund_${order.orderNumber}_${Date.now()}`;
+        await createRefund({
+          orderId: order.cashfreeOrderId,
+          refundAmount,
+          refundId,
+          refundNote: `Auto-cancelled: not shipped within ${AUTO_CANCEL_HOURS} hours`
+        });
+        order.paymentStatus = 'refunded';
+        order.refundId = refundId;
+      } catch (refundErr) {
+        logger.error(`[AutoCancel] Refund failed for order ${order.orderNumber}: ${refundErr.message}`);
+        order.paymentStatus = 'refund_pending';
+      }
+    } else {
+      order.paymentStatus = 'refunded';
+    }
+
     await order.save();
 
     // Restore stock
@@ -47,6 +78,15 @@ async function autoCancelUnshippedOrders() {
     await Seller.findByIdAndUpdate(order.sellerId, {
       $inc: { 'sellerProfile.failedOrders': 1 }
     });
+
+    // Notify customer about the refund
+    if (order.customerId) {
+      try {
+        await createNotification({ userId: order.customerId, userRole: 'customer', type: 'order', title: 'Order Auto-Cancelled & Refunded', message: `Order ${order.orderNumber} was auto-cancelled because the seller did not ship it within ${AUTO_CANCEL_HOURS} hours. A refund has been initiated.`, link: `/orders/${order._id}` });
+      } catch (notifyErr) {
+        logger.warn(`[AutoCancel] Failed to notify customer for ${order.orderNumber}`);
+      }
+    }
 
     cancelled++;
     logActivity({ domain: 'cron', action: 'order_auto_cancelled', actorRole: 'system', targetType: 'Order', targetId: order._id, message: `Order ${order.orderNumber} auto-cancelled (not shipped within ${AUTO_CANCEL_HOURS}h)`, metadata: { sellerId: order.sellerId.toString(), orderNumber: order.orderNumber } });
