@@ -5,18 +5,18 @@ import SEO from '../../components/SEO';
 export default function About() {
   return (
     <div>
-      <SEO title="About" description="Giftsity is India's gift marketplace connecting you with verified gift sellers. Tech gadgets, artisan crafts, hampers and more. 0% seller platform fee." />
+      <SEO title="About" description="Giftsity is India's marketplace for creators and Instagram sellers. Discover unique products from verified creators. 0% platform fee for creators." />
       {/* Hero */}
       <section className="relative overflow-hidden py-20 px-4">
         <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-orange-500/5" />
         <div className="max-w-4xl mx-auto text-center relative">
           <h1 className="text-4xl md:text-5xl font-black text-theme-primary mb-4">
-            The Gift Marketplace <br />
+            The Creator Marketplace <br />
             <span className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Built for India</span>
           </h1>
           <p className="text-lg text-theme-muted max-w-2xl mx-auto mb-8">
-            Giftsity connects you with India's finest gift sellers -- from artisan crafts to tech gadgets.
-            One platform, hundreds of unique gifts, delivered to your door.
+            Giftsity connects you with India's finest creators -- from Instagram sellers to artisan brands.
+            One platform, hundreds of unique products, delivered to your door.
           </p>
           <div className="flex gap-4 justify-center">
             <Link to="/shop" className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-xl font-semibold transition-colors">
@@ -34,9 +34,9 @@ export default function About() {
         <h2 className="text-2xl font-bold text-theme-primary text-center mb-12">How Giftsity Works</h2>
         <div className="grid md:grid-cols-3 gap-8">
           {[
-            { icon: Gift, title: 'Browse & Discover', desc: 'Explore gifts from verified sellers across India. Filter by category, price, and occasion.' },
+            { icon: Gift, title: 'Browse & Discover', desc: 'Explore products from verified creators across India. Filter by category, price, and occasion.' },
             { icon: Shield, title: 'Secure Checkout', desc: 'Pay safely with Cashfree payment gateway. Your payment details are never stored on our servers.' },
-            { icon: Truck, title: 'Track & Receive', desc: 'Sellers ship directly to you with tracked delivery via Shiprocket logistics partners.' },
+            { icon: Truck, title: 'Track & Receive', desc: 'Creators ship directly to you with tracked delivery via Shiprocket logistics partners.' },
           ].map((item, i) => (
             <div key={i} className="bg-card border border-edge/50 rounded-2xl p-6 text-center">
               <div className="w-14 h-14 rounded-xl bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
@@ -55,8 +55,8 @@ export default function About() {
           <h2 className="text-2xl font-bold text-theme-primary text-center mb-12">Why Choose Giftsity</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: Heart, title: 'Curated Selection', desc: 'Every seller is manually verified by our team before they can list products.' },
-              { icon: Zap, title: '0% Platform Fee', desc: 'Our sellers keep more, so you get better prices and happier gifting.' },
+              { icon: Heart, title: 'Curated Selection', desc: 'Every creator is manually verified by our team before they can list products.' },
+              { icon: Zap, title: '0% Platform Fee', desc: 'Our creators keep more, so you get better prices and happier gifting.' },
               { icon: Star, title: 'Honest Reviews', desc: 'Real reviews from verified buyers. No fake ratings, ever.' },
               { icon: Users, title: 'B2B & B2C', desc: 'Gift for yourself, or get a custom quote for corporate bulk orders.' },
             ].map((item, i) => (

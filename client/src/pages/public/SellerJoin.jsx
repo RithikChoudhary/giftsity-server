@@ -164,12 +164,12 @@ export default function SellerJoin() {
 
   return (
     <div className="min-h-screen">
-      <SEO title="Sell on Giftsity" description="Start selling gifts online with 0% platform fee. Keep 97% of every sale. Join India's fastest growing gift marketplace for free." keywords="sell gifts online, gift marketplace seller, sell on Giftsity, 0% commission, start selling online India" />
+      <SEO title="Sell on Giftsity" description="Start selling your products online as a creator with 0% platform fee. Keep 97% of every sale. Join India's fastest growing creator marketplace for free." keywords="sell online as creator, creator marketplace, Instagram seller store, sell on Giftsity, 0% commission, start selling online India" />
       {/* Hero */}
       <section className="bg-gradient-to-br from-surface via-card to-surface py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-xs font-medium mb-6">LIMITED TIME: 0% PLATFORM FEE!</div>
-          <h1 className="text-3xl md:text-5xl font-black text-theme-primary mb-4">Sell Gifts on <span className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Giftsity</span></h1>
+          <h1 className="text-3xl md:text-5xl font-black text-theme-primary mb-4">Sell Your Products on <span className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Giftsity</span></h1>
           <p className="text-lg text-theme-muted max-w-xl mx-auto mb-8">Keep 97% of every sale. Only payment gateway fee (3%). No listing fees. No monthly charges.</p>
 
           {/* Comparison table */}
@@ -356,7 +356,7 @@ export default function SellerJoin() {
           {[
             { title: 'Zero Commission', desc: 'Start selling with 0% platform fee. You keep 97% of every sale.' },
             { title: 'Easy Setup', desc: 'List products in minutes. Manage from your seller dashboard.' },
-            { title: 'Growing Audience', desc: 'Reach thousands of gift buyers. We drive traffic to your products.' },
+            { title: 'Growing Audience', desc: 'Reach thousands of customers beyond your followers. We drive traffic to your products.' },
           ].map((b, i) => (
             <div key={i} className="bg-card border border-edge/50 rounded-xl p-5 text-center">
               <h3 className="font-semibold text-theme-primary mb-2">{b.title}</h3>

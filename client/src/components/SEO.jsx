@@ -1,19 +1,19 @@
 import { Helmet } from 'react-helmet-async';
 
 const SITE_NAME = 'Giftsity';
-const DEFAULT_DESCRIPTION = 'India\'s gift marketplace. Discover unique gifts from hundreds of verified sellers. Tech gadgets, artisan crafts, hampers & more. 0% platform fee for sellers.';
+const DEFAULT_DESCRIPTION = 'India\'s marketplace for creators. Discover unique products from verified Instagram sellers, artists & online entrepreneurs. 0% platform fee for creators.';
 const DEFAULT_URL = 'https://giftsity.com';
 
 export default function SEO({
   title,
   description = DEFAULT_DESCRIPTION,
-  keywords = 'gifts, gift marketplace, corporate gifts, online gifts India, unique gifts, tech gifts, artisan gifts, Giftsity',
+  keywords = 'gifts, creator marketplace, Instagram seller, creator store India, sell online India, online seller platform, corporate gifts, online gifts India, unique gifts, tech gifts, artisan gifts, Giftsity',
   image,
   url,
   type = 'website',
   noIndex = false,
 }) {
-  const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} — India's Gift Marketplace`;
+  const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} — Where India's Creators Sell`;
   const pageUrl = url || DEFAULT_URL;
 
   return (

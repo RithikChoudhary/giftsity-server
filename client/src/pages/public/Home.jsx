@@ -58,13 +58,13 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-20 md:py-32 relative">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-400 text-xs font-medium mb-6">
-              <Sparkles className="w-3 h-3" /> The Gift Marketplace
+              <Sparkles className="w-3 h-3" /> Where Creators Sell
             </div>
             <h1 className="text-4xl md:text-6xl font-black leading-tight mb-6">
-              Find the <span className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Perfect Gift</span> for Every Occasion
+              Discover Products from India's <span className="bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Best Creators</span>
             </h1>
             <p className="text-lg text-theme-muted mb-8 max-w-xl">
-              Discover handpicked gifts from hundreds of independent sellers. From tech gadgets to artisan crafts.
+              Discover handpicked products from hundreds of creators, Instagram sellers & artisans.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link to="/shop" className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-xl font-semibold transition-colors">
@@ -83,7 +83,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
-              { icon: ShoppingBag, title: 'Curated Gifts', sub: 'Handpicked quality' },
+              { icon: ShoppingBag, title: 'From Real Creators', sub: 'Verified & authentic' },
               { icon: Truck, title: 'Fast Delivery', sub: 'Pan India shipping' },
               { icon: Shield, title: 'Secure Payment', sub: 'Cashfree powered' },
               { icon: Heart, title: '0% Platform Fee', sub: 'Best prices guaranteed' },
@@ -141,7 +141,7 @@ export default function Home() {
         <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold text-theme-primary flex items-center gap-2">
-              <Store className="w-5 h-5 text-amber-400" /> Top Sellers
+              <Store className="w-5 h-5 text-amber-400" /> Top Creators
             </h2>
             <Link to="/sellers" className="text-sm text-amber-400 hover:text-amber-300 flex items-center gap-1">View All <ArrowRight className="w-3 h-3" /></Link>
           </div>
@@ -190,10 +190,10 @@ export default function Home() {
       {/* CTA */}
       <section className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-y border-edge/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 text-center">
-          <h2 className="text-3xl font-bold text-theme-primary mb-4">Start Selling on Giftsity</h2>
-          <p className="text-theme-muted mb-6 max-w-lg mx-auto">0% platform fee for a limited time. List your products and reach thousands of gift buyers.</p>
+          <h2 className="text-3xl font-bold text-theme-primary mb-4">Are You a Creator? Start Selling</h2>
+          <p className="text-theme-muted mb-6 max-w-lg mx-auto">0% platform fee. Set up your store in minutes. Reach thousands of new customers beyond your followers.</p>
           <Link to="/seller/join" className="inline-flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-xl font-semibold transition-colors">
-            Join as Seller <ArrowRight className="w-4 h-4" />
+            Join as Creator <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>

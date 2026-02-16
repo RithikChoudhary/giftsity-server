@@ -13,7 +13,7 @@ export default function ShippingPolicy() {
       <div className="prose-sm space-y-6 text-theme-secondary leading-relaxed">
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">1. Overview</h2>
-          <p>Giftsity partners with leading logistics providers through the Shiprocket network to deliver your orders across India. Shipping is coordinated between the seller, our logistics partners, and the platform to ensure timely and safe delivery of your gifts.</p>
+          <p>Giftsity partners with leading logistics providers through the Shiprocket network to deliver your orders across India. Shipping is coordinated between the creator/seller, our logistics partners, and the platform to ensure timely and safe delivery of your orders.</p>
         </section>
 
         <section>

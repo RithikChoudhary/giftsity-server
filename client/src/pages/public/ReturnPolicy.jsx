@@ -13,7 +13,7 @@ export default function ReturnPolicy() {
       <div className="prose-sm space-y-6 text-theme-secondary leading-relaxed">
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">1. Overview</h2>
-          <p>Giftsity is a multi-vendor marketplace. Products are sold by independent third-party sellers. Each seller is responsible for the quality and accuracy of their products. This Return &amp; Refund Policy outlines the process for returning products purchased through our platform.</p>
+          <p>Giftsity is a multi-vendor marketplace. Products are sold by independent creators and sellers. Each seller is responsible for the quality and accuracy of their products. This Return &amp; Refund Policy outlines the process for returning products purchased through our platform.</p>
         </section>
 
         <section>

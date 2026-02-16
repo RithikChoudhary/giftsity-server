@@ -31,7 +31,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           <div>
             <h3 className="text-xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent mb-3">{info.platformName || 'Giftsity'}</h3>
-            <p className="text-sm text-theme-muted">The gift marketplace. Find the perfect gift from hundreds of sellers.</p>
+            <p className="text-sm text-theme-muted">Where India's creators sell. Discover unique products from verified creators & independent sellers.</p>
             {/* Social links */}
             <div className="flex gap-3 mt-4">
               {info.instagramUrl && (
