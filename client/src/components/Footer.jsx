@@ -9,6 +9,22 @@ export default function Footer() {
     API.get('/store/info').then(res => setInfo(res.data)).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const script = document.getElementById('merchantWidgetScript');
+    if (!script) return;
+    const init = () => {
+      if (window.merchantwidget) {
+        window.merchantwidget.start({
+          merchant_id: 5728574030,
+          position: 'BOTTOM_RIGHT',
+          region: 'IN',
+        });
+      }
+    };
+    if (window.merchantwidget) init();
+    else script.addEventListener('load', init);
+  }, []);
+
   return (
     <footer className="bg-surface border-t border-edge/50 mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">

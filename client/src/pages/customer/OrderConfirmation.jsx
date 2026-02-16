@@ -18,6 +18,30 @@ export default function OrderConfirmation() {
     loadOrder();
   }, [id, user, authLoading]);
 
+  useEffect(() => {
+    if (!order) return;
+    const estimatedDelivery = new Date(Date.now() + 7 * 86400000)
+      .toISOString().split('T')[0];
+
+    window.renderOptIn = function () {
+      if (window.gapi && window.gapi.load) {
+        window.gapi.load('surveyoptin', function () {
+          window.gapi.surveyoptin.render({
+            merchant_id: 5728574030,
+            order_id: order.orderNumber,
+            email: order.customerEmail,
+            delivery_country: 'IN',
+            estimated_delivery_date: estimatedDelivery,
+          });
+        });
+      }
+    };
+
+    if (window.gapi && window.gapi.load) {
+      window.renderOptIn();
+    }
+  }, [order]);
+
   const loadOrder = async () => {
     try {
       const { data } = await API.get(`/orders/${id}`);
