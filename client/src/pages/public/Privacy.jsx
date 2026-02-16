@@ -5,7 +5,7 @@ import SEO from '../../components/SEO';
 export default function Privacy() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
-      <SEO title="Privacy Policy" description="Giftsity privacy policy. Learn how we collect, use, and protect your data on our gift marketplace." noIndex />
+      <SEO title="Privacy Policy" description="Giftsity privacy policy. Learn how we collect, use, and protect your data on our gift marketplace." url="https://giftsity.com/privacy" />
       <Link to="/" className="inline-flex items-center gap-1 text-sm text-theme-muted hover:text-theme-primary mb-6"><ArrowLeft className="w-4 h-4" /> Back to Home</Link>
       <h1 className="text-3xl font-bold text-theme-primary mb-2">Privacy Policy</h1>
       <p className="text-sm text-theme-dim mb-8">Last updated: {new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}</p>

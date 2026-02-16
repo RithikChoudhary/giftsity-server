@@ -1,7 +1,8 @@
 User-agent: *
 Allow: /
+Allow: /seller/join
 Disallow: /admin
-Disallow: /seller
+Disallow: /seller/
 Disallow: /profile
 Disallow: /orders
 Disallow: /corporate

@@ -5,7 +5,7 @@ import SEO from '../../components/SEO';
 export default function Terms() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
-      <SEO title="Terms & Conditions" description="Giftsity terms of service. Read our terms and conditions for using the gift marketplace platform." noIndex />
+      <SEO title="Terms & Conditions" description="Giftsity terms of service. Read our terms and conditions for using the gift marketplace platform." url="https://giftsity.com/terms" />
       <Link to="/" className="inline-flex items-center gap-1 text-sm text-theme-muted hover:text-theme-primary mb-6"><ArrowLeft className="w-4 h-4" /> Back to Home</Link>
       <h1 className="text-3xl font-bold text-theme-primary mb-2">Terms &amp; Conditions</h1>
       <p className="text-sm text-theme-dim mb-8">Last updated: {new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
