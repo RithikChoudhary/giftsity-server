@@ -62,6 +62,7 @@ const orderSchema = new mongoose.Schema({
     default: 'pending'
   },
   refundId: { type: String, default: '' },
+  refundRetryCount: { type: Number, default: 0 },
   cashfreeOrderId: { type: String, default: '' },
   cashfreePaymentId: { type: String, default: '' },
   paymentSessionId: { type: String, default: '' },

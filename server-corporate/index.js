@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
+const mongoose = require('mongoose');
 const connectDB = require('../server/config/db');
 const logger = require('../server/utils/logger');
 
@@ -71,5 +72,23 @@ process.on('unhandledRejection', (err) => {
 
 // Start
 connectDB().then(() => {
-  app.listen(PORT, () => logger.info(`Giftsity Corporate server running on port ${PORT}`));
+  const server = app.listen(PORT, () => {
+    console.log(`[Startup] Giftsity Corporate server running on port ${PORT}`);
+    logger.info(`Giftsity Corporate server running on port ${PORT}`);
+  });
+
+  // Graceful shutdown
+  const shutdown = (signal) => {
+    logger.info(`[Corporate] ${signal} received, shutting down gracefully...`);
+    server.close(() => {
+      logger.info('[Corporate] HTTP server closed');
+      mongoose.connection.close(false).then(() => {
+        logger.info('[Corporate] MongoDB connection closed');
+        process.exit(0);
+      });
+    });
+    setTimeout(() => { process.exit(1); }, 10000);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 });

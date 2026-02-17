@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
+const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 const logger = require('./utils/logger');
 const { initSocket } = require('./socket');
@@ -107,4 +108,19 @@ connectDB().then(() => {
     startCronJobs();
     console.log('[Startup] Cron jobs scheduled');
   });
+
+  // Graceful shutdown
+  const shutdown = (signal) => {
+    logger.info(`${signal} received, shutting down gracefully...`);
+    server.close(() => {
+      logger.info('HTTP server closed');
+      mongoose.connection.close(false).then(() => {
+        logger.info('MongoDB connection closed');
+        process.exit(0);
+      });
+    });
+    setTimeout(() => { process.exit(1); }, 10000);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 });

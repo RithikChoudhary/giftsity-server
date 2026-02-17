@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Seller = require('../models/Seller');
 const Product = require('../models/Product');
+const User = require('../models/User');
 const { sendOTP } = require('../utils/email'); // reuse transporter
 const { logActivity } = require('../utils/audit');
 const { createRefund, getCashfreeOrder } = require('../config/cashfree');
@@ -674,6 +675,85 @@ async function autoDisbursePayouts() {
   }
 }
 
+// ==================== RETRY FAILED REFUNDS ====================
+const MAX_REFUND_RETRIES = 5;
+
+async function retryFailedRefunds() {
+  try {
+    const pendingOrders = await Order.find({
+      paymentStatus: 'refund_pending',
+      refundRetryCount: { $lt: MAX_REFUND_RETRIES },
+      cashfreeOrderId: { $ne: '' }
+    });
+
+    if (pendingOrders.length === 0) return;
+
+    logger.info(`[RefundRetry] Found ${pendingOrders.length} orders with pending refunds`);
+
+    let succeeded = 0, failed = 0, maxedOut = 0;
+
+    for (const order of pendingOrders) {
+      try {
+        let refundAmount = order.totalAmount;
+        try {
+          const cfOrderData = await getCashfreeOrder(order.cashfreeOrderId);
+          if (cfOrderData.order_amount) {
+            refundAmount = Math.min(order.totalAmount, parseFloat(cfOrderData.order_amount));
+          }
+        } catch (cfErr) {
+          logger.warn(`[RefundRetry] Could not verify Cashfree amount for ${order.orderNumber}, using order total`);
+        }
+
+        const refundId = `refund_${order.orderNumber}_retry${order.refundRetryCount + 1}_${Date.now()}`;
+        await createRefund({
+          orderId: order.cashfreeOrderId,
+          refundAmount,
+          refundId,
+          refundNote: `Auto-retry refund (attempt ${order.refundRetryCount + 1})`
+        });
+
+        order.paymentStatus = 'refunded';
+        order.refundId = refundId;
+        await order.save();
+        succeeded++;
+        logger.info(`[RefundRetry] Refund succeeded for ${order.orderNumber} on attempt ${order.refundRetryCount + 1}`);
+      } catch (retryErr) {
+        order.refundRetryCount = (order.refundRetryCount || 0) + 1;
+        await order.save();
+        failed++;
+        logger.error(`[RefundRetry] Attempt ${order.refundRetryCount} failed for ${order.orderNumber}: ${retryErr.message}`);
+
+        if (order.refundRetryCount >= MAX_REFUND_RETRIES) {
+          maxedOut++;
+          logger.error(`[RefundRetry] Order ${order.orderNumber} exceeded max retries (${MAX_REFUND_RETRIES}). Requires manual intervention.`);
+
+          // Notify all admin users
+          try {
+            const admins = await User.find({ userType: 'admin', status: 'active' }).select('_id');
+            for (const admin of admins) {
+              await createNotification({
+                userId: admin._id,
+                userRole: 'admin',
+                type: 'alert',
+                title: 'Refund Failed - Manual Action Needed',
+                message: `Refund for order #${order.orderNumber} (₹${order.totalAmount}) failed after ${MAX_REFUND_RETRIES} attempts. Please process manually via Cashfree dashboard.`,
+                link: '/admin/orders',
+                metadata: { orderId: order._id.toString(), orderNumber: order.orderNumber }
+              });
+            }
+          } catch (notifyErr) {
+            logger.warn(`[RefundRetry] Failed to notify admin for ${order.orderNumber}: ${notifyErr.message}`);
+          }
+        }
+      }
+    }
+
+    logger.info(`[RefundRetry] Complete: ${succeeded} succeeded, ${failed} failed, ${maxedOut} maxed out`);
+  } catch (err) {
+    logger.error('[RefundRetry] Cron error:', err.message);
+  }
+}
+
 // ==================== SCHEDULE ====================
 function startCronJobs() {
   // Auto-cancel unpaid orders every 5 minutes
@@ -700,6 +780,9 @@ function startCronJobs() {
   // Poll Cashfree payout statuses every 5 minutes
   cron.schedule('*/5 * * * *', pollPayoutStatuses);
 
+  // Retry failed refunds every 30 minutes
+  cron.schedule('*/30 * * * *', retryFailedRefunds);
+
   // Run initial checks after 30 seconds (let server start)
   setTimeout(runAllCrons, 30 * 1000);
   // Also run unpaid check shortly after start
@@ -717,5 +800,6 @@ module.exports = {
   autoSuspendBadSellers,
   autoCalculatePayouts,
   autoDisbursePayouts,
-  updateSellerLastActive
+  updateSellerLastActive,
+  retryFailedRefunds
 };
