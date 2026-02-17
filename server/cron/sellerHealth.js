@@ -775,10 +775,10 @@ function startCronJobs() {
   cron.schedule('0 0 * * *', autoCalculatePayouts);
 
   // Auto-disburse pending payouts at 00:05 (5 min after calculation)
-  cron.schedule('5 0 * * *', autoDisbursePayouts);
+  // cron.schedule('5 0 * * *', autoDisbursePayouts);  // DISABLED: Cashfree Payouts unavailable for current entity type
 
   // Poll Cashfree payout statuses every 5 minutes
-  cron.schedule('*/5 * * * *', pollPayoutStatuses);
+  // cron.schedule('*/5 * * * *', pollPayoutStatuses);  // DISABLED: Cashfree Payouts unavailable for current entity type
 
   // Retry failed refunds every 30 minutes
   cron.schedule('*/30 * * * *', retryFailedRefunds);
