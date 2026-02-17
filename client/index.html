@@ -102,12 +102,13 @@
     <script defer src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
   </head>
   <body>
+    <!-- SEO: visible H1 for crawlers that don't execute JS (Bingbot) -->
+    <div id="seo-fallback" style="padding:2rem;text-align:center;font-family:sans-serif;">
+      <h1>Giftsity — Where India's Creators Sell</h1>
+      <p>Discover unique products from India's best creators and Instagram sellers. Handmade crafts, curated gifts, tech accessories and more.</p>
+    </div>
     <noscript>
-      <div style="padding:2rem;text-align:center;font-family:sans-serif;">
-        <h1>Giftsity — Where India's Creators Sell</h1>
-        <p>Please enable JavaScript to use this application.</p>
-        <p>Visit us at <a href="https://giftsity.com">giftsity.com</a></p>
-      </div>
+      <p style="text-align:center;font-family:sans-serif;">Please enable JavaScript to use this application. Visit us at <a href="https://giftsity.com">giftsity.com</a></p>
     </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>

@@ -14,3 +14,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </ErrorBoundary>
   </React.StrictMode>
 );
+
+// Remove SEO fallback once React has mounted
+document.getElementById('seo-fallback')?.remove();
