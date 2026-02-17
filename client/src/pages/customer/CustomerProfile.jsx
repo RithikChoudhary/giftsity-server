@@ -99,7 +99,7 @@ export default function CustomerProfile() {
               {editing ? (
                 <input type="text" value={name} onChange={e => setName(e.target.value)} className="px-3 py-1 bg-inset border border-edge rounded-lg text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
               ) : (
-                <h2 className="text-lg font-semibold text-theme-primary">{user?.name}</h2>
+                <h2 className="text-lg font-semibold text-theme-primary">{user?.name || <span className="text-theme-dim italic text-base">No name set</span>}</h2>
               )}
               <p className="text-sm text-theme-muted">{user?.email}</p>
             </div>
@@ -121,7 +121,7 @@ export default function CustomerProfile() {
             <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full px-3 py-2 bg-inset border border-edge rounded-lg text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
           </div>
         )}
-        {!editing && user?.phone && <p className="text-sm text-theme-secondary mt-1 ml-17">Phone: {user.phone}</p>}
+        {!editing && <p className="text-sm text-theme-secondary mt-1 ml-17">Phone: {user?.phone || <span className="text-theme-dim italic">Not set</span>}</p>}
       </div>
 
       {/* Quick links */}

@@ -75,7 +75,7 @@ router.post('/send-otp', otpLimiter, async (req, res) => {
 // POST /api/auth/verify-otp
 router.post('/verify-otp', verifyLimiter, async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp, name, phone } = req.body;
     if (!email || !otp) return res.status(400).json({ message: 'Email and OTP required' });
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -97,6 +97,17 @@ router.post('/verify-otp', verifyLimiter, async (req, res) => {
 
     user.otp = null;
     user.otpExpiry = null;
+
+    // For new customers: require and save name + phone
+    const isNewCustomer = identity.role === 'customer' && !user.isProfileComplete;
+    if (isNewCustomer) {
+      if (!name || !name.trim()) return res.status(400).json({ message: 'Name is required for new accounts' });
+      if (!phone || !/^[0-9]{10}$/.test(phone.trim())) return res.status(400).json({ message: 'A valid 10-digit phone number is required' });
+      user.name = name.trim();
+      user.phone = phone.trim();
+      user.isProfileComplete = true;
+    }
+
     await user.save();
 
     const userType = identity.source === 'legacy' ? user.userType : identity.role;

@@ -82,7 +82,8 @@ export default function Auth() {
     e.preventDefault();
     if (submittingRef.current) return;
     if (!otp.trim()) return toast.error('Enter OTP');
-    if (isNew && !name) return toast.error('Enter your name');
+    if (isNew && !name.trim()) return toast.error('Enter your name');
+    if (isNew && !/^[0-9]{10}$/.test(phone.trim())) return toast.error('Enter a valid 10-digit phone number');
     submittingRef.current = true;
     setLoading(true);
     try {
@@ -129,11 +130,11 @@ export default function Auth() {
               <>
                 <div>
                   <label className="text-xs text-theme-muted font-medium mb-1 block">Your Name *</label>
-                  <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="John Doe" className="w-full px-4 py-2.5 bg-card border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
+                  <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2.5 bg-card border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
                 </div>
                 <div>
-                  <label className="text-xs text-theme-muted font-medium mb-1 block">Phone Number</label>
-                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91 9876543210" className="w-full px-4 py-2.5 bg-card border border-edge rounded-xl text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
+                  <label className="text-xs text-theme-muted font-medium mb-1 block">Phone Number *</label>
+                  <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} maxLength={10} className="w-full px-4 py-2.5 bg-card border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
                 </div>
               </>
             )}
