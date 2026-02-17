@@ -388,7 +388,7 @@ async function autoCalculatePayouts() {
       const commissionDeducted = sellerOrders.reduce((s, o) => s + (o.commissionAmount || 0), 0);
       const gatewayFeesDeducted = sellerOrders.reduce((s, o) => s + (o.paymentGatewayFee || 0), 0);
       const shippingDeducted = sellerOrders.reduce((s, o) => {
-        return s + (o.shippingPaidBy === 'seller' ? (o.shippingCost || 0) : 0);
+        return s + (o.shippingPaidBy === 'seller' ? (o.actualShippingCost || o.shippingCost || 0) : 0);
       }, 0);
       const sellerAmountBeforeShipping = sellerOrders.reduce((s, o) => s + (o.sellerAmount || 0), 0);
       const netPayout = Math.max(0, sellerAmountBeforeShipping - shippingDeducted);

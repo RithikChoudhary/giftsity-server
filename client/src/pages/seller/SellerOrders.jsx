@@ -81,7 +81,7 @@ export default function SellerOrders() {
     setUpdating(null);
   };
 
-  const createShipmentWithCourier = async (orderId, courierId) => {
+  const createShipmentWithCourier = async (orderId, courierId, courierRate) => {
     setUpdating(orderId);
     try {
       // Step 1: Create shipment on Shiprocket
@@ -89,8 +89,8 @@ export default function SellerOrders() {
       setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
       toast.success('Shipment created!');
 
-      // Step 2: Immediately assign the selected courier
-      const { data: assignData } = await SellerAPI.post(`/shipping/${orderId}/assign-courier`, { courierId });
+      // Step 2: Immediately assign the selected courier (include rate for actual cost tracking)
+      const { data: assignData } = await SellerAPI.post(`/shipping/${orderId}/assign-courier`, { courierId, courierRate });
       setShipmentInfo(prev => ({ ...prev, [orderId]: assignData.shipment }));
       toast.success(`Courier assigned: ${assignData.shipment?.courierName}`);
       setCouriers([]);
@@ -99,10 +99,10 @@ export default function SellerOrders() {
     setUpdating(null);
   };
 
-  const assignCourier = async (orderId, courierId) => {
+  const assignCourier = async (orderId, courierId, courierRate) => {
     setUpdating(orderId);
     try {
-      const { data } = await SellerAPI.post(`/shipping/${orderId}/assign-courier`, { courierId });
+      const { data } = await SellerAPI.post(`/shipping/${orderId}/assign-courier`, { courierId, courierRate });
       setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
       toast.success(`Courier assigned: ${data.shipment?.courierName}`);
     } catch (err) { toast.error(err.response?.data?.message || 'Failed to assign courier'); }
@@ -310,7 +310,7 @@ export default function SellerOrders() {
                             )}
                             <div className="space-y-2 max-h-60 overflow-y-auto">
                               {couriers.map(c => (
-                                <button key={c.courierId} onClick={() => createShipmentWithCourier(order._id, c.courierId)} disabled={updating === order._id} className="w-full flex items-center justify-between p-3 bg-card border border-edge rounded-lg text-sm hover:border-amber-500/30 transition-colors">
+                                <button key={c.courierId} onClick={() => createShipmentWithCourier(order._id, c.courierId, c.rate)} disabled={updating === order._id} className="w-full flex items-center justify-between p-3 bg-card border border-edge rounded-lg text-sm hover:border-amber-500/30 transition-colors">
                                   <div className="text-left">
                                     <p className="font-medium text-theme-primary">{c.courierName}</p>
                                     <p className="text-xs text-theme-muted">Est. {c.estimatedDays} days &middot; Rating: {c.rating}/5</p>
@@ -344,7 +344,7 @@ export default function SellerOrders() {
                         {couriers.length > 0 && (
                           <div className="space-y-2 max-h-48 overflow-y-auto">
                             {couriers.map(c => (
-                              <button key={c.courierId} onClick={() => assignCourier(order._id, c.courierId)} disabled={updating === order._id} className="w-full flex items-center justify-between p-3 bg-card border border-edge rounded-lg text-sm hover:border-amber-500/30 transition-colors">
+                              <button key={c.courierId} onClick={() => assignCourier(order._id, c.courierId, c.rate)} disabled={updating === order._id} className="w-full flex items-center justify-between p-3 bg-card border border-edge rounded-lg text-sm hover:border-amber-500/30 transition-colors">
                                 <div className="text-left">
                                   <p className="font-medium text-theme-primary">{c.courierName}</p>
                                   <p className="text-xs text-theme-muted">Est. {c.estimatedDays} days &middot; Rating: {c.rating}/5</p>
