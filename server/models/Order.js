@@ -127,6 +127,8 @@ orderSchema.index({ sellerId: 1, status: 1 });
 orderSchema.index({ payoutStatus: 1, deliveredAt: 1 });
 orderSchema.index({ status: 1, createdAt: -1 });
 orderSchema.index({ paymentStatus: 1 });
+orderSchema.index({ cashfreeOrderId: 1 });
+orderSchema.index({ sellerId: 1, paymentStatus: 1, status: 1, payoutStatus: 1 });
 
 orderSchema.pre('save', function (next) {
   this.updatedAt = Date.now();

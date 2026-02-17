@@ -79,7 +79,8 @@ router.get('/', cacheMiddleware(60), async (req, res) => {
       .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit))
-      .populate('sellerId', 'name sellerProfile.businessName sellerProfile.businessSlug sellerProfile.avatar sellerProfile.rating sellerProfile.isVerified');
+      .populate('sellerId', 'name sellerProfile.businessName sellerProfile.businessSlug sellerProfile.avatar sellerProfile.rating sellerProfile.isVerified')
+      .lean();
     const total = await Product.countDocuments(filter);
 
     res.json({ products, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
@@ -98,7 +99,8 @@ router.get('/featured', cacheMiddleware(60), async (req, res) => {
 
     const products = await Product.find(featuredFilter)
       .limit(12)
-      .populate('sellerId', 'name sellerProfile.businessName sellerProfile.businessSlug sellerProfile.avatar sellerProfile.isVerified');
+      .populate('sellerId', 'name sellerProfile.businessName sellerProfile.businessSlug sellerProfile.avatar sellerProfile.isVerified')
+      .lean();
     res.json({ products });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -108,7 +110,7 @@ router.get('/featured', cacheMiddleware(60), async (req, res) => {
 // GET /api/products/categories
 router.get('/categories', cacheMiddleware(300), async (req, res) => {
   try {
-    const categories = await Category.find({ isActive: true }).sort({ displayOrder: 1 });
+    const categories = await Category.find({ isActive: true }).sort({ displayOrder: 1 }).lean();
     res.json({ categories });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
@@ -119,12 +121,14 @@ router.get('/categories', cacheMiddleware(300), async (req, res) => {
 router.get('/:slug', cacheMiddleware(120), async (req, res) => {
   try {
     const product = await Product.findOne({ slug: req.params.slug, isActive: true })
-      .populate('sellerId', 'name status sellerProfile.businessName sellerProfile.businessSlug sellerProfile.avatar sellerProfile.rating sellerProfile.totalOrders sellerProfile.isVerified');
+      .populate('sellerId', 'name status sellerProfile.businessName sellerProfile.businessSlug sellerProfile.avatar sellerProfile.rating sellerProfile.totalOrders sellerProfile.isVerified')
+      .lean();
 
     if (!product) {
       // Try by ID as fallback
       const byId = await Product.findById(req.params.slug)
-        .populate('sellerId', 'name status sellerProfile.businessName sellerProfile.businessSlug sellerProfile.avatar sellerProfile.rating sellerProfile.totalOrders sellerProfile.isVerified');
+        .populate('sellerId', 'name status sellerProfile.businessName sellerProfile.businessSlug sellerProfile.avatar sellerProfile.rating sellerProfile.totalOrders sellerProfile.isVerified')
+        .lean();
       if (!byId || byId.sellerId?.status === 'suspended') return res.status(404).json({ message: 'Product not found' });
 
       Product.findByIdAndUpdate(byId._id, { $inc: { viewCount: 1 } }).catch(() => {});

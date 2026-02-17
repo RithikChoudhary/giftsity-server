@@ -9,11 +9,12 @@ import { CorporateAuthProvider } from './context/CorporateAuthContext';
 import { SocketProvider } from './context/SocketContext';
 import LoadingSpinner from './components/LoadingSpinner';
 
-// Layouts (always loaded)
+// Layout (always loaded -- used on every customer page)
 import Layout from './components/Layout';
-import SellerLayout from './components/SellerLayout';
-import AdminLayout from './components/AdminLayout';
-import CorporateLayout from './components/CorporateLayout';
+// Layouts for seller/admin/corporate (lazy -- most users never visit these)
+const SellerLayout = lazy(() => import('./components/SellerLayout'));
+const AdminLayout = lazy(() => import('./components/AdminLayout'));
+const CorporateLayout = lazy(() => import('./components/CorporateLayout'));
 
 // Public pages (lazy loaded)
 const Home = lazy(() => import('./pages/public/Home'));

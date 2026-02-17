@@ -14,7 +14,7 @@ const requireAuth = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const identity = await findIdentityByToken(decoded);
     if (!identity) {
-      await logAuthEvent(req, { action: 'token_rejected', reason: 'identity_not_found' });
+      logAuthEvent(req, { action: 'token_rejected', reason: 'identity_not_found' }).catch(() => {});
       return res.status(401).json({ message: 'User not found' });
     }
 
@@ -32,7 +32,7 @@ const requireAuth = async (req, res, next) => {
     req.identitySource = identity.source;
     next();
   } catch (err) {
-    await logAuthEvent(req, { action: 'token_rejected', reason: 'invalid_or_expired' });
+    logAuthEvent(req, { action: 'token_rejected', reason: 'invalid_or_expired' }).catch(() => {});
     return res.status(401).json({ message: 'Invalid or expired token' });
   }
 };

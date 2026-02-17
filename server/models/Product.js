@@ -81,6 +81,7 @@ productSchema.index({ title: 'text', description: 'text', tags: 'text' });
 productSchema.index({ isFeatured: 1, isActive: 1 });
 productSchema.index({ price: 1 });
 productSchema.index({ createdAt: -1 });
+productSchema.index({ isActive: 1, stock: 1 });
 
 productSchema.pre('save', function (next) {
   this.updatedAt = Date.now();

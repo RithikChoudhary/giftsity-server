@@ -69,10 +69,14 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
       } catch (e) { /* Coupon model may not exist yet, skip */ }
     }
 
-    // Validate products and build seller groups
+    // Validate products and build seller groups (batch fetch to avoid N+1)
+    const productIds = items.map(i => i.productId);
+    const products = await Product.find({ _id: { $in: productIds } });
+    const productMap = new Map(products.map(p => [p._id.toString(), p]));
+
     const sellerGroups = {};
     for (const item of items) {
-      const product = await Product.findById(item.productId);
+      const product = productMap.get(item.productId.toString());
       if (!product) return res.status(400).json({ message: `Product not found: ${item.productId}` });
       if (!product.isActive) {
         return res.status(400).json({ message: `${product.title} is unavailable` });
@@ -365,6 +369,11 @@ router.post('/verify-payment', requireAuth, paymentVerifyLimiter, validatePaymen
       logActivity({ domain: 'payment', action: 'payment_amount_mismatch', actorRole: 'customer', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Order', targetId: orders[0]?._id, message: `Amount mismatch: paid ${paidAmount}, expected ${expectedTotal}` });
       return res.status(400).json({ message: 'Payment amount does not match order total. Please contact support.' });
     }
+    // Collect bulk operations for products and sellers
+    const productBulkOps = [];
+    const sellerIncrements = {};
+    const sellerIdsToCheck = new Set();
+
     for (const order of orders) {
       if (order.paymentStatus === 'paid') continue; // Already processed
 
@@ -372,25 +381,21 @@ router.post('/verify-payment', requireAuth, paymentVerifyLimiter, validatePaymen
       order.status = 'confirmed';
       order.cashfreePaymentId = successPayment?.cf_payment_id?.toString() || '';
       order.paidAt = new Date();
-      await order.save();
-
-      // Stock was already reserved at order creation time.
-      // Just increment orderCount now that payment is confirmed.
-      for (const item of order.items) {
-        await Product.findByIdAndUpdate(item.productId, {
-          $inc: { orderCount: item.quantity }
-        });
-      }
-
-      // Update seller stats (use itemTotal so shipping collected from customer isn't counted as seller sales)
-      await Seller.findByIdAndUpdate(order.sellerId, {
-        $inc: { 'sellerProfile.totalSales': order.itemTotal || order.totalAmount, 'sellerProfile.totalOrders': 1 }
-      });
-
-      // Add status history entry
       if (!order.statusHistory) order.statusHistory = [];
       order.statusHistory.push({ status: 'confirmed', timestamp: new Date(), changedByRole: 'system', note: 'Payment confirmed' });
       await order.save();
+
+      // Collect product orderCount increments for bulk write
+      for (const item of order.items) {
+        productBulkOps.push({ updateOne: { filter: { _id: item.productId }, update: { $inc: { orderCount: item.quantity } } } });
+      }
+
+      // Collect seller stat increments
+      const sid = order.sellerId.toString();
+      if (!sellerIncrements[sid]) sellerIncrements[sid] = { totalSales: 0, totalOrders: 0 };
+      sellerIncrements[sid].totalSales += order.itemTotal || order.totalAmount;
+      sellerIncrements[sid].totalOrders += 1;
+      sellerIdsToCheck.add(sid);
 
       // Notify customer
       createNotification({
@@ -406,28 +411,42 @@ router.post('/verify-payment', requireAuth, paymentVerifyLimiter, validatePaymen
         message: `New order worth Rs.${order.itemTotal || order.totalAmount}`,
         link: '/seller/orders', metadata: { orderId: order._id.toString() }
       });
+    }
 
-      // Remind seller to add bank details if missing
+    // Execute batched DB operations
+    if (productBulkOps.length) await Product.bulkWrite(productBulkOps);
+    for (const [sid, inc] of Object.entries(sellerIncrements)) {
+      await Seller.findByIdAndUpdate(sid, {
+        $inc: { 'sellerProfile.totalSales': inc.totalSales, 'sellerProfile.totalOrders': inc.totalOrders }
+      });
+    }
+
+    // Check bank details and send emails (non-critical, after main processing)
+    for (const sid of sellerIdsToCheck) {
       try {
-        const sellerForBank = await Seller.findById(order.sellerId).select('sellerProfile.bankDetails');
-        const bank = sellerForBank?.sellerProfile?.bankDetails;
+        const sellerDoc = await Seller.findById(sid).select('email sellerProfile.bankDetails').lean();
+        const bank = sellerDoc?.sellerProfile?.bankDetails;
         const hasBankDetails = bank?.accountHolderName && bank?.accountNumber && bank?.ifscCode && bank?.bankName;
         if (!hasBankDetails) {
           createNotification({
-            userId: order.sellerId.toString(), userRole: 'seller',
+            userId: sid, userRole: 'seller',
             type: 'bank_details_reminder', title: 'Add bank details to receive payouts',
             message: 'You have a new order! Please add your bank account details in Settings to receive payouts.',
-            link: '/seller/settings', metadata: { orderId: order._id.toString() }
+            link: '/seller/settings'
           });
         }
-      } catch (bankCheckErr) { /* non-critical */ }
+        // Send seller order email
+        const sellerOrders = orders.filter(o => o.sellerId.toString() === sid && o.paymentStatus === 'paid');
+        for (const so of sellerOrders) {
+          try { await sendOrderConfirmation(sellerDoc.email, so, 'seller'); } catch (_e) { /* non-critical */ }
+        }
+      } catch (_bankErr) { /* non-critical */ }
+    }
 
-      // Send emails (non-blocking)
-      try {
-        await sendOrderConfirmation(order.customerEmail, order, 'customer');
-        const seller = await Seller.findById(order.sellerId);
-        if (seller) await sendOrderConfirmation(seller.email, order, 'seller');
-      } catch (emailErr) {
+    // Send customer confirmation emails
+    for (const order of orders) {
+      if (order.paymentStatus !== 'paid') continue;
+      try { await sendOrderConfirmation(order.customerEmail, order, 'customer'); } catch (emailErr) {
         logger.error('Email send error:', emailErr.message);
       }
     }

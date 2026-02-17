@@ -36,7 +36,7 @@ export function SocketProvider({ children }) {
     });
 
     newSocket.on('connect', () => {
-      console.log('[Socket] Connected');
+      if (import.meta.env.DEV) console.log('[Socket] Connected');
     });
 
     newSocket.on('notification', (data) => {
@@ -52,7 +52,7 @@ export function SocketProvider({ children }) {
     });
 
     newSocket.on('disconnect', () => {
-      console.log('[Socket] Disconnected');
+      if (import.meta.env.DEV) console.log('[Socket] Disconnected');
     });
 
     socketRef.current = newSocket;
