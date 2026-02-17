@@ -5,7 +5,7 @@ const platformSettingsSchema = new mongoose.Schema({
   globalCommissionRate: { type: Number, default: 0 },
   newSellerCommissionRate: { type: Number, default: null }, // null = use global
   commissionGrandfatherDate: { type: Date, default: null }, // sellers before this date keep old rate
-  paymentGatewayFeeRate: { type: Number, default: 2 },
+  paymentGatewayFeeRate: { type: Number, default: 3 },
 
   // Payouts
   payoutSchedule: {
@@ -50,8 +50,8 @@ platformSettingsSchema.statics.getSettings = async function () {
     settings.minimumPayoutAmount = 0;
     needsSave = true;
   }
-  if (settings.paymentGatewayFeeRate === 3) {
-    settings.paymentGatewayFeeRate = 2;
+  if (settings.paymentGatewayFeeRate === 2) {
+    settings.paymentGatewayFeeRate = 3;
     needsSave = true;
   }
   if (needsSave) await settings.save();
