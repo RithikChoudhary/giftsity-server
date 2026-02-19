@@ -33,16 +33,15 @@ export default function SellerOrders() {
       const orderList = Array.isArray(data) ? data : data.orders || [];
       setOrders(orderList);
 
-      // Load shipment info for orders that might have shipments
       const shippableStatuses = ['processing', 'shipped', 'delivered'];
       const shippableOrders = orderList.filter(o => shippableStatuses.includes(o.status));
-      for (const order of shippableOrders) {
+      if (shippableOrders.length > 0) {
         try {
-          const { data: trackData } = await SellerAPI.get(`/shipping/${order._id}/track`);
-          if (trackData.shipment) {
-            setShipmentInfo(prev => ({ ...prev, [order._id]: trackData.shipment }));
-          }
-        } catch { /* no shipment yet */ }
+          const { data: batchData } = await SellerAPI.post('/shipping/batch-shipments', {
+            orderIds: shippableOrders.map(o => o._id)
+          });
+          if (batchData.shipments) setShipmentInfo(batchData.shipments);
+        } catch { /* no shipments yet */ }
       }
     } catch (e) { console.error(e); }
     setLoading(false);

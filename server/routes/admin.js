@@ -86,6 +86,7 @@ router.put('/settings', async (req, res) => {
 
     Object.assign(settings, req.body, { updatedAt: Date.now(), updatedBy: req.user._id });
     await settings.save();
+    PlatformSettings.invalidateSettingsCache();
 
     // If commission rate changed, notify sellers
     if (req.body.globalCommissionRate !== undefined && req.body.globalCommissionRate !== oldRate) {

@@ -1,4 +1,7 @@
 const mongoose = require('mongoose');
+const NodeCache = require('node-cache');
+
+const settingsCache = new NodeCache({ stdTTL: 300, checkperiod: 60, useClones: false });
 
 const platformSettingsSchema = new mongoose.Schema({
   // Commission
@@ -40,6 +43,9 @@ const platformSettingsSchema = new mongoose.Schema({
 
 // Ensure only one settings document exists
 platformSettingsSchema.statics.getSettings = async function () {
+  const cached = settingsCache.get('ps');
+  if (cached) return cached;
+
   let settings = await this.findOne();
   if (!settings) {
     settings = await this.create({});
@@ -55,7 +61,13 @@ platformSettingsSchema.statics.getSettings = async function () {
     needsSave = true;
   }
   if (needsSave) await settings.save();
+
+  settingsCache.set('ps', settings);
   return settings;
+};
+
+platformSettingsSchema.statics.invalidateSettingsCache = function () {
+  settingsCache.del('ps');
 };
 
 module.exports = mongoose.model('PlatformSettings', platformSettingsSchema);

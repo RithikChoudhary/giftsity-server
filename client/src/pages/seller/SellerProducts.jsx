@@ -30,7 +30,7 @@ export default function SellerProducts() {
 
   const loadMinPrice = async () => {
     try {
-      const { data } = await SellerAPI.get('/dashboard');
+      const { data } = await SellerAPI.get('/preflight');
       if (data.minimumProductPrice) setMinPrice(data.minimumProductPrice);
       if (data.bankDetailsComplete !== undefined) setBankDetailsComplete(data.bankDetailsComplete);
       if (data.pickupAddressComplete !== undefined) setPickupAddressComplete(data.pickupAddressComplete);
