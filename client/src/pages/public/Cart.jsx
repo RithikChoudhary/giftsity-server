@@ -309,10 +309,16 @@ export default function Cart() {
                 <div className="space-y-1">
                   {shippingEstimates.map(e => (
                     <div key={e.sellerId} className="flex justify-between text-xs">
-                      <span className="text-theme-secondary">{e.courierName || 'Courier'}{e.estimatedDays ? ` · ${e.estimatedDays} days` : ''}</span>
-                      <span className={e.shippingPaidBy === 'seller' || !e.shippingCost ? 'text-green-400' : 'text-theme-primary font-medium'}>
-                        {e.shippingPaidBy === 'seller' || !e.shippingCost ? 'Free' : `Rs. ${e.shippingCost.toLocaleString('en-IN')}`}
+                      <span className="text-theme-secondary">
+                        {e.shippingPaidBy === 'seller'
+                          ? 'Free Shipping'
+                          : `${e.courierName || 'Courier'}${e.estimatedDays ? ` · ${e.estimatedDays} days` : ''}`}
                       </span>
+                      {e.shippingPaidBy !== 'seller' && (
+                        <span className={!e.shippingCost ? 'text-green-400' : 'text-theme-primary font-medium'}>
+                          {!e.shippingCost ? 'Free' : `Rs. ${e.shippingCost.toLocaleString('en-IN')}`}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -360,7 +366,12 @@ export default function Cart() {
               <div className="border-t border-edge/50 mt-2 pt-2 space-y-1">
                 {shippingEstimates.map(e => (
                   <div key={e.sellerId} className="flex justify-between text-xs text-theme-muted">
-                    <span className="flex items-center gap-1"><Truck className="w-3 h-3" /> Shipping{e.courierName ? ` (${e.courierName})` : ''}{e.estimatedDays ? ` · ${e.estimatedDays} days` : ''}</span>
+                    <span className="flex items-center gap-1">
+                      <Truck className="w-3 h-3" />
+                      {e.shippingPaidBy === 'seller'
+                        ? 'Shipping'
+                        : `Shipping${e.courierName ? ` (${e.courierName})` : ''}${e.estimatedDays ? ` · ${e.estimatedDays} days` : ''}`}
+                    </span>
                     <span className={`shrink-0 ml-2 ${e.shippingPaidBy === 'seller' || !e.shippingCost ? 'text-green-400' : 'text-theme-secondary'}`}>
                       {e.shippingPaidBy === 'seller' || !e.shippingCost ? 'Free' : `Rs. ${e.shippingCost.toLocaleString('en-IN')}`}
                     </span>

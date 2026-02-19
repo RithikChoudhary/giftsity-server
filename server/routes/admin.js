@@ -475,7 +475,7 @@ router.post('/payouts/calculate', async (req, res) => {
       const gatewayFeesDeducted = sellerOrders.reduce((s, o) => s + (o.paymentGatewayFee || 0), 0);
       // Shipping deducted: only for orders where seller pays shipping
       const shippingDeducted = sellerOrders.reduce((s, o) => {
-        return s + (o.shippingPaidBy === 'seller' ? (o.shippingCost || 0) : 0);
+        return s + (o.shippingPaidBy === 'seller' ? (o.actualShippingCost || o.shippingCost || 0) : 0);
       }, 0);
       const sellerAmountBeforeShipping = sellerOrders.reduce((s, o) => s + (o.sellerAmount || 0), 0);
       const netPayout = Math.max(0, sellerAmountBeforeShipping - shippingDeducted);

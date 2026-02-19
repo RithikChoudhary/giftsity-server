@@ -166,6 +166,14 @@ async function generateManifest({ shipmentId }) {
   return res.data;
 }
 
+async function getShiprocketOrderDetails(orderId) {
+  const token = await getToken();
+  const res = await axios.get(`${SHIPROCKET_BASE}/orders/show/${orderId}`, {
+    headers: shiprocketHeaders(token)
+  });
+  return res.data;
+}
+
 async function cancelShiprocketOrder({ shiprocketOrderId }) {
   const token = await getToken();
   const res = await axios.post(`${SHIPROCKET_BASE}/orders/cancel`, {
@@ -186,5 +194,6 @@ module.exports = {
   addPickupLocation,
   updatePickupLocation,
   cancelShiprocketOrder,
+  getShiprocketOrderDetails,
   getToken
 };

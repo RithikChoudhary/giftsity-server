@@ -33,7 +33,7 @@ export default function SellerOrders() {
       const orderList = Array.isArray(data) ? data : data.orders || [];
       setOrders(orderList);
 
-      const shippableStatuses = ['processing', 'shipped', 'delivered'];
+      const shippableStatuses = ['confirmed', 'processing', 'shipped', 'delivered'];
       const shippableOrders = orderList.filter(o => shippableStatuses.includes(o.status));
       if (shippableOrders.length > 0) {
         try {
@@ -72,10 +72,9 @@ export default function SellerOrders() {
   const createShipment = async (orderId) => {
     setUpdating(orderId);
     try {
-      const { data } = await SellerAPI.post(`/shipping/${orderId}/create`);
-      setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
+      await SellerAPI.post(`/shipping/${orderId}/create`);
       toast.success('Shipment created on Shiprocket!');
-      loadOrders();
+      await loadOrders();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed to create shipment'); }
     setUpdating(null);
   };
@@ -83,17 +82,18 @@ export default function SellerOrders() {
   const createShipmentWithCourier = async (orderId, courierId, courierRate) => {
     setUpdating(orderId);
     try {
-      // Step 1: Create shipment on Shiprocket
       const { data } = await SellerAPI.post(`/shipping/${orderId}/create`);
-      setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
       toast.success('Shipment created!');
 
-      // Step 2: Immediately assign the selected courier (include rate for actual cost tracking)
-      const { data: assignData } = await SellerAPI.post(`/shipping/${orderId}/assign-courier`, { courierId, courierRate });
-      setShipmentInfo(prev => ({ ...prev, [orderId]: assignData.shipment }));
-      toast.success(`Courier assigned: ${assignData.shipment?.courierName}`);
+      try {
+        const { data: assignData } = await SellerAPI.post(`/shipping/${orderId}/assign-courier`, { courierId, courierRate });
+        toast.success(`Courier assigned: ${assignData.shipment?.courierName}`);
+      } catch (assignErr) {
+        toast.error(assignErr.response?.data?.message || 'Shipment created but courier assignment failed — retry from Step 2');
+      }
+
       setCouriers([]);
-      loadOrders();
+      await loadOrders();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed to create shipment'); }
     setUpdating(null);
   };
@@ -102,8 +102,9 @@ export default function SellerOrders() {
     setUpdating(orderId);
     try {
       const { data } = await SellerAPI.post(`/shipping/${orderId}/assign-courier`, { courierId, courierRate });
-      setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
       toast.success(`Courier assigned: ${data.shipment?.courierName}`);
+      setCouriers([]);
+      await loadOrders();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed to assign courier'); }
     setUpdating(null);
   };
@@ -111,10 +112,9 @@ export default function SellerOrders() {
   const schedulePickup = async (orderId) => {
     setUpdating(orderId);
     try {
-      const { data } = await SellerAPI.post(`/shipping/${orderId}/pickup`);
-      setShipmentInfo(prev => ({ ...prev, [orderId]: data.shipment }));
+      await SellerAPI.post(`/shipping/${orderId}/pickup`);
       toast.success('Pickup scheduled! Order marked as shipped.');
-      loadOrders();
+      await loadOrders();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed to schedule pickup'); }
     setUpdating(null);
   };
@@ -136,8 +136,8 @@ export default function SellerOrders() {
 
   const toggleExpand = (orderId) => {
     if (expandedOrder === orderId) { setExpandedOrder(null); return; }
+    setCouriers([]);
     setExpandedOrder(orderId);
-    // Only fetch tracking if there's an existing shipment
     if (shipmentInfo[orderId]?.shiprocketOrderId) {
       getTracking(orderId);
     }
@@ -230,15 +230,15 @@ export default function SellerOrders() {
                       <span>Sale: Rs. {(order.itemTotal || order.totalAmount || 0).toLocaleString('en-IN')}</span>
                       {(order.commissionAmount || 0) > 0 && <span>Commission: -Rs. {order.commissionAmount.toLocaleString('en-IN')}</span>}
                       {(order.paymentGatewayFee || 0) > 0 && <span>Gateway Fee: -Rs. {order.paymentGatewayFee.toLocaleString('en-IN')}</span>}
-                      {order.shippingPaidBy === 'seller' && (order.shippingCost || 0) > 0 && (
-                        <span className="text-red-400">Shipping: -Rs. {order.shippingCost.toLocaleString('en-IN')}</span>
+                      {order.shippingPaidBy === 'seller' && ((order.actualShippingCost || order.shippingCost || 0) > 0) && (
+                        <span className="text-red-400">Shipping: -Rs. {(order.actualShippingCost || order.shippingCost).toLocaleString('en-IN')}</span>
                       )}
                       {order.shippingPaidBy === 'customer' && (order.shippingCost || 0) > 0 && (
                         <span className="text-theme-dim">Shipping: Paid by customer</span>
                       )}
                       <span className="text-green-400 font-medium">You get: Rs. {(
                         order.shippingPaidBy === 'seller'
-                          ? Math.max(0, (order.sellerAmount || 0) - (order.shippingCost || 0))
+                          ? Math.max(0, (order.sellerAmount || 0) - (order.actualShippingCost || order.shippingCost || 0))
                           : (order.sellerAmount || 0)
                       ).toLocaleString('en-IN')}</span>
                     </div>
@@ -274,16 +274,9 @@ export default function SellerOrders() {
                       </>
                     )}
                     {order.status === 'shipped' && (
-                      <>
-                        {!shipment?.shiprocketOrderId && (
-                          <button onClick={() => updateStatus(order._id, 'delivered')} disabled={updating === order._id} className="px-3 py-1.5 bg-green-500/10 text-green-400 rounded-lg text-xs font-medium hover:bg-green-500/20">
-                            {updating === order._id ? <Loader className="w-3 h-3 animate-spin" /> : 'Mark Delivered'}
-                          </button>
-                        )}
-                        <button onClick={() => toggleExpand(order._id)} className="px-3 py-1.5 bg-inset text-theme-muted rounded-lg text-xs font-medium hover:text-theme-primary flex items-center gap-1">
-                          Track {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                        </button>
-                      </>
+                      <button onClick={() => toggleExpand(order._id)} className="px-3 py-1.5 bg-inset text-theme-muted rounded-lg text-xs font-medium hover:text-theme-primary flex items-center gap-1">
+                        Track {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </button>
                     )}
                   </div>
                 </div>
@@ -339,7 +332,7 @@ export default function SellerOrders() {
                     )}
 
                     {/* Step 2: Assign courier (if shipment created but no AWB yet) */}
-                    {shipment?.shiprocketOrderId && !shipment?.awbCode && (
+                    {shipment?.shiprocketOrderId && !shipment?.awbCode && (order.status === 'confirmed' || order.status === 'processing') && (
                       <div className="mb-4">
                         <div className="text-xs text-green-400 bg-green-500/5 border border-green-500/10 rounded-lg px-3 py-2 mb-3">
                           Shiprocket Order #{shipment.shiprocketOrderId} created
@@ -390,15 +383,7 @@ export default function SellerOrders() {
                       </div>
                     )}
 
-                    {/* Or manual ship without Shiprocket */}
-                    {(order.status === 'confirmed' || order.status === 'processing') && (
-                      <div className="mt-4 pt-4 border-t border-edge/50">
-                        <p className="text-xs text-theme-dim mb-2">Or ship manually (without Shiprocket):</p>
-                        <button onClick={() => updateStatus(order._id, 'shipped')} disabled={updating === order._id} className="px-3 py-1.5 bg-inset text-theme-muted rounded-lg text-xs font-medium hover:text-theme-primary">
-                          Mark as Shipped (Manual)
-                        </button>
-                      </div>
-                    )}
+                    {/* Manual ship hidden — all shipments go through Shiprocket */}
 
                     {/* Tracking display */}
                     {tracking?.shipment && (
