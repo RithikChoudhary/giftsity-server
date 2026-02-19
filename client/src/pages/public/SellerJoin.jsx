@@ -21,6 +21,7 @@ export default function SellerJoin() {
   const [otpSent, setOtpSent] = useState(false);
 
   // Step 2: seller details
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [businessName, setBusinessName] = useState('');
   const [businessType, setBusinessType] = useState('individual');
   const [instagramUsername, setInstagramUsername] = useState('');
@@ -122,6 +123,7 @@ export default function SellerJoin() {
     e.preventDefault();
     if (!businessName) return toast.error('Business name is required');
     if (!instagramUsername) return toast.error('Instagram username is required');
+    if (!agreedToTerms) return toast.error('Please accept the Seller Agreement');
     setLoading(true);
     try {
       // Step 1: Upload avatar if provided
@@ -153,7 +155,8 @@ export default function SellerJoin() {
         gstNumber: gstNumber || undefined,
         avatarUrl, avatarPublicId,
         coverImageUrl, coverImagePublicId,
-        referralCode: new URLSearchParams(window.location.search).get('ref') || undefined
+        referralCode: new URLSearchParams(window.location.search).get('ref') || undefined,
+        agreedToTerms: true
       });
       login(data.token, data.user);
       toast.success('Registration submitted! Awaiting admin approval.');
@@ -342,6 +345,12 @@ export default function SellerJoin() {
                 <label className="text-xs text-theme-muted font-medium mb-1 block">GST Number (optional)</label>
                 <input type="text" value={gstNumber} onChange={e => setGstNumber(e.target.value)} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" />
               </div>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" checked={agreedToTerms} onChange={e => setAgreedToTerms(e.target.checked)} className="mt-1" />
+                <span className="text-xs text-theme-muted">
+                  I have read and agree to the <a href="/seller-agreement" target="_blank" rel="noopener noreferrer" className="text-amber-400 underline">Seller Agreement</a> and <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-amber-400 underline">Terms of Service</a>
+                </span>
+              </label>
               <button type="submit" disabled={loading} className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors">
                 {loading ? <Loader className="w-4 h-4 animate-spin" /> : <>Submit for Approval <Check className="w-4 h-4" /></>}
               </button>

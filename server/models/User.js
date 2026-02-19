@@ -85,7 +85,9 @@ const userSchema = new mongoose.Schema({
     },
     lastActiveAt: { type: Date, default: Date.now },
     suspensionType: { type: String, enum: ['manual', 'auto', ''], default: '' },
-    suspensionReason: { type: String, default: '' }
+    suspensionReason: { type: String, default: '' },
+    agreedToTerms: { type: Boolean, default: false },
+    termsAcceptedAt: { type: Date }
   },
 
   // Customer-specific fields

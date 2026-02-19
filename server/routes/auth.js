@@ -181,13 +181,16 @@ router.post('/upload-avatar', avatarUploadLimiter, upload.single('avatar'), asyn
 // POST /api/auth/register-seller
 router.post('/register-seller', async (req, res) => {
   try {
-    const { email, name, phone, instagramUsername, avatarUrl, avatarPublicId, referralCode, coverImageUrl, coverImagePublicId, businessName, businessType, gstNumber } = req.body;
+    const { email, name, phone, instagramUsername, avatarUrl, avatarPublicId, referralCode, coverImageUrl, coverImagePublicId, businessName, businessType, gstNumber, agreedToTerms } = req.body;
 
     if (!email || !name || !phone) {
       return res.status(400).json({ message: 'Email, name, and phone are required' });
     }
     if (!instagramUsername) {
       return res.status(400).json({ message: 'Instagram username is required' });
+    }
+    if (!agreedToTerms) {
+      return res.status(400).json({ message: 'You must accept the Seller Agreement' });
     }
 
     // Verify Instagram username exists
@@ -249,7 +252,9 @@ router.post('/register-seller', async (req, res) => {
         instagramVerified: true,
         shiprocketPickupLocation: '',
         suspensionRemovalRequested: false,
-        suspensionRemovalReason: ''
+        suspensionRemovalReason: '',
+        agreedToTerms: true,
+        termsAcceptedAt: new Date()
       }
     });
     await seller.save();

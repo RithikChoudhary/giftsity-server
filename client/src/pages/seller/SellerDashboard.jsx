@@ -137,7 +137,7 @@ export default function SellerDashboard() {
       {dashData.currentPeriodEarnings && (dashData.currentPeriodEarnings.totalSales > 0 || dashData.currentPeriodEarnings.pendingOrderCount > 0) && (
         <div className="bg-card border border-edge/50 rounded-xl p-5 mb-8">
           <h3 className="font-semibold text-theme-primary mb-4">Pending Earnings Breakdown</h3>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 text-sm">
             <div>
               <p className="text-theme-muted">Total Sales</p>
               <p className="text-lg font-bold text-theme-primary">Rs. {(dashData.currentPeriodEarnings.totalSales || 0).toLocaleString('en-IN')}</p>

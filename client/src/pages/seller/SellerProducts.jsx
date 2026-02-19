@@ -182,9 +182,9 @@ export default function SellerProducts() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold text-theme-primary">Products</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <input type="file" accept=".csv" ref={csvRef} onChange={handleCsvUpload} className="hidden" />
           <button onClick={() => csvRef.current?.click()} disabled={csvUploading}
             className="flex items-center gap-2 px-4 py-2 border border-edge/30 text-theme-muted hover:text-theme-primary rounded-xl text-sm font-medium transition-colors disabled:opacity-50">
@@ -244,7 +244,7 @@ export default function SellerProducts() {
       {/* Product Form Modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-card border border-edge rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+          <div className="bg-card border border-edge rounded-2xl w-full max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-theme-primary">{editing ? 'Edit Product' : 'New Product'}</h2>
               <button onClick={() => setShowForm(false)} className="text-theme-dim hover:text-theme-primary"><X className="w-5 h-5" /></button>
@@ -258,7 +258,7 @@ export default function SellerProducts() {
                 <label className="text-xs text-theme-muted font-medium mb-1 block">Description</label>
                 <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50 resize-none" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-theme-muted font-medium mb-1 block">Price (Rs.) *</label>
                   <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} min={minPrice} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" required />
@@ -268,7 +268,7 @@ export default function SellerProducts() {
                   <input type="number" value={form.stock} onChange={e => setForm(f => ({ ...f, stock: e.target.value }))} min="0" className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" required />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-theme-muted font-medium mb-1 block">Category *</label>
                   <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} className="w-full px-4 py-2.5 bg-inset border border-edge rounded-xl text-sm text-theme-primary focus:outline-none focus:border-amber-500/50" required>
@@ -384,7 +384,7 @@ export default function SellerProducts() {
       ) : (
         <div className="space-y-3">
           {products.map(p => (
-            <div key={p._id} className="bg-card border border-edge/50 rounded-xl p-4 flex items-center gap-4">
+            <div key={p._id} className="bg-card border border-edge/50 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
               <div className="w-16 h-16 bg-inset rounded-lg overflow-hidden shrink-0">
                 {p.images?.[0]?.url ? <img src={p.images[0].url} alt="" className="w-full h-full object-cover" /> : <Image className="w-6 h-6 text-theme-dim m-auto mt-5" />}
               </div>

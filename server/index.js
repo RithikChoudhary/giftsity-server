@@ -34,7 +34,7 @@ app.use(helmet({
 app.use(compression());
 // Capture raw body for Cashfree webhook signature verification
 app.use(express.json({
-  limit: '10mb',
+  limit: '2mb',
   verify: (req, _res, buf) => { req.rawBody = buf.toString(); }
 }));
 
