@@ -807,8 +807,11 @@ router.post('/shipping-estimate', requireAuth, async (req, res) => {
       if (!sellerGroups[sid]) sellerGroups[sid] = { products: [], totalWeight: 0 };
       sellerGroups[sid].products.push(product);
       sellerGroups[sid].totalWeight += (product.weight || 500) * (item.quantity || 1);
-      // Use first product's shippingPaidBy (all items from same seller in one shipment)
-      if (!sellerGroups[sid].shippingPaidBy) sellerGroups[sid].shippingPaidBy = product.shippingPaidBy || 'seller';
+      if (!sellerGroups[sid].shippingPaidBy) {
+        sellerGroups[sid].shippingPaidBy = product.shippingPaidBy || 'seller';
+      } else if (product.shippingPaidBy === 'customer') {
+        sellerGroups[sid].shippingPaidBy = 'customer';
+      }
     }
 
     const estimates = [];
