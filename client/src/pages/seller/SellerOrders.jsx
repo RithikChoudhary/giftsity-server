@@ -266,16 +266,20 @@ export default function SellerOrders() {
                         <button onClick={() => toggleExpand(order._id)} className="px-3 py-1.5 bg-purple-500/10 text-purple-400 rounded-lg text-xs font-medium hover:bg-purple-500/20 flex items-center gap-1">
                           <Truck className="w-3 h-3" /> Ship Order {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                         </button>
-                        <button onClick={() => updateStatus(order._id, 'cancelled')} disabled={updating === order._id} className="px-3 py-1.5 bg-red-500/10 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/20">
-                          Cancel Order
-                        </button>
+                        {!(shipment && ['picked_up', 'in_transit', 'out_for_delivery'].includes(shipment.status)) && (
+                          <button onClick={() => updateStatus(order._id, 'cancelled')} disabled={updating === order._id} className="px-3 py-1.5 bg-red-500/10 text-red-400 rounded-lg text-xs font-medium hover:bg-red-500/20">
+                            Cancel Order
+                          </button>
+                        )}
                       </>
                     )}
                     {order.status === 'shipped' && (
                       <>
-                        <button onClick={() => updateStatus(order._id, 'delivered')} disabled={updating === order._id} className="px-3 py-1.5 bg-green-500/10 text-green-400 rounded-lg text-xs font-medium hover:bg-green-500/20">
-                          {updating === order._id ? <Loader className="w-3 h-3 animate-spin" /> : 'Mark Delivered'}
-                        </button>
+                        {!shipment?.shiprocketOrderId && (
+                          <button onClick={() => updateStatus(order._id, 'delivered')} disabled={updating === order._id} className="px-3 py-1.5 bg-green-500/10 text-green-400 rounded-lg text-xs font-medium hover:bg-green-500/20">
+                            {updating === order._id ? <Loader className="w-3 h-3 animate-spin" /> : 'Mark Delivered'}
+                          </button>
+                        )}
                         <button onClick={() => toggleExpand(order._id)} className="px-3 py-1.5 bg-inset text-theme-muted rounded-lg text-xs font-medium hover:text-theme-primary flex items-center gap-1">
                           Track {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                         </button>
@@ -310,16 +314,22 @@ export default function SellerOrders() {
                             <div className="space-y-2 max-h-60 overflow-y-auto">
                               {couriers.map(c => (
                                 <button key={c.courierId} onClick={() => createShipmentWithCourier(order._id, c.courierId, c.rate)} disabled={updating === order._id} className="w-full flex items-center justify-between p-3 bg-card border border-edge rounded-lg text-sm hover:border-amber-500/30 transition-colors">
-                                  <div className="text-left">
-                                    <p className="font-medium text-theme-primary">{c.courierName}</p>
-                                    <p className="text-xs text-theme-muted">Est. {c.estimatedDays} days &middot; Rating: {c.rating}/5</p>
-                                  </div>
-                                  <div className="text-right shrink-0 ml-3">
-                                    <span className="text-amber-400 font-bold">Rs. {c.rate}</span>
-                                    {order.shippingPaidBy === 'seller' && (
-                                      <p className="text-[10px] text-red-400">deducted from payout</p>
-                                    )}
-                                  </div>
+                                  {updating === order._id ? (
+                                    <div className="flex items-center justify-center w-full py-1"><Loader className="w-4 h-4 animate-spin text-amber-400" /></div>
+                                  ) : (
+                                    <>
+                                      <div className="text-left">
+                                        <p className="font-medium text-theme-primary">{c.courierName}</p>
+                                        <p className="text-xs text-theme-muted">Est. {c.estimatedDays} days &middot; Rating: {c.rating}/5</p>
+                                      </div>
+                                      <div className="text-right shrink-0 ml-3">
+                                        <span className="text-amber-400 font-bold">Rs. {c.rate}</span>
+                                        {order.shippingPaidBy === 'seller' && (
+                                          <p className="text-[10px] text-red-400">deducted from payout</p>
+                                        )}
+                                      </div>
+                                    </>
+                                  )}
                                 </button>
                               ))}
                             </div>
@@ -344,11 +354,17 @@ export default function SellerOrders() {
                           <div className="space-y-2 max-h-48 overflow-y-auto">
                             {couriers.map(c => (
                               <button key={c.courierId} onClick={() => assignCourier(order._id, c.courierId, c.rate)} disabled={updating === order._id} className="w-full flex items-center justify-between p-3 bg-card border border-edge rounded-lg text-sm hover:border-amber-500/30 transition-colors">
-                                <div className="text-left">
-                                  <p className="font-medium text-theme-primary">{c.courierName}</p>
-                                  <p className="text-xs text-theme-muted">Est. {c.estimatedDays} days &middot; Rating: {c.rating}/5</p>
-                                </div>
-                                <span className="text-amber-400 font-bold whitespace-nowrap ml-3">Rs. {c.rate}</span>
+                                {updating === order._id ? (
+                                  <div className="flex items-center justify-center w-full py-1"><Loader className="w-4 h-4 animate-spin text-amber-400" /></div>
+                                ) : (
+                                  <>
+                                    <div className="text-left">
+                                      <p className="font-medium text-theme-primary">{c.courierName}</p>
+                                      <p className="text-xs text-theme-muted">Est. {c.estimatedDays} days &middot; Rating: {c.rating}/5</p>
+                                    </div>
+                                    <span className="text-amber-400 font-bold whitespace-nowrap ml-3">Rs. {c.rate}</span>
+                                  </>
+                                )}
                               </button>
                             ))}
                           </div>
