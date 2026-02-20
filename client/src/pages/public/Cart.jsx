@@ -312,7 +312,7 @@ export default function Cart() {
                       <span className="text-theme-secondary">
                         {e.shippingPaidBy === 'seller'
                           ? 'Free Shipping'
-                          : `${e.courierName || 'Courier'}${e.estimatedDays ? ` · ${e.estimatedDays} days` : ''}`}
+                          : `Standard Shipping${e.estimatedDays ? ` · ${e.estimatedDays} days` : ''}`}
                       </span>
                       {e.shippingPaidBy !== 'seller' && (
                         <span className={!e.shippingCost ? 'text-green-400' : 'text-theme-primary font-medium'}>
@@ -370,7 +370,7 @@ export default function Cart() {
                       <Truck className="w-3 h-3" />
                       {e.shippingPaidBy === 'seller'
                         ? 'Shipping'
-                        : `Shipping${e.courierName ? ` (${e.courierName})` : ''}${e.estimatedDays ? ` · ${e.estimatedDays} days` : ''}`}
+                        : `Standard Shipping${e.estimatedDays ? ` · ${e.estimatedDays} days` : ''}`}
                     </span>
                     <span className={`shrink-0 ml-2 ${e.shippingPaidBy === 'seller' || !e.shippingCost ? 'text-green-400' : 'text-theme-secondary'}`}>
                       {e.shippingPaidBy === 'seller' || !e.shippingCost ? 'Free' : `Rs. ${e.shippingCost.toLocaleString('en-IN')}`}
