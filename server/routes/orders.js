@@ -847,19 +847,20 @@ router.post('/shipping-estimate', requireAuth, async (req, res) => {
 
         const companies = result?.data?.available_courier_companies || result?.available_courier_companies || [];
         if (companies.length > 0) {
-          // Pick cheapest courier
-          const cheapest = companies.reduce((min, c) => c.rate < min.rate ? c : min, companies[0]);
-          const actualRate = Math.round(cheapest.rate);
-          // Add Rs. 10 platform shipping markup when customer pays
+          // Sort by rate and pick median courier (gives seller multiple options below this price)
+          const sorted = [...companies].sort((a, b) => a.rate - b.rate);
+          const medianIdx = Math.floor(sorted.length / 2);
+          const median = sorted[medianIdx];
+          const medianRate = Math.round(median.rate);
           const SHIPPING_MARKUP = 10;
-          const displayRate = group.shippingPaidBy === 'customer' ? actualRate + SHIPPING_MARKUP : actualRate;
+          const displayRate = group.shippingPaidBy === 'customer' ? medianRate + SHIPPING_MARKUP : medianRate;
           estimates.push({
             sellerId,
-            shippingCost: displayRate, // what customer sees/pays
-            actualShippingCost: actualRate, // actual Shiprocket rate (for courier cap)
+            shippingCost: displayRate,
+            actualShippingCost: medianRate,
             shippingPaidBy: group.shippingPaidBy,
-            courierName: cheapest.courier_name,
-            estimatedDays: cheapest.estimated_delivery_days,
+            courierName: median.courier_name,
+            estimatedDays: median.estimated_delivery_days,
           });
         } else {
           estimates.push({

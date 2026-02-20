@@ -121,6 +121,7 @@ export default function App() {
               <Route path="/store/:slug" element={<SellerStore />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/orders" element={<CustomerOrders />} />
+              <Route path="/orders/confirmation" element={<OrderConfirmation />} />
               <Route path="/orders/:id" element={<OrderDetail />} />
               <Route path="/orders/:id/confirmation" element={<OrderConfirmation />} />
               <Route path="/profile" element={<CustomerProfile />} />

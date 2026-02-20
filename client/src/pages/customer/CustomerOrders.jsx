@@ -45,11 +45,12 @@ export default function CustomerOrders() {
       // Payment confirmed — now clear the cart
       clearCart();
       toast.success('Payment verified! Your order is confirmed.');
-      // Redirect to confirmation page
-      const confirmedOrder = data.orders?.[0];
-      if (confirmedOrder) {
+      // Redirect to confirmation page with all order IDs
+      const confirmedOrders = data.orders || [];
+      if (confirmedOrders.length > 0) {
         setSearchParams({});
-        return navigate(`/orders/${confirmedOrder._id}/confirmation`);
+        const ids = confirmedOrders.map(o => o._id).join(',');
+        return navigate(`/orders/confirmation?ids=${ids}`);
       }
     } catch (err) {
       const msg = err.response?.data?.message || 'Payment verification failed';
