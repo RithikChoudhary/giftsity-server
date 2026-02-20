@@ -32,6 +32,7 @@ export default function SellerOrders() {
       const { data } = await SellerAPI.get('/orders');
       const orderList = Array.isArray(data) ? data : data.orders || [];
       setOrders(orderList);
+      setCouriers([]);
 
       const shippableStatuses = ['confirmed', 'processing', 'shipped', 'delivered'];
       const shippableOrders = orderList.filter(o => shippableStatuses.includes(o.status));
@@ -82,14 +83,17 @@ export default function SellerOrders() {
   const createShipmentWithCourier = async (orderId, courierId, courierRate) => {
     setUpdating(orderId);
     try {
-      const { data } = await SellerAPI.post(`/shipping/${orderId}/create`);
-      toast.success('Shipment created!');
+      await SellerAPI.post(`/shipping/${orderId}/create`);
 
       try {
         const { data: assignData } = await SellerAPI.post(`/shipping/${orderId}/assign-courier`, { courierId, courierRate });
-        toast.success(`Courier assigned: ${assignData.shipment?.courierName}`);
+        if (assignData.pickupScheduled) {
+          toast.success('Shipment created, courier assigned & pickup scheduled!');
+        } else {
+          toast.success(`Courier assigned: ${assignData.shipment?.courierName} — schedule pickup manually`);
+        }
       } catch (assignErr) {
-        toast.error(assignErr.response?.data?.message || 'Shipment created but courier assignment failed — retry from Step 2');
+        toast.error(assignErr.response?.data?.message || 'Shipment created but courier assignment failed — retry below');
       }
 
       setCouriers([]);
@@ -102,7 +106,11 @@ export default function SellerOrders() {
     setUpdating(orderId);
     try {
       const { data } = await SellerAPI.post(`/shipping/${orderId}/assign-courier`, { courierId, courierRate });
-      toast.success(`Courier assigned: ${data.shipment?.courierName}`);
+      if (data.pickupScheduled) {
+        toast.success('Courier assigned & pickup scheduled!');
+      } else {
+        toast.success(`Courier assigned: ${data.shipment?.courierName} — schedule pickup manually`);
+      }
       setCouriers([]);
       await loadOrders();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed to assign courier'); }
@@ -286,10 +294,15 @@ export default function SellerOrders() {
                   <div className="border-t border-edge/50 p-4 bg-inset/30 animate-fade-in">
                     <h4 className="text-sm font-semibold text-theme-primary mb-3 flex items-center gap-2"><Truck className="w-4 h-4 text-amber-400" /> Shipping Management</h4>
 
-                    {/* Step 1: Create shipment on Shiprocket & check couriers */}
-                    {(order.status === 'confirmed' || order.status === 'processing') && !shipment?.shiprocketOrderId && (
+                    {/* Select courier: no Shiprocket order yet OR shipment created but no AWB */}
+                    {(order.status === 'confirmed' || order.status === 'processing') && !shipment?.awbCode && (
                       <div className="mb-4">
-                        <p className="text-xs text-theme-muted mb-2">Step 1: Check available delivery partners</p>
+                        {shipment?.shiprocketOrderId && (
+                          <div className="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/10 rounded-lg px-3 py-2 mb-3">
+                            Shiprocket Order #{shipment.shiprocketOrderId} created — select a courier to continue
+                          </div>
+                        )}
+                        <p className="text-xs text-theme-muted mb-2">Select a delivery partner (pickup will be auto-scheduled)</p>
                         {couriers.length === 0 && (
                           <button onClick={() => checkServiceability(order._id)} disabled={courierLoading} className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-lg text-sm font-semibold flex items-center gap-2">
                             {courierLoading ? <Loader className="w-4 h-4 animate-spin" /> : <><Truck className="w-4 h-4" /> Check Available Couriers</>}
@@ -297,7 +310,7 @@ export default function SellerOrders() {
                         )}
                         {couriers.length > 0 && (
                           <div className="space-y-2">
-                            <p className="text-xs text-amber-400 font-medium mb-2">{couriers.length} courier{couriers.length > 1 ? 's' : ''} available — select one to create shipment:</p>
+                            <p className="text-xs text-amber-400 font-medium mb-2">{couriers.length} courier{couriers.length > 1 ? 's' : ''} available:</p>
                             {order.shippingPaidBy === 'seller' && (
                               <p className="text-[11px] text-red-400 bg-red-500/5 border border-red-500/10 rounded-lg px-3 py-1.5 mb-2">Shipping cost will be deducted from your payout (you offered free shipping)</p>
                             )}
@@ -306,7 +319,7 @@ export default function SellerOrders() {
                             )}
                             <div className="space-y-2 max-h-60 overflow-y-auto">
                               {couriers.map(c => (
-                                <button key={c.courierId} onClick={() => createShipmentWithCourier(order._id, c.courierId, c.rate)} disabled={updating === order._id} className="w-full flex items-center justify-between p-3 bg-card border border-edge rounded-lg text-sm hover:border-amber-500/30 transition-colors">
+                                <button key={c.courierId} onClick={() => shipment?.shiprocketOrderId ? assignCourier(order._id, c.courierId, c.rate) : createShipmentWithCourier(order._id, c.courierId, c.rate)} disabled={updating === order._id} className="w-full flex items-center justify-between p-3 bg-card border border-edge rounded-lg text-sm hover:border-amber-500/30 transition-colors">
                                   {updating === order._id ? (
                                     <div className="flex items-center justify-center w-full py-1"><Loader className="w-4 h-4 animate-spin text-amber-400" /></div>
                                   ) : (
@@ -331,47 +344,13 @@ export default function SellerOrders() {
                       </div>
                     )}
 
-                    {/* Step 2: Assign courier (if shipment created but no AWB yet) */}
-                    {shipment?.shiprocketOrderId && !shipment?.awbCode && (order.status === 'confirmed' || order.status === 'processing') && (
-                      <div className="mb-4">
-                        <div className="text-xs text-green-400 bg-green-500/5 border border-green-500/10 rounded-lg px-3 py-2 mb-3">
-                          Shiprocket Order #{shipment.shiprocketOrderId} created
-                        </div>
-                        <p className="text-xs text-theme-muted mb-2">Step 2: Select a delivery partner</p>
-                        {couriers.length === 0 && (
-                          <button onClick={() => checkServiceability(order._id)} disabled={courierLoading} className="px-4 py-2 bg-card border border-edge hover:border-edge-strong text-theme-primary rounded-lg text-sm font-medium mb-3 flex items-center gap-2">
-                            {courierLoading ? <Loader className="w-4 h-4 animate-spin" /> : 'Check Available Couriers'}
-                          </button>
-                        )}
-                        {couriers.length > 0 && (
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {couriers.map(c => (
-                              <button key={c.courierId} onClick={() => assignCourier(order._id, c.courierId, c.rate)} disabled={updating === order._id} className="w-full flex items-center justify-between p-3 bg-card border border-edge rounded-lg text-sm hover:border-amber-500/30 transition-colors">
-                                {updating === order._id ? (
-                                  <div className="flex items-center justify-center w-full py-1"><Loader className="w-4 h-4 animate-spin text-amber-400" /></div>
-                                ) : (
-                                  <>
-                                    <div className="text-left">
-                                      <p className="font-medium text-theme-primary">{c.courierName}</p>
-                                      <p className="text-xs text-theme-muted">Est. {c.estimatedDays} days &middot; Rating: {c.rating}/5</p>
-                                    </div>
-                                    <span className="text-amber-400 font-bold whitespace-nowrap ml-3">Rs. {c.rate}</span>
-                                  </>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Step 3: Schedule pickup */}
+                    {/* Fallback: pickup not auto-scheduled (AWB exists but order not shipped) */}
                     {shipment?.awbCode && order.status !== 'shipped' && order.status !== 'delivered' && (
                       <div className="mb-4">
                         <div className="text-xs text-green-400 bg-green-500/5 border border-green-500/10 rounded-lg px-3 py-2 mb-3">
                           {shipment.courierName && <span>Courier: {shipment.courierName} &middot; </span>}AWB: {shipment.awbCode}
                         </div>
-                        <p className="text-xs text-theme-muted mb-2">Step 3: Schedule pickup</p>
+                        <p className="text-xs text-theme-muted mb-2">Pickup was not auto-scheduled — schedule manually:</p>
                         <div className="flex gap-2">
                           <button onClick={() => schedulePickup(order._id)} disabled={updating === order._id} className="px-4 py-2 bg-green-500 hover:bg-green-400 text-zinc-950 rounded-lg text-sm font-semibold flex items-center gap-2">
                             {updating === order._id ? <Loader className="w-4 h-4 animate-spin" /> : 'Schedule Pickup'}

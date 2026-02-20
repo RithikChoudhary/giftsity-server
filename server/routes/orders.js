@@ -771,6 +771,12 @@ router.post('/:id/cancel', requireAuth, sanitizeBody, async (req, res) => {
 
     logActivity({ domain: 'order', action: 'order_cancelled', actorRole: 'customer', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Order', targetId: order._id, message: `Order ${order.orderNumber} cancelled by customer`, metadata: { reason: order.cancelReason } });
 
+    // Send cancellation email to customer
+    try {
+      const { sendCancellationEmail } = require('../utils/email');
+      if (req.user.email) await sendCancellationEmail(req.user.email, order);
+    } catch (emailErr) { logger.error('Cancellation email error:', emailErr.message); }
+
     // Notify seller about cancellation
     createNotification({
       userId: order.sellerId.toString(), userRole: 'seller',

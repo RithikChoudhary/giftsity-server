@@ -136,6 +136,15 @@ const sendCorporateQuoteNotification = async (email, quote, action = 'created') 
   });
 };
 
+const sendCancellationEmail = async (email, order) => {
+  const subject = `Order #${order.orderNumber} Cancelled — Refund ${order.paymentStatus === 'refunded' ? 'Initiated' : 'Pending'}`;
+  const html = templates.cancellationTemplate(order);
+  await sendEmail(email, subject, html, {
+    template: 'cancellation', recipientRole: 'customer',
+    metadata: { orderNumber: order.orderNumber }
+  });
+};
+
 module.exports = {
   sendOTP,
   sendOrderConfirmation,
@@ -147,5 +156,6 @@ module.exports = {
   sendDeliveredEmail,
   sendReviewRequestEmail,
   sendCorporateOrderStatusEmail,
-  sendCorporateQuoteNotification
+  sendCorporateQuoteNotification,
+  sendCancellationEmail
 };

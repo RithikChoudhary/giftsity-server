@@ -213,6 +213,28 @@ const corporateQuoteTemplate = (quote, action = 'created') => {
   `, { title: 'Giftsity Corporate' });
 };
 
+const cancellationTemplate = (order) => {
+  const refundStatus = order.paymentStatus === 'refunded' ? 'Refund initiated' : order.paymentStatus === 'refund_pending' ? 'Refund pending' : 'No payment was charged';
+  const itemsList = (order.items || []).map(i =>
+    `<li style="color:#ccc;margin:4px 0;">${i.title} x ${i.quantity} — ₹${(i.price * i.quantity).toLocaleString()}</li>`
+  ).join('');
+
+  return baseTemplate(`
+    <h2 style="color:#eee;margin:0 0 20px;">Order Cancelled</h2>
+    ${infoBox(`
+      <p style="color:#ff6666;margin:4px 0;font-weight:bold;">Order #${order.orderNumber} has been cancelled</p>
+      <p style="color:#ccc;margin:4px 0;">Amount: ₹${(order.totalAmount || 0).toLocaleString()}</p>
+    `, { bg: '#2e1a1a' })}
+    <ul style="color:#ccc;padding-left:20px;margin:0 0 16px;">${itemsList}</ul>
+    ${infoBox(`
+      <p style="color:#ccc;margin:0;">Refund Status: <strong style="color:#f5c518;">${refundStatus}</strong></p>
+      ${order.paymentStatus === 'refunded' ? '<p style="color:#888;margin:8px 0 0;font-size:12px;">The refund will reflect in your account within 5-7 business days.</p>' : ''}
+    `)}
+    ${ctaButton('View Order Details', CLIENT_URL() + `/orders/${order._id}`)}
+    <p style="color:#888;font-size:13px;">If you have questions, contact us at ${process.env.ADMIN_EMAIL || 'support@giftsity.com'}.</p>
+  `);
+};
+
 module.exports = {
   baseTemplate,
   otpTemplate,
@@ -225,5 +247,6 @@ module.exports = {
   reviewRequestTemplate,
   corporateWelcomeTemplate,
   corporateOrderStatusTemplate,
-  corporateQuoteTemplate
+  corporateQuoteTemplate,
+  cancellationTemplate
 };
