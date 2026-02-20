@@ -239,6 +239,13 @@ router.post('/webhook', async (req, res) => {
       } catch (ndrErr) {
         logger.error(`[Shiprocket Webhook] NDR handler error: ${ndrErr.message}`);
       }
+    } else if (shipment.status === 'cancelled' && previousStatus !== 'cancelled') {
+      try {
+        const order = await Order.findById(shipment.orderId);
+        if (order) await handleRTO(shipment, order);
+      } catch (cancelErr) {
+        logger.error(`[Shiprocket Webhook] Cancel handler error: ${cancelErr.message}`);
+      }
     }
 
     logger.info(`[Shiprocket Webhook] Updated shipment ${shipment._id}: ${previousStatus} → ${shipment.status}`);
