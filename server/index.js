@@ -70,6 +70,7 @@ app.use('/api/tracking', require('./routes/shiprocket'));
 app.use('/api/chat', require('./routes/chat'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/returns', require('./routes/returns'));
+app.use('/api/pincode', require('./routes/pincodeCheck'));
 
 app.use('/api', require('./routes/sitemap'));
 

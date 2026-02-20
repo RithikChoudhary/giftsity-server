@@ -1,8 +1,11 @@
 const express = require('express');
 const Shipment = require('../models/Shipment');
 const Order = require('../models/Order');
+const logger = require('../utils/logger');
 const { logActivity } = require('../utils/audit');
 const { createNotification } = require('../utils/notify');
+const { handleRTO } = require('../utils/rtoHandler');
+const { handleNDR } = require('../utils/ndrHandler');
 const router = express.Router();
 
 /**
@@ -24,7 +27,8 @@ const STATUS_MAP = {
   14: 'rto',                 // RTO Acknowledged
   // Cancelled
   8: 'cancelled',            // Cancelled
-  21: 'cancelled',           // Undelivered
+  // NDR (Non-Delivery Report) — courier will re-attempt, don't cancel yet
+  21: 'ndr',                 // Undelivered
 };
 
 /**
@@ -41,7 +45,8 @@ function shipmentToOrderStatus(shipmentStatus) {
       return 'delivered';
     case 'rto':
     case 'cancelled':
-      return null; // don't auto-update order for RTO/cancel — needs manual review
+    case 'ndr':
+      return null; // handled separately by rtoHandler / ndrHandler
     default:
       return null;
   }
@@ -152,11 +157,11 @@ router.post('/webhook', async (req, res) => {
     }
 
     // Only advance status forward (don't go backwards)
-    const statusOrder = ['created', 'pickup_scheduled', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'rto', 'cancelled'];
+    const statusOrder = ['created', 'pickup_scheduled', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'ndr', 'rto', 'cancelled'];
     if (newStatus) {
       const currentIdx = statusOrder.indexOf(previousStatus);
       const newIdx = statusOrder.indexOf(newStatus);
-      if (newIdx > currentIdx || newStatus === 'rto' || newStatus === 'cancelled') {
+      if (newIdx > currentIdx || newStatus === 'rto' || newStatus === 'cancelled' || newStatus === 'ndr') {
         shipment.status = newStatus;
 
         // Set specific date fields
@@ -215,6 +220,24 @@ router.post('/webhook', async (req, res) => {
           targetId: order._id,
           message: `Shiprocket updated order ${order.orderNumber} to ${orderStatus} (AWB: ${awb})`
         });
+      }
+    }
+
+    // Handle RTO / NDR — these don't change order status via shipmentToOrderStatus,
+    // so we handle them separately with dedicated handlers
+    if (shipment.status === 'rto' && previousStatus !== 'rto') {
+      try {
+        const order = await Order.findById(shipment.orderId);
+        if (order) await handleRTO(shipment, order);
+      } catch (rtoErr) {
+        logger.error(`[Shiprocket Webhook] RTO handler error: ${rtoErr.message}`);
+      }
+    } else if (shipment.status === 'ndr' && previousStatus !== 'ndr') {
+      try {
+        const order = await Order.findById(shipment.orderId);
+        if (order) await handleNDR(shipment, order);
+      } catch (ndrErr) {
+        logger.error(`[Shiprocket Webhook] NDR handler error: ${ndrErr.message}`);
       }
     }
 

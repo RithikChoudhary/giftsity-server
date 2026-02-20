@@ -21,7 +21,7 @@ const shipmentSchema = new mongoose.Schema({
   // Status
   status: {
     type: String,
-    enum: ['created', 'pickup_scheduled', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'rto', 'cancelled'],
+    enum: ['created', 'pickup_scheduled', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'rto', 'ndr', 'cancelled'],
     default: 'created'
   },
 
