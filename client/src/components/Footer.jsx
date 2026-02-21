@@ -72,12 +72,13 @@ export default function Footer() {
             <div className="space-y-2">
               <Link to="/about" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">About Us</Link>
               <Link to="/contact" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">Contact Us</Link>
-              {info.supportEmail && <a href={`mailto:${info.supportEmail}`} className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">{info.supportEmail}</a>}
-              {info.supportPhone && <a href={`tel:${info.supportPhone}`} className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">{info.supportPhone}</a>}
+              {info.whatsappNumber && <a href={`https://wa.me/${info.whatsappNumber.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">WhatsApp Support</a>}
+              {info.supportPhone && <a href={`tel:${info.supportPhone}`} className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">Call: {info.supportPhone}</a>}
               <Link to="/terms" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">Terms &amp; Conditions</Link>
               <Link to="/privacy" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">Privacy Policy</Link>
               <Link to="/return-policy" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">Return &amp; Refund Policy</Link>
               <Link to="/shipping-policy" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">Shipping Policy</Link>
+              <Link to="/seller-agreement" className="block text-sm text-theme-muted hover:text-theme-secondary transition-colors">Seller Agreement</Link>
             </div>
           </div>
         </div>
