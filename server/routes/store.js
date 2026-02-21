@@ -9,14 +9,14 @@ const { cacheMiddleware } = require('../middleware/cache');
 const logger = require('../utils/logger');
 const router = express.Router();
 
-// Helper: find seller by businessSlug OR ObjectId
+// Helper: find seller by businessSlug, oldSlugs, or ObjectId
 function sellerQuery(slug, requireActive = true) {
   const base = {};
   if (requireActive) base.status = 'active';
   if (mongoose.Types.ObjectId.isValid(slug) && slug.length === 24) {
-    return { ...base, $or: [{ _id: slug }, { 'sellerProfile.businessSlug': slug }] };
+    return { ...base, $or: [{ _id: slug }, { 'sellerProfile.businessSlug': slug }, { 'sellerProfile.oldSlugs': slug }] };
   }
-  return { ...base, 'sellerProfile.businessSlug': slug };
+  return { ...base, $or: [{ 'sellerProfile.businessSlug': slug }, { 'sellerProfile.oldSlugs': slug }] };
 }
 
 // GET /api/store/info - public platform info (social links, contact)

@@ -28,6 +28,7 @@ const sellerSchema = new mongoose.Schema({
   sellerProfile: {
     businessName: { type: String, default: '' },
     businessSlug: { type: String, default: '' },
+    oldSlugs: [{ type: String }],
     bio: { type: String, default: '' },
     avatar: { url: { type: String, default: '' }, publicId: { type: String, default: '' } },
     coverImage: { url: { type: String, default: '' }, publicId: { type: String, default: '' } },

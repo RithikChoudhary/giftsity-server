@@ -216,8 +216,20 @@ router.post('/register-seller', async (req, res) => {
       referredBySeller = await Seller.findOne({ 'sellerProfile.referralCode': referralCode.toUpperCase() });
     }
 
+    if (!businessName) {
+      return res.status(400).json({ message: 'Business name is required' });
+    }
+    const escapedName = businessName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const existingBusinessName = await Seller.findOne({
+      'sellerProfile.businessName': { $regex: new RegExp(`^${escapedName}$`, 'i') }
+    });
+    if (existingBusinessName) {
+      return res.status(400).json({ message: 'Business name already taken. Please choose a different one.' });
+    }
+
+    const { generateUniqueSlug } = require('../utils/slugify');
     const sellerRefCode = (name.replace(/\s/g, '').substring(0, 4).toUpperCase() + Date.now().toString(36).toUpperCase()).substring(0, 10);
-    const businessSlug = name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 20) + Math.random().toString(36).substring(2, 6);
+    const businessSlug = await generateUniqueSlug(businessName, Seller);
 
     seller = new Seller({
       email: normalizedEmail,
