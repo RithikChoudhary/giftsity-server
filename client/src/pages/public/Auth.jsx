@@ -53,7 +53,7 @@ export default function Auth() {
     setLoading(true);
     try {
       const { data } = await API.post('/auth/send-otp', { email });
-      setIsNew(data.isNew);
+      setIsNew(data.isNewUser);
       setStep('otp');
       startResendTimer();
       toast.success('OTP sent to your email!');
