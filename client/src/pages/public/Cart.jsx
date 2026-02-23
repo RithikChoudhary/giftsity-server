@@ -176,7 +176,7 @@ export default function Cart() {
                         <Link to={`/product/${item.slug}`} className="font-medium text-sm text-theme-primary hover:text-amber-400 line-clamp-2 block">{item.title}</Link>
                         <p className="text-xs text-theme-muted mt-0.5">{item.sellerName}</p>
                       </div>
-                      <button onClick={() => removeItem(item.cartKey || item.productId)} className="text-theme-dim hover:text-red-400 shrink-0 p-1"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => removeItem(item.cartKey || item.productId)} aria-label="Remove item" className="text-theme-dim hover:text-red-400 shrink-0 p-1"><Trash2 className="w-4 h-4" /></button>
                     </div>
                     {item.customizations?.length > 0 && (
                       <div className="mt-1 space-y-0.5">
@@ -190,9 +190,9 @@ export default function Cart() {
                     <div className="flex items-center justify-between mt-2">
                       <p className="text-sm font-bold text-theme-primary">Rs. {item.price?.toLocaleString('en-IN')}</p>
                       <div className="flex items-center gap-1.5">
-                        <button onClick={() => updateQuantity(item.cartKey || item.productId, item.quantity - 1)} className="w-7 h-7 flex items-center justify-center bg-inset rounded-md"><Minus className="w-3 h-3" /></button>
+                        <button onClick={() => updateQuantity(item.cartKey || item.productId, item.quantity - 1)} aria-label="Decrease quantity" className="w-7 h-7 flex items-center justify-center bg-inset rounded-md"><Minus className="w-3 h-3" /></button>
                         <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.cartKey || item.productId, item.quantity + 1)} disabled={item.quantity >= item.stock} className="w-7 h-7 flex items-center justify-center bg-inset rounded-md disabled:opacity-40"><Plus className="w-3 h-3" /></button>
+                        <button onClick={() => updateQuantity(item.cartKey || item.productId, item.quantity + 1)} disabled={item.quantity >= item.stock} aria-label="Increase quantity" className="w-7 h-7 flex items-center justify-center bg-inset rounded-md disabled:opacity-40"><Plus className="w-3 h-3" /></button>
                       </div>
                     </div>
                   </div>

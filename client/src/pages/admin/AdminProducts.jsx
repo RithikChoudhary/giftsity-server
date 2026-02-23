@@ -85,13 +85,13 @@ export default function AdminProducts() {
                 </p>
               </div>
               <div className="flex gap-1.5">
-                <button onClick={() => toggleFeatured(p._id, p.isFeatured)} className={`p-2 rounded-lg ${p.isFeatured ? 'bg-amber-500/10 text-amber-400' : 'bg-inset text-theme-muted'} hover:text-amber-400`} title="Feature">
+                <button onClick={() => toggleFeatured(p._id, p.isFeatured)} aria-label="Toggle featured" className={`p-2 rounded-lg ${p.isFeatured ? 'bg-amber-500/10 text-amber-400' : 'bg-inset text-theme-muted'} hover:text-amber-400`} title="Feature">
                   <Star className={`w-4 h-4 ${p.isFeatured ? 'fill-current' : ''}`} />
                 </button>
-                <button onClick={() => toggleActive(p._id, p.isActive)} className="p-2 rounded-lg bg-inset text-theme-muted hover:text-theme-primary" title={p.isActive ? 'Hide' : 'Show'}>
+                <button onClick={() => toggleActive(p._id, p.isActive)} aria-label="Toggle visibility" className="p-2 rounded-lg bg-inset text-theme-muted hover:text-theme-primary" title={p.isActive ? 'Hide' : 'Show'}>
                   {p.isActive ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
-                <button onClick={() => deleteProduct(p._id)} className="p-2 rounded-lg bg-inset text-theme-muted hover:text-red-400" title="Delete">
+                <button onClick={() => deleteProduct(p._id)} aria-label="Delete product" className="p-2 rounded-lg bg-inset text-theme-muted hover:text-red-400" title="Delete">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

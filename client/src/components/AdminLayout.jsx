@@ -67,7 +67,7 @@ export default function AdminLayout() {
           <img src="/logo.png" alt="Giftsity" className="h-10 w-10 rounded-lg object-contain" />
           <span className="text-xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent">Giftsity</span>
         </Link>
-        <button onClick={() => setSidebarOpen(false)} className="md:hidden p-1 text-theme-muted hover:text-theme-primary"><X className="w-5 h-5" /></button>
+        <button onClick={() => setSidebarOpen(false)} aria-label="Close menu" className="md:hidden p-1 text-theme-muted hover:text-theme-primary"><X className="w-5 h-5" /></button>
       </div>
       <p className="text-xs text-theme-dim px-5 pt-2">Admin Panel</p>
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
@@ -113,7 +113,7 @@ export default function AdminLayout() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
         <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-card border-b border-edge/50">
-          <button onClick={() => setSidebarOpen(true)} className="p-1 text-theme-muted hover:text-theme-primary">
+          <button onClick={() => setSidebarOpen(true)} aria-label="Open menu" className="p-1 text-theme-muted hover:text-theme-primary">
             <Menu className="w-5 h-5" />
           </button>
           <img src="/logo.png" alt="Giftsity" className="h-7 w-7 rounded object-contain" />

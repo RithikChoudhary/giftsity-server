@@ -126,7 +126,7 @@ export default function Shop() {
               <span className="text-xs text-theme-dim">Active:</span>
               <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-400 text-xs rounded-full">
                 {categories.find(c => c.slug === category)?.name || category}
-                <button onClick={() => { setCategory(''); setPage(1); }}><X className="w-3 h-3" /></button>
+                <button onClick={() => { setCategory(''); setPage(1); }} aria-label="Clear filter"><X className="w-3 h-3" /></button>
               </span>
             </div>
           )}

@@ -125,7 +125,7 @@ export default function CorporateProfile() {
           </div>
           {form.shippingAddresses.map((addr, i) => (
             <div key={i} className="border border-edge/30 rounded-lg p-4 space-y-3 relative">
-              <button type="button" onClick={() => removeAddress(i)} className="absolute top-2 right-2 text-red-400 hover:text-red-300">
+              <button type="button" onClick={() => removeAddress(i)} aria-label="Remove address" className="absolute top-2 right-2 text-red-400 hover:text-red-300">
                 <Trash2 className="w-4 h-4" />
               </button>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

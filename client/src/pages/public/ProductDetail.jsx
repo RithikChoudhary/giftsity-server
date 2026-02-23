@@ -170,8 +170,8 @@ export default function ProductDetail() {
             )}
             {media.length > 1 && (
               <>
-                <button onClick={() => setImgIdx(i => i > 0 ? i - 1 : media.length - 1)} className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70"><ChevronLeft className="w-4 h-4" /></button>
-                <button onClick={() => setImgIdx(i => i < media.length - 1 ? i + 1 : 0)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70"><ChevronRight className="w-4 h-4" /></button>
+                <button onClick={() => setImgIdx(i => i > 0 ? i - 1 : media.length - 1)} aria-label="Previous image" className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70"><ChevronLeft className="w-4 h-4" /></button>
+                <button onClick={() => setImgIdx(i => i < media.length - 1 ? i + 1 : 0)} aria-label="Next image" className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70"><ChevronRight className="w-4 h-4" /></button>
               </>
             )}
             {product.isFeatured && <span className="absolute top-3 left-3 px-2 py-1 bg-amber-500 text-zinc-950 text-xs font-bold rounded-full">Featured</span>}
@@ -252,7 +252,7 @@ export default function ProductDetail() {
                         {(customizations[idx] || []).map((url, i) => (
                           <div key={i} className="relative w-14 h-14 rounded-lg overflow-hidden bg-inset border border-edge">
                             <img src={url} alt="" className="w-full h-full object-cover" />
-                            <button type="button" onClick={() => setCustomizations(prev => ({ ...prev, [idx]: prev[idx].filter((_, fi) => fi !== i) }))} className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"><X className="w-2.5 h-2.5 text-white" /></button>
+                            <button type="button" onClick={() => setCustomizations(prev => ({ ...prev, [idx]: prev[idx].filter((_, fi) => fi !== i) }))} aria-label="Remove image" className="absolute top-0.5 right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"><X className="w-2.5 h-2.5 text-white" /></button>
                           </div>
                         ))}
                         {(customizations[idx] || []).length < (opt.maxFiles || 5) && (
@@ -289,9 +289,9 @@ export default function ProductDetail() {
               <div className="flex items-center gap-4">
                 <span className="text-sm text-theme-muted">Quantity:</span>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => setQty(q => Math.max(1, q - 1))} className="w-8 h-8 flex items-center justify-center bg-inset rounded-lg text-theme-secondary hover:text-theme-primary"><Minus className="w-3 h-3" /></button>
+                  <button onClick={() => setQty(q => Math.max(1, q - 1))} aria-label="Decrease quantity" className="w-8 h-8 flex items-center justify-center bg-inset rounded-lg text-theme-secondary hover:text-theme-primary"><Minus className="w-3 h-3" /></button>
                   <span className="w-10 text-center text-sm font-medium text-theme-primary">{qty}</span>
-                  <button onClick={() => setQty(q => Math.min(product.stock, q + 1))} disabled={qty >= product.stock} className="w-8 h-8 flex items-center justify-center bg-inset rounded-lg text-theme-secondary hover:text-theme-primary disabled:opacity-40"><Plus className="w-3 h-3" /></button>
+                  <button onClick={() => setQty(q => Math.min(product.stock, q + 1))} disabled={qty >= product.stock} aria-label="Increase quantity" className="w-8 h-8 flex items-center justify-center bg-inset rounded-lg text-theme-secondary hover:text-theme-primary disabled:opacity-40"><Plus className="w-3 h-3" /></button>
                 </div>
                 <span className="text-xs text-theme-dim">{product.stock} in stock</span>
               </div>

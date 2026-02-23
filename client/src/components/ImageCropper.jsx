@@ -41,7 +41,7 @@ export default function ImageCropper({ image, aspect = 3, onCropDone, onCancel, 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-edge/50">
           <h3 className="text-sm font-semibold text-theme-primary">{title}</h3>
-          <button onClick={onCancel} className="p-1 text-theme-muted hover:text-theme-primary rounded-lg">
+          <button onClick={onCancel} aria-label="Cancel" className="p-1 text-theme-muted hover:text-theme-primary rounded-lg">
             <X className="w-4 h-4" />
           </button>
         </div>

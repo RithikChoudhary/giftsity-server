@@ -193,12 +193,12 @@ export default function AdminLogs() {
       {pages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-            className="p-2 rounded-lg hover:bg-inset/50 disabled:opacity-30 text-theme-muted">
+            aria-label="Previous page" className="p-2 rounded-lg hover:bg-inset/50 disabled:opacity-30 text-theme-muted">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <span className="text-sm text-theme-dim">Page {page} of {pages}</span>
           <button onClick={() => setPage(p => Math.min(pages, p + 1))} disabled={page === pages}
-            className="p-2 rounded-lg hover:bg-inset/50 disabled:opacity-30 text-theme-muted">
+            aria-label="Next page" className="p-2 rounded-lg hover:bg-inset/50 disabled:opacity-30 text-theme-muted">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>

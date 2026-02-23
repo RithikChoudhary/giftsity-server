@@ -77,7 +77,7 @@ export default function AdminCategories() {
           <div className="bg-card border border-edge rounded-2xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-theme-primary">{editing ? 'Edit Category' : 'New Category'}</h2>
-              <button onClick={() => setShowForm(false)} className="text-theme-dim hover:text-theme-primary"><X className="w-5 h-5" /></button>
+              <button onClick={() => setShowForm(false)} aria-label="Close" className="text-theme-dim hover:text-theme-primary"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -127,8 +127,8 @@ export default function AdminCategories() {
                 <p className="text-[10px] text-theme-dim mt-0.5">Slug: {cat.slug} &middot; Order: {cat.displayOrder || 0}</p>
               </div>
               <div className="flex gap-1.5">
-                <button onClick={() => openForm(cat)} className="p-2 rounded-lg bg-inset text-theme-muted hover:text-theme-primary"><Edit3 className="w-4 h-4" /></button>
-                <button onClick={() => deleteCategory(cat._id)} className="p-2 rounded-lg bg-inset text-theme-muted hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => openForm(cat)} className="p-2 rounded-lg bg-inset text-theme-muted hover:text-theme-primary" aria-label="Edit category"><Edit3 className="w-4 h-4" /></button>
+                <button onClick={() => deleteCategory(cat._id)} className="p-2 rounded-lg bg-inset text-theme-muted hover:text-red-400" aria-label="Delete category"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
           ))}

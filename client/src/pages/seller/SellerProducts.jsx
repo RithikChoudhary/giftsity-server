@@ -228,7 +228,7 @@ export default function SellerProducts() {
         <div className="p-4 rounded-xl bg-inset/50 border border-edge/30 space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium">{csvResult.message}</p>
-            <button onClick={() => setCsvResult(null)} className="text-theme-dim hover:text-theme-primary"><X className="w-4 h-4" /></button>
+            <button onClick={() => setCsvResult(null)} aria-label="Close" className="text-theme-dim hover:text-theme-primary"><X className="w-4 h-4" /></button>
           </div>
           {csvResult.errors?.length > 0 && (
             <div className="max-h-32 overflow-y-auto space-y-1">
@@ -247,7 +247,7 @@ export default function SellerProducts() {
           <div className="bg-card border border-edge rounded-2xl w-full max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-theme-primary">{editing ? 'Edit Product' : 'New Product'}</h2>
-              <button onClick={() => setShowForm(false)} className="text-theme-dim hover:text-theme-primary"><X className="w-5 h-5" /></button>
+              <button onClick={() => setShowForm(false)} aria-label="Close" className="text-theme-dim hover:text-theme-primary"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
