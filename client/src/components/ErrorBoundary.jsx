@@ -16,7 +16,8 @@ export default class ErrorBoundary extends Component {
   }
 
   handleReload = () => {
-    window.location.reload();
+    this.setState({ hasError: false, error: null });
+    window.location.href = '/';
   };
 
   handleGoHome = () => {
