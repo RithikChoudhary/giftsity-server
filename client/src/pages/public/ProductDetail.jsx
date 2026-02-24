@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { ShoppingBag, Star, Minus, Plus, Store, Truck, Shield, ArrowLeft, ChevronLeft, ChevronRight, MessageSquare, Upload, X, Palette, Play } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
@@ -142,6 +143,33 @@ export default function ProductDetail() {
         type="product"
         keywords={`${product.title}, ${product.category || 'gifts'}, buy online, Giftsity`}
       />
+      <Helmet>
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": product.title,
+          "image": product.images?.[0]?.url,
+          "description": product.description?.slice(0, 500),
+          "sku": product.sku || undefined,
+          "brand": {
+            "@type": "Brand",
+            "name": product.sellerId?.sellerProfile?.businessName || "Giftsity"
+          },
+          "offers": {
+            "@type": "Offer",
+            "price": product.price,
+            "priceCurrency": "INR",
+            "availability": product.stock > 0
+              ? "https://schema.org/InStock"
+              : "https://schema.org/OutOfStock",
+            "url": `https://giftsity.com/product/${product.slug}`,
+            "seller": {
+              "@type": "Organization",
+              "name": product.sellerId?.sellerProfile?.businessName || "Giftsity"
+            }
+          }
+        })}</script>
+      </Helmet>
       <Link to="/shop" className="inline-flex items-center gap-1 text-sm text-theme-muted hover:text-theme-primary mb-6">
         <ArrowLeft className="w-4 h-4" /> Back to Shop
       </Link>
