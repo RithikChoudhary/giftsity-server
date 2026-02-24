@@ -1,6 +1,17 @@
 import { Component } from 'react';
 import { Gift, RefreshCw, Home } from 'lucide-react';
 
+const CHUNK_RELOAD_KEY = 'chunkReloadAttempted';
+
+function isChunkLoadError(error) {
+  const msg = error?.message ?? '';
+  return (
+    msg.includes('Failed to fetch') ||
+    msg.includes('Loading chunk') ||
+    msg.includes('dynamically imported module')
+  );
+}
+
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -13,6 +24,10 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('[ErrorBoundary]', error, errorInfo);
+    if (isChunkLoadError(error) && !sessionStorage.getItem(CHUNK_RELOAD_KEY)) {
+      sessionStorage.setItem(CHUNK_RELOAD_KEY, '1');
+      window.location.reload();
+    }
   }
 
   handleReload = () => {
