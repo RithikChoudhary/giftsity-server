@@ -242,7 +242,7 @@ export default function SellerStore() {
                       )}
 
                       {/* Hover overlay with details */}
-                      <div className={`absolute inset-0 bg-black/60 flex flex-col items-center justify-center rounded-lg sm:rounded-xl transition-opacity duration-200 ${
+                      <Link to={`/product/${p.slug || p._id}`} className={`absolute inset-0 bg-black/60 flex flex-col items-center justify-center rounded-lg sm:rounded-xl transition-opacity duration-200 ${
                         isHovered ? 'opacity-100' : 'opacity-0'
                       } pointer-events-none sm:pointer-events-auto`}>
                         <p className="text-white text-sm font-semibold text-center px-2 mb-1 line-clamp-2">{p.title}</p>
@@ -259,6 +259,7 @@ export default function SellerStore() {
                         <button
                           onClick={(e) => {
                             e.preventDefault();
+                            e.stopPropagation();
                             if (needsCustomization(p)) {
                               toast('Customization required — redirecting to product page', { icon: '✏️' });
                               navigate(`/product/${p.slug || p._id}`);
@@ -269,7 +270,7 @@ export default function SellerStore() {
                           className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 text-zinc-950 text-xs font-bold rounded-lg pointer-events-auto hover:bg-amber-400 transition-colors">
                           <ShoppingCart className="w-3 h-3" /> Add
                         </button>
-                      </div>
+                      </Link>
                     </div>
                   );
                 })}
