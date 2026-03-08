@@ -16,6 +16,7 @@ const { sanitizeBody } = require('../../server/middleware/sanitize');
 const { logActivity } = require('../../server/utils/audit');
 const { createNotification } = require('../../server/utils/notify');
 const logger = require('../../server/utils/logger');
+const { logRequestError } = require('../../server/utils/logError');
 const { invalidateCache } = require('../../server/middleware/cache');
 const { submitToIndexNow } = require('../../server/utils/indexnow');
 const rateLimit = require('express-rate-limit');
@@ -331,7 +332,13 @@ router.post('/products', productCreationLimiter, upload.array('media', 15), sani
     for (const item of allUploadedPublicIds) {
       await deleteMedia(item.publicId, item.type).catch(() => {});
     }
-    logger.error('Create product error:', err.message);
+    logRequestError(logger, 'error', 'Create product error', err, req, {
+      titleTruncated: req.body?.title ? String(req.body.title).slice(0, 80) : undefined,
+      category: req.body?.category,
+      fileCount: req.files?.length,
+      hasBase64Images: !!(req.body?.newImages && (Array.isArray(req.body.newImages) ? req.body.newImages.length : 0)),
+      hasBase64Videos: !!(req.body?.newVideos && (Array.isArray(req.body.newVideos) ? req.body.newVideos.length : 0))
+    });
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -521,7 +528,14 @@ router.put('/products/:id', upload.array('media', 15), sanitizeBody, async (req,
     for (const item of newUploadedPublicIds) {
       await deleteMedia(item.publicId, item.type).catch(() => {});
     }
-    logger.error('Update product error:', err.message);
+    logRequestError(logger, 'error', 'Update product error', err, req, {
+      productId: req.params?.id,
+      titleTruncated: req.body?.title ? String(req.body.title).slice(0, 80) : undefined,
+      category: req.body?.category,
+      fileCount: req.files?.length,
+      hasBase64Images: !!(req.body?.newImages && (Array.isArray(req.body.newImages) ? req.body.newImages.length : 0)),
+      hasBase64Videos: !!(req.body?.newVideos && (Array.isArray(req.body.newVideos) ? req.body.newVideos.length : 0))
+    });
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -553,7 +567,7 @@ router.delete('/products/:id', async (req, res) => {
     if (product.slug) submitToIndexNow(`https://giftsity.com/product/${product.slug}`);
     res.json({ message: 'Product deleted' });
   } catch (err) {
-    logger.error('Delete product error:', err.message);
+    logRequestError(logger, 'error', 'Delete product error', err, req, { productId: req.params?.id });
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -653,7 +667,7 @@ router.post('/products/bulk-csv', csvUploadLimiter, csvUpload.single('csv'), asy
     logActivity({ domain: 'seller', action: 'bulk_csv_upload', actorRole: 'seller', actorId: req.user._id, actorEmail: req.user.email, message: `Bulk CSV: ${results.success} created, ${results.failed} failed` });
     res.json({ message: `Import complete: ${results.success} products created, ${results.failed} failed`, ...results });
   } catch (err) {
-    logger.error('Bulk CSV error:', err.message);
+    logRequestError(logger, 'error', 'Bulk CSV error', err, req, {});
     res.status(500).json({ message: 'Failed to process CSV' });
   }
 });
@@ -1049,7 +1063,7 @@ router.put('/settings', sanitizeBody, async (req, res) => {
     if (shiprocketError) response.shiprocketError = shiprocketError;
     res.json(response);
   } catch (err) {
-    logger.error('Settings update error:', err.message);
+    logRequestError(logger, 'error', 'Settings update error', err, req, {});
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -1103,7 +1117,7 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
 
     res.json({ url: result.secure_url, publicId: result.public_id });
   } catch (err) {
-    logger.error('Seller upload image error:', err);
+    logRequestError(logger, 'error', 'Seller upload image error', err, req, { type: req.body?.type });
     res.status(500).json({ message: 'Upload failed' });
   }
 });
@@ -1174,7 +1188,10 @@ router.post('/shipping/serviceability', async (req, res) => {
     logger.info('[Shipping] Returning', couriers.length, 'couriers');
     res.json({ couriers, pickupPincode, deliveryPincode, shippingBudget });
   } catch (err) {
-    logger.error('Serviceability error:', err?.response?.data || err.message);
+    logRequestError(logger, 'error', 'Serviceability error', err, req, {
+      orderId: req.body?.orderId,
+      apiMessage: err?.response?.data?.message
+    });
     res.status(500).json({ message: 'Failed to check serviceability', error: err?.response?.data?.message || err.message });
   }
 });
@@ -1321,7 +1338,10 @@ router.post('/shipping/:orderId/create', async (req, res) => {
 
     res.json({ message: 'Shipment created', shipment, warning: !srShipmentId ? 'Shipment created but courier assignment may need a retry' : undefined });
   } catch (err) {
-    logger.error('Create shipment error:', err?.response?.data || err.message);
+    logRequestError(logger, 'error', 'Create shipment error', err, req, {
+      orderId: req.params?.orderId,
+      apiMessage: err?.response?.data?.message
+    });
     res.status(500).json({ message: 'Failed to create shipment', error: err?.response?.data?.message || err.message });
   }
 });
@@ -1424,7 +1444,10 @@ router.post('/shipping/:orderId/assign-courier', async (req, res) => {
 
     res.json({ message: pickupScheduled ? 'Courier assigned & pickup scheduled' : 'Courier assigned (schedule pickup manually)', shipment, pickupScheduled });
   } catch (err) {
-    logger.error('Assign courier error:', err?.response?.data || err.message);
+    logRequestError(logger, 'error', 'Assign courier error', err, req, {
+      orderId: req.params?.orderId,
+      apiMessage: err?.response?.data?.message
+    });
     res.status(500).json({ message: err?.response?.data?.message || 'Failed to assign courier', error: err?.response?.data });
   }
 });
@@ -1479,7 +1502,7 @@ router.post('/shipping/:orderId/pickup', async (req, res) => {
 
     res.json({ message: 'Pickup scheduled', shipment });
   } catch (err) {
-    logger.error('[Pickup] Unexpected error:', err.message);
+    logRequestError(logger, 'error', '[Pickup] Unexpected error', err, req, { orderId: req.params?.orderId });
     res.status(500).json({ message: err.message || 'Failed to schedule pickup' });
   }
 });
@@ -1561,7 +1584,7 @@ router.post('/shipping/verify-pickup', async (req, res) => {
       message: isVerified ? 'Pickup address is verified' : 'Pickup address phone is not verified. Please verify it on the Shiprocket dashboard.'
     });
   } catch (err) {
-    logger.error('Verify pickup error:', err?.response?.data || err.message);
+    logRequestError(logger, 'error', 'Verify pickup error', err, req, { apiMessage: err?.response?.data?.message });
     res.status(500).json({ message: 'Failed to check verification status', error: err?.response?.data?.message || err.message });
   }
 });
