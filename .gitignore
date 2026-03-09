@@ -5,3 +5,8 @@ dist/
 build/
 *.log
 logs/
+
+# Google service account keys (contain private keys)
+giftisty-*.json
+examfit-*.json
+secrets/

@@ -467,6 +467,16 @@ async function autoCalculatePayouts() {
   }
 }
 
+// ==================== GOOGLE SHOPPING SYNC ====================
+async function syncGoogleShoppingProducts() {
+  try {
+    const { syncProductsToGoogle } = require('../services/googleShoppingSync');
+    await syncProductsToGoogle();
+  } catch (err) {
+    logger.error('[Cron] Google Shopping sync error:', err.message);
+  }
+}
+
 // ==================== RUN ALL CRONS ====================
 async function runAllCrons() {
   logger.info(`\n[Cron] Running seller health checks at ${new Date().toISOString()}`);
@@ -474,6 +484,7 @@ async function runAllCrons() {
     await autoCancelUnshippedOrders();
     await calculateSellerMetrics();
     await autoSuspendBadSellers();
+    await syncGoogleShoppingProducts();
     logger.info('[Cron] All checks complete\n');
   } catch (err) {
     logger.error('[Cron] Error:', err.message);
@@ -783,6 +794,9 @@ function startCronJobs() {
   // Retry failed refunds every 30 minutes
   cron.schedule('*/30 * * * *', retryFailedRefunds);
 
+  // Google Shopping sync daily at 2 AM
+  cron.schedule('0 2 * * *', syncGoogleShoppingProducts);
+
   // Run initial checks after 30 seconds (let server start)
   setTimeout(runAllCrons, 30 * 1000);
   // Also run unpaid check shortly after start
@@ -794,6 +808,7 @@ function startCronJobs() {
 module.exports = {
   startCronJobs,
   runAllCrons,
+  syncGoogleShoppingProducts,
   autoCancelUnshippedOrders,
   autoCancelUnpaidOrders,
   calculateSellerMetrics,
