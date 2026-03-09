@@ -46,6 +46,8 @@ router.use(requireAuth, requireSeller);
 // Allowed MIME types for seller product uploads
 const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const ALLOWED_VIDEO_MIMES = ['video/mp4', 'video/webm', 'video/quicktime'];
+const CLOUDINARY_MAX_MB = 7.5;
+const CLOUDINARY_MAX_BYTES = CLOUDINARY_MAX_MB * 1024 * 1024;
 
 // =================== PREFLIGHT (lightweight check) ===================
 router.get('/preflight', async (req, res) => {
@@ -225,6 +227,15 @@ router.post('/products', productCreationLimiter, upload.array('media', 15), sani
           return res.status(400).json({ message: `Invalid image type: ${file.mimetype}. Allowed: ${ALLOWED_IMAGE_MIMES.join(', ')}` });
         }
       }
+      for (const file of req.files) {
+        if (file.size > CLOUDINARY_MAX_BYTES) {
+          const type = file.mimetype.startsWith('video/') ? 'Video' : 'Image';
+          const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+          return res.status(400).json({
+            message: `${type} "${file.originalname || 'file'}" is too large (${sizeMB}MB). Maximum is ${CLOUDINARY_MAX_MB}MB. Please compress or use smaller files.`
+          });
+        }
+      }
 
       // Upload all files in parallel for speed
       const uploadPromises = req.files.map(file => {
@@ -248,14 +259,14 @@ router.post('/products', productCreationLimiter, upload.array('media', 15), sani
     }
 
     // Also handle base64 strings sent in body (backward compat)
-    const MAX_BASE64_IMAGE_SIZE = 10 * 1024 * 1024; // ~7.5MB decoded
+    const MAX_BASE64_IMAGE_SIZE = 7.5 * 1024 * 1024; // 7.5MB - stays under Cloudinary 10MB
     const MAX_BASE64_VIDEO_SIZE = 40 * 1024 * 1024; // ~30MB decoded (base64 is ~33% larger)
 
     // Validate sizes before uploading
     if (data.newImages && Array.isArray(data.newImages)) {
       for (const img of data.newImages) {
         if (typeof img === 'string' && img.startsWith('data:') && img.length > MAX_BASE64_IMAGE_SIZE) {
-          return res.status(400).json({ message: 'Base64 image too large (max ~7.5MB)' });
+          return res.status(400).json({ message: 'Image too large (max 7.5MB). Please compress or use smaller images.' });
         }
       }
     }
@@ -339,6 +350,12 @@ router.post('/products', productCreationLimiter, upload.array('media', 15), sani
       hasBase64Images: !!(req.body?.newImages && (Array.isArray(req.body.newImages) ? req.body.newImages.length : 0)),
       hasBase64Videos: !!(req.body?.newVideos && (Array.isArray(req.body.newVideos) ? req.body.newVideos.length : 0))
     });
+    const errMsg = err?.message || '';
+    if (errMsg.includes('File size too large') || errMsg.includes('Maximum is')) {
+      return res.status(400).json({
+        message: `Image or video is too large. Maximum is ${CLOUDINARY_MAX_MB}MB per file. Please compress or use smaller files.`
+      });
+    }
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
@@ -388,6 +405,15 @@ router.put('/products/:id', upload.array('media', 15), sanitizeBody, async (req,
           return res.status(400).json({ message: `Invalid image type: ${file.mimetype}. Allowed: ${ALLOWED_IMAGE_MIMES.join(', ')}` });
         }
       }
+      for (const file of req.files) {
+        if (file.size > CLOUDINARY_MAX_BYTES) {
+          const type = file.mimetype.startsWith('video/') ? 'Video' : 'Image';
+          const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+          return res.status(400).json({
+            message: `${type} "${file.originalname || 'file'}" is too large (${sizeMB}MB). Maximum is ${CLOUDINARY_MAX_MB}MB. Please compress or use smaller files.`
+          });
+        }
+      }
 
       // Upload all files in parallel for speed
       const uploadPromises = req.files.map(file => {
@@ -411,10 +437,11 @@ router.put('/products/:id', upload.array('media', 15), sanitizeBody, async (req,
     }
 
     // Validate base64 sizes before uploading
+    const MAX_BASE64_IMAGE_SIZE = 7.5 * 1024 * 1024;
     if (data.newImages && Array.isArray(data.newImages)) {
       for (const img of data.newImages) {
-        if (typeof img === 'string' && img.startsWith('data:') && img.length > 10 * 1024 * 1024) {
-          return res.status(400).json({ message: 'Base64 image too large (max ~7.5MB)' });
+        if (typeof img === 'string' && img.startsWith('data:') && img.length > MAX_BASE64_IMAGE_SIZE) {
+          return res.status(400).json({ message: 'Image too large (max 7.5MB). Please compress or use smaller images.' });
         }
       }
     }
@@ -536,6 +563,12 @@ router.put('/products/:id', upload.array('media', 15), sanitizeBody, async (req,
       hasBase64Images: !!(req.body?.newImages && (Array.isArray(req.body.newImages) ? req.body.newImages.length : 0)),
       hasBase64Videos: !!(req.body?.newVideos && (Array.isArray(req.body.newVideos) ? req.body.newVideos.length : 0))
     });
+    const errMsg = err?.message || '';
+    if (errMsg.includes('File size too large') || errMsg.includes('Maximum is')) {
+      return res.status(400).json({
+        message: `Image or video is too large. Maximum is ${CLOUDINARY_MAX_MB}MB per file. Please compress or use smaller files.`
+      });
+    }
     res.status(500).json({ message: 'Server error', error: err.message });
   }
 });

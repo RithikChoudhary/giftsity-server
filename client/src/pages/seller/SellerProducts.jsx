@@ -157,7 +157,7 @@ export default function SellerProducts() {
       }
       setShowForm(false);
       loadProducts();
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
+    } catch (err) { toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to add product'); }
     setSubmitting(false);
   };
 
