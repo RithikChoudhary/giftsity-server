@@ -5,7 +5,7 @@ import SEO from '../../components/SEO';
 export default function About() {
   return (
     <div>
-      <SEO title="About" description="Giftsity is India's marketplace for creators and Instagram sellers. Discover unique products from verified creators. 0% platform fee for creators." />
+      <SEO title="About" description="Giftsity is India's marketplace for creators and Instagram sellers. Discover unique products from verified creators. 0% platform fee for creators." url="https://giftsity.com/about" />
       {/* Hero */}
       <section className="relative overflow-hidden py-20 px-4">
         <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-orange-500/5" />

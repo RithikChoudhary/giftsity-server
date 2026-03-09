@@ -167,7 +167,7 @@ export default function SellerJoin() {
 
   return (
     <div className="min-h-screen">
-      <SEO title="Sell on Giftsity" description="Start selling your products online as a creator with 0% platform fee. Keep 97% of every sale. Join India's fastest growing creator marketplace for free." keywords="sell online as creator, creator marketplace, Instagram seller store, sell on Giftsity, 0% commission, start selling online India" />
+      <SEO title="Sell on Giftsity" description="Start selling your products online as a creator with 0% platform fee. Keep 97% of every sale. Join India's fastest growing creator marketplace for free." keywords="sell online as creator, creator marketplace, Instagram seller store, sell on Giftsity, 0% commission, start selling online India" url="https://giftsity.com/seller/join" />
       {/* Hero */}
       <section className="bg-gradient-to-br from-surface via-card to-surface py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">

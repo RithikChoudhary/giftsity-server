@@ -6,6 +6,7 @@ import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import NotFound from '../../components/NotFound';
 import SEO from '../../components/SEO';
 import API, { chatAPI } from '../../api';
 import ProfileCompleteModal from '../../components/ProfileCompleteModal';
@@ -31,6 +32,7 @@ export default function ProductDetail() {
 
   const loadProduct = async () => {
     setLoading(true);
+    setProduct(null);
     try {
       const { data } = await API.get(`/products/${slug}`);
       const prod = data.product || data;
@@ -116,7 +118,12 @@ export default function ProductDetail() {
   };
 
   if (loading) return <LoadingSpinner />;
-  if (!product) return <div className="max-w-7xl mx-auto px-4 py-20 text-center text-theme-muted">Product not found.</div>;
+  if (!product) return (
+    <>
+      <SEO title="Product Not Found" noIndex url={`https://giftsity.com/product/${slug}`} />
+      <NotFound />
+    </>
+  );
 
   // Build unified media array from images + media (which contains videos)
   const imageItems = (product.images || []).map(img => ({ type: 'image', url: img.url, thumbnailUrl: img.url, publicId: img.publicId }));
@@ -142,6 +149,7 @@ export default function ProductDetail() {
         image={media[0]?.type === 'image' ? media[0]?.url : media[0]?.thumbnailUrl}
         type="product"
         keywords={`${product.title}, ${product.category || 'gifts'}, buy online, Giftsity`}
+        url={`https://giftsity.com/product/${product.slug || product._id}`}
       />
       <Helmet>
         <script type="application/ld+json">{JSON.stringify({

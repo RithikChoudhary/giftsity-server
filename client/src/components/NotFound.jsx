@@ -1,8 +1,12 @@
-import { Link } from 'react-router-dom';
-import { Home, Search, ArrowLeft } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Home, Search } from 'lucide-react';
+import SEO from './SEO';
 
 export default function NotFound() {
+  const { pathname } = useLocation();
   return (
+    <>
+      <SEO title="Page Not Found" noIndex url={`https://giftsity.com${pathname}`} />
     <div className="min-h-[70vh] flex items-center justify-center px-4">
       <div className="text-center max-w-md">
         <div className="text-8xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent mb-4">404</div>
@@ -18,5 +22,6 @@ export default function NotFound() {
         </div>
       </div>
     </div>
+    </>
   );
 }

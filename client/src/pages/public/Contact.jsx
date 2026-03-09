@@ -36,7 +36,7 @@ export default function Contact() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
-      <SEO title="Contact Us" description="Get in touch with Giftsity. Questions about orders, selling, corporate gifting, or partnerships — we're here to help." />
+      <SEO title="Contact Us" description="Get in touch with Giftsity. Questions about orders, selling, corporate gifting, or partnerships — we're here to help." url="https://giftsity.com/contact" />
       <div className="text-center mb-12">
         <h1 className="text-3xl md:text-4xl font-bold text-theme-primary mb-3">Contact Us</h1>
         <p className="text-theme-muted max-w-xl mx-auto">Have a question, feedback, or need help with an order? We'd love to hear from you.</p>

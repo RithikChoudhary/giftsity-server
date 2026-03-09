@@ -33,7 +33,7 @@ export default function B2BInquiry() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
-      <SEO title="Corporate Gifting" description="Get custom quotes for bulk corporate gifting. Employee rewards, client gifts, event gifts and more. Tailored solutions for Indian businesses." />
+      <SEO title="Corporate Gifting" description="Get custom quotes for bulk corporate gifting. Employee rewards, client gifts, event gifts and more. Tailored solutions for Indian businesses." url="https://giftsity.com/b2b" />
       <div className="text-center mb-10">
         <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-500/10 rounded-2xl mb-4"><Briefcase className="w-7 h-7 text-amber-400" /></div>
         <h1 className="text-3xl font-bold text-theme-primary">Corporate Gifting</h1>

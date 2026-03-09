@@ -4,6 +4,7 @@ import { MapPin, Star, CheckCircle, Package, Truck, XCircle, Calendar, ShoppingC
 import { storeAPI } from '../../api';
 import { useCart, needsCustomization } from '../../context/CartContext';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import NotFound from '../../components/NotFound';
 import SEO from '../../components/SEO';
 import toast from 'react-hot-toast';
 
@@ -35,7 +36,7 @@ export default function SellerStore() {
         setProducts(prods);
         setReviews(revsRes.data.reviews || []);
       })
-      .catch(() => {})
+      .catch(() => { setStore(null); })
       .finally(() => { setLoading(false); setFilterCat('all'); setSortBy('newest'); });
   }, [slug]);
 
@@ -60,9 +61,10 @@ export default function SellerStore() {
 
   if (loading) return <LoadingSpinner />;
   if (!store) return (
-    <div className="min-h-[60vh] flex items-center justify-center">
-      <p className="text-theme-muted text-lg">Store not found</p>
-    </div>
+    <>
+      <SEO title="Store Not Found" noIndex url={`https://giftsity.com/store/${slug}`} />
+      <NotFound />
+    </>
   );
 
   const stats = [
@@ -84,6 +86,7 @@ export default function SellerStore() {
         description={`Shop gifts from ${store.businessName || store.name} on Giftsity. ${store.productCount} products available.`}
         image={store.avatar?.url || store.profilePhoto}
         type="profile"
+        url={`https://giftsity.com/store/${slug}`}
       />
 
       {/* Cover Image */}

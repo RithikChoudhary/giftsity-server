@@ -40,6 +40,7 @@ export default function AllSellers() {
       <SEO
         title="All Creators - Giftsity"
         description="Browse all creators on Giftsity. Find unique handcrafted and curated products from verified creators across India."
+        url="https://giftsity.com/sellers"
       />
 
       {/* Header */}

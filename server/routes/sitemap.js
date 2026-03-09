@@ -68,6 +68,7 @@ router.get('/sitemap.xml', async (req, res) => {
 
     // Product pages
     for (const p of products) {
+      if (!p.slug) continue;
       const lastmod = p.updatedAt ? new Date(p.updatedAt).toISOString().split('T')[0] : today;
       xml += `  <url>\n`;
       xml += `    <loc>${BASE}/product/${p.slug}</loc>\n`;

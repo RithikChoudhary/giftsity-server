@@ -71,7 +71,7 @@ export default function Shop() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      <SEO title="Shop Gifts" description="Browse unique products from verified creators across India. Filter by category, price, and more." />
+      <SEO title="Shop Gifts" description="Browse unique products from verified creators across India. Filter by category, price, and more." url="https://giftsity.com/shop" />
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-theme-primary mb-2">Creator's Shop</h1>
