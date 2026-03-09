@@ -58,6 +58,7 @@ function buildProductPayload(product) {
 
   return {
     id: slug,
+    offerId: slug,
     title,
     description: description || title,
     link: `${BASE_URL}/product/${slug}`,
