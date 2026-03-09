@@ -56,9 +56,10 @@ function buildProductPayload(product) {
   const seller = product.sellerId;
   const brand = (seller?.sellerProfile?.businessName || seller?.name || '').trim() || 'Giftsity';
 
+  const offerId = product._id?.toString() || slug.slice(0, 50);
   return {
-    id: slug,
-    offerId: slug,
+    id: offerId,
+    offerId,
     title,
     description: description || title,
     link: `${BASE_URL}/product/${slug}`,
