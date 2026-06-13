@@ -44,6 +44,8 @@ const generateOrderNumber = () => {
 
 // POST /api/orders - create order + Cashfree payment session
 router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async (req, res) => {
+  // Declared at function scope so the catch block can roll back reserved stock
+  let reservedItems = []; // { productId, quantity }
   try {
     if ((req.user.userType || req.user.role) !== 'customer') {
       return res.status(403).json({ message: 'Customer access required' });
@@ -120,8 +122,7 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
     }
 
     // Reserve stock atomically for all items BEFORE creating orders
-    // Track reserved items so we can rollback on failure
-    const reservedItems = []; // { productId, quantity }
+    // Track reserved items so we can rollback on failure (declared at function scope above)
     try {
       for (const item of items) {
         const updated = await Product.findOneAndUpdate(
