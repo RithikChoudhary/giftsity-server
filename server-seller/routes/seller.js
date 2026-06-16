@@ -1236,7 +1236,8 @@ router.post('/shipping/:orderId/create', async (req, res) => {
     const order = await Order.findById(req.params.orderId).populate('customerId', 'name email phone');
     if (!order) return res.status(404).json({ message: 'Order not found' });
     if (order.sellerId.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'Not your order' });
-    if (order.paymentStatus !== 'paid') return res.status(400).json({ message: 'Order not paid' });
+    // Allow prepaid (paid) orders, or Cash-on-Delivery orders (collected on delivery)
+    if (order.paymentStatus !== 'paid' && order.paymentMethod !== 'cod') return res.status(400).json({ message: 'Order not paid' });
 
     const existing = await Shipment.findOne({ orderId: order._id });
     if (existing && existing.shiprocketOrderId) return res.status(400).json({ message: 'Shipment already created', shipment: existing });

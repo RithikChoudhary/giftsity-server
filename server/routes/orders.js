@@ -586,12 +586,14 @@ router.post('/verify-payment', requireAuth, paymentVerifyLimiter, validatePaymen
 // GET /api/orders/my-orders
 router.get('/my-orders', requireAuth, async (req, res) => {
   try {
-    // Exclude unpaid pending orders (abandoned checkouts) — customers should not see these
+    // Exclude unpaid pending orders (abandoned checkouts) — customers should not see these.
+    // COD orders are intentionally unpaid but confirmed, so include them explicitly.
     const orders = await Order.find({
       customerId: req.user._id,
       $or: [
-        { paymentStatus: { $ne: 'pending' } },       // Show paid, refunded orders
-        { status: { $in: ['cancelled', 'refunded'] } } // Show cancelled orders even if payment was pending
+        { paymentStatus: { $ne: 'pending' } },          // Show paid, refunded orders
+        { paymentMethod: 'cod' },                        // Show Cash on Delivery orders (unpaid until delivery)
+        { status: { $in: ['cancelled', 'refunded'] } }   // Show cancelled orders even if payment was pending
       ]
     })
       .sort({ createdAt: -1 })
