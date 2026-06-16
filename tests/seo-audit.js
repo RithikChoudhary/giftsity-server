@@ -261,9 +261,6 @@ async function checkExternalResources() {
     { label: 'Google Fonts (Inter + Space Grotesk)',
       url: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap',
       critical: true },
-    { label: 'Cashfree SDK',
-      url: 'https://sdk.cashfree.com/js/v3/cashfree.js',
-      critical: true },
   ];
 
   for (const r of resources) {
@@ -274,15 +271,6 @@ async function checkExternalResources() {
     console.log(`  ${c.dim}       ${r.url.substring(0, 80)}...${c.reset}`);
     console.log(`  ${c.dim}       Status: ${res.status} (${res.ms}ms)${c.reset}`);
     record(st, 'External Resources', `${r.label}: ${reachable ? 'reachable' : 'UNREACHABLE'}`);
-  }
-
-  // Check if Cashfree SDK is deferred in the actual HTML
-  const htmlRes = await probe(`${SITE}/`);
-  if (htmlRes.ok && htmlRes.body) {
-    const hasCashfreeDefer = htmlRes.body.includes('defer') && htmlRes.body.includes('cashfree');
-    const st = hasCashfreeDefer ? PASS : WARN;
-    console.log(`\n  ${st}  Cashfree SDK defer attribute: ${hasCashfreeDefer ? 'YES (non-blocking)' : 'NO (render-blocking)'}`);
-    record(st, 'External Resources', hasCashfreeDefer ? 'Cashfree SDK deferred' : 'Cashfree SDK is render-blocking');
   }
 }
 

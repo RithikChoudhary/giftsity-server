@@ -29,10 +29,16 @@ export default function CustomerOrders() {
     if (authLoading) return;
     if (!user) return navigate('/auth?redirect=/orders');
 
-    // Check if returning from Cashfree payment
-    const cfId = searchParams.get('cf_id');
-    if (cfId) {
-      verifyPayment(cfId);
+    // Check if returning from PayU payment
+    const txnid = searchParams.get('txnid');
+    const payuStatus = searchParams.get('payu_status');
+    if (txnid && payuStatus && payuStatus !== 'success') {
+      // PayU reported a failed/cancelled payment — skip verification
+      toast.error('Payment was not completed. Please try again.');
+      setSearchParams({});
+      loadOrders();
+    } else if (txnid) {
+      verifyPayment(txnid);
     } else {
       loadOrders();
     }
@@ -57,7 +63,7 @@ export default function CustomerOrders() {
       if (msg.includes('not completed')) toast.error('Payment was not completed. Please try again.');
       else toast.error(msg);
     }
-    // Clear the cf_id param
+    // Clear the txnid param
     setSearchParams({});
     setVerifying(false);
     loadOrders();

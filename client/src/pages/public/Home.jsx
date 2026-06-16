@@ -85,7 +85,7 @@ export default function Home() {
             {[
               { icon: ShoppingBag, title: 'From Real Creators', sub: 'Verified & authentic' },
               { icon: Truck, title: 'Fast Delivery', sub: 'Pan India shipping' },
-              { icon: Shield, title: 'Secure Payment', sub: 'Cashfree powered' },
+              { icon: Shield, title: 'Secure Payment', sub: 'PayU powered' },
               { icon: Heart, title: '0% Platform Fee', sub: 'Best prices guaranteed' },
             ].map((b, i) => (
               <div key={i} className="flex items-center gap-3">

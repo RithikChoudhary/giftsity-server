@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useCorporateAuth } from '../../context/CorporateAuthContext';
 import { corporateAPI } from '../../api';
 import { Trash2, Minus, Plus, ShoppingBag, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { submitPayuForm } from '../../utils/payu';
 
 export default function CorporateCart() {
   const { user } = useCorporateAuth();
@@ -52,13 +53,10 @@ export default function CorporateCart() {
         shippingAddress
       });
 
-      // Cashfree redirect — cart is NOT cleared here; it will be cleared after payment verification
-      if (res.data.cashfreeOrder?.paymentSessionId) {
-        const cashfree = await window.Cashfree?.({ mode: res.data.env === 'production' ? 'production' : 'sandbox' });
-        if (cashfree) {
-          cashfree.checkout({ paymentSessionId: res.data.cashfreeOrder.paymentSessionId, redirectTarget: '_self' });
-          return;
-        }
+      // PayU redirect — cart is NOT cleared here; it will be cleared after payment verification
+      if (res.data.payu) {
+        submitPayuForm(res.data.payu);
+        return;
       }
       // No payment gateway fallback
       localStorage.removeItem('giftsity_corporate_cart');

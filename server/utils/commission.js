@@ -32,7 +32,7 @@ const getCommissionRate = (seller, settings) => {
 const calculateOrderFinancials = (itemTotal, paymentTotal, commissionRate, gatewayFeeRate) => {
   // Commission is on item total only
   const commissionAmount = Math.round((itemTotal * commissionRate) / 100);
-  // Gateway fee is on the full payment amount (what Cashfree actually charges)
+  // Gateway fee is on the full payment amount (what PayU actually charges)
   const paymentGatewayFee = Math.round((itemTotal * gatewayFeeRate) / 100);
   // Seller receives item total minus commission and gateway fee
   const sellerAmount = itemTotal - commissionAmount - paymentGatewayFee;

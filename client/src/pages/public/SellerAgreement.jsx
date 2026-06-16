@@ -31,7 +31,7 @@ export default function SellerAgreement() {
           <h2 className="text-lg font-semibold text-theme-primary mb-2">3. Fees and Commission</h2>
           <ul className="list-disc pl-5 mt-2 space-y-1">
             <li><strong>Platform Fee:</strong> Currently 0% (zero percent). This is a promotional rate and may change with prior notice.</li>
-            <li><strong>Payment Gateway Fee:</strong> 3% of the total order amount is deducted to cover payment processing costs (Cashfree). This fee is non-negotiable and is deducted automatically from your earnings.</li>
+            <li><strong>Payment Gateway Fee:</strong> 3% of the total order amount is deducted to cover payment processing costs (PayU). This fee is non-negotiable and is deducted automatically from your earnings.</li>
             <li><strong>You Keep:</strong> 97% of every sale (after the 3% payment gateway fee).</li>
             <li>If platform commission is introduced in the future, you will be notified at least 30 days in advance. You may choose to deactivate your account if you disagree with the revised terms.</li>
           </ul>

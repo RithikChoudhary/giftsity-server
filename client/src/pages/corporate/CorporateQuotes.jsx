@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { corporateAPI } from '../../api';
 import { FileText, Loader2, CheckCircle, XCircle, Clock, AlertTriangle, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { submitPayuForm } from '../../utils/payu';
 
 export default function CorporateQuotes() {
   const [quotes, setQuotes] = useState([]);
@@ -21,12 +22,9 @@ export default function CorporateQuotes() {
     setActionLoading(quoteId);
     try {
       const res = await corporateAPI.approveQuote(quoteId, {});
-      if (res.data.cashfreeOrder?.paymentSessionId) {
-        const cashfree = await window.Cashfree?.({ mode: res.data.env === 'production' ? 'production' : 'sandbox' });
-        if (cashfree) {
-          cashfree.checkout({ paymentSessionId: res.data.cashfreeOrder.paymentSessionId, redirectTarget: '_self' });
-          return;
-        }
+      if (res.data.payu) {
+        submitPayuForm(res.data.payu);
+        return;
       }
       // Refresh quotes
       setQuotes(quotes.map(q => q._id === quoteId ? { ...q, status: 'approved' } : q));

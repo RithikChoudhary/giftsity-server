@@ -5,7 +5,7 @@ const PlatformSettings = require('../models/PlatformSettings');
 const { requireAuth } = require('../middleware/auth');
 const { createNotification } = require('../utils/notify');
 const { logActivity } = require('../utils/audit');
-const { createRefund } = require('../config/cashfree');
+const { createRefund } = require('../config/payu');
 const router = express.Router();
 
 router.use(requireAuth);

@@ -108,24 +108,24 @@ export default function Navbar() {
                     placeholder="Search gifts..."
                     className="w-48 px-3 py-1.5 bg-inset border border-edge rounded-lg text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50 transition-all"
                   />
-                  <button type="button" onClick={() => { setSearchOpen(false); setSearchQuery(''); }} className="p-1.5 text-theme-dim hover:text-theme-primary ml-1">
+                  <button type="button" onClick={() => { setSearchOpen(false); setSearchQuery(''); }} className="p-1.5 text-theme-dim hover:text-theme-primary ml-1" aria-label="Close search">
                     <X className="w-4 h-4" />
                   </button>
                 </form>
               ) : (
-                <button onClick={() => setSearchOpen(true)} className="p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all" title="Search">
+                <button onClick={() => setSearchOpen(true)} className="p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all" title="Search" aria-label="Search">
                   <Search className="w-4 h-4" />
                 </button>
               )}
             </div>
 
             {/* Theme toggle */}
-            <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all" title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
+            <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all" title={theme === 'dark' ? 'Light mode' : 'Dark mode'} aria-label="Toggle theme">
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
             {/* Cart */}
-            <Link to="/cart" className="relative p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all">
+            <Link to="/cart" className="relative p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all" aria-label="Shopping cart">
               <ShoppingBag className="w-5 h-5" />
               {items.length > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-500 text-zinc-950 rounded-full text-[10px] flex items-center justify-center font-bold">{items.length}</span>
@@ -135,7 +135,7 @@ export default function Navbar() {
             {/* User */}
             {user ? (
               <div className="relative">
-                <button onClick={() => setUserMenu(!userMenu)} className="relative flex items-center gap-2 p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all">
+                <button onClick={() => setUserMenu(!userMenu)} className="relative flex items-center gap-2 p-2 rounded-lg hover:bg-inset/50 text-theme-muted hover:text-theme-primary transition-all" aria-label="Account menu">
                   <User className="w-5 h-5" />
                   {unreadNotifications > 0 && (
                     <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-surface" />
@@ -198,7 +198,7 @@ export default function Navbar() {
             )}
 
             {/* Mobile menu */}
-            <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 text-theme-muted hover:text-theme-primary">
+            <button onClick={() => setMenuOpen(!menuOpen)} className="md:hidden p-2 text-theme-muted hover:text-theme-primary" aria-label="Toggle menu">
               {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
@@ -211,7 +211,7 @@ export default function Navbar() {
           <div className="px-4 py-3 space-y-2">
             <form onSubmit={handleSearch} className="flex gap-2 mb-2">
               <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search gifts..." className="flex-1 px-3 py-2 bg-inset border border-edge rounded-lg text-sm text-theme-primary placeholder:text-theme-dim focus:outline-none focus:border-amber-500/50" />
-              <button type="submit" className="px-3 py-2 bg-amber-500 text-zinc-950 rounded-lg"><Search className="w-4 h-4" /></button>
+              <button type="submit" className="px-3 py-2 bg-amber-500 text-zinc-950 rounded-lg" aria-label="Search"><Search className="w-4 h-4" /></button>
             </form>
             <Link to="/shop" className="block py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>Shop</Link>
             <Link to="/sellers" className="block py-2 text-sm text-theme-secondary hover:text-theme-primary" onClick={() => setMenuOpen(false)}>Creators</Link>

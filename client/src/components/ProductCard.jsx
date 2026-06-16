@@ -51,10 +51,10 @@ export default function ProductCard({ product }) {
             <span className="absolute top-2 left-2 px-2 py-0.5 bg-amber-500 text-zinc-950 text-xs font-bold rounded-full">Featured</span>
           )}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-          <button onClick={handleWishlist} className={`absolute top-3 right-3 p-2 rounded-full transition-all shadow-lg ${wishlisted ? 'bg-red-500 text-white' : 'bg-black/40 text-white opacity-0 group-hover:opacity-100'}`} title={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}>
+          <button onClick={handleWishlist} className={`absolute top-3 right-3 p-2 rounded-full transition-all shadow-lg ${wishlisted ? 'bg-red-500 text-white' : 'bg-black/40 text-white opacity-0 group-hover:opacity-100'}`} title={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'} aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}>
             <Heart className={`w-3.5 h-3.5 ${wishlisted ? 'fill-white' : ''}`} />
           </button>
-          <button onClick={handleAdd} className="absolute bottom-3 right-3 p-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-xl opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all shadow-lg" title="Add to cart">
+          <button onClick={handleAdd} className="absolute bottom-3 right-3 p-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-950 rounded-xl opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all shadow-lg" title="Add to cart" aria-label="Add to cart">
             <ShoppingBag className="w-4 h-4" />
           </button>
         </div>

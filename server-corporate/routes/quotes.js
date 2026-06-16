@@ -2,14 +2,14 @@ const express = require('express');
 const CorporateQuote = require('../../server/models/CorporateQuote');
 const Order = require('../../server/models/Order');
 const Product = require('../../server/models/Product');
-const { createCashfreeOrder } = require('../../server/config/cashfree');
+const { buildPaymentRequest } = require('../../server/config/payu');
 const { requireCorporateAuth, requireActiveStatus } = require('../middleware/corporateAuth');
 const { logActivity } = require('../../server/utils/audit');
 const { generateQuoteDocument } = require('../../server/utils/pdf');
 const logger = require('../../server/utils/logger');
 const router = express.Router();
 
-// Normalize phone to 10 digits for Cashfree
+// Normalize phone to 10 digits for PayU
 const normalizePhone = (phone) => {
   const digits = (phone || '').replace(/\D/g, '');
   if (digits.length >= 10) return digits.slice(-10);
@@ -130,21 +130,21 @@ router.post('/:id/approve', async (req, res) => {
     });
     await order.save();
 
-    // Create Cashfree payment
-    const cfOrder = await createCashfreeOrder({
-      orderId: orderNumber,
-      orderAmount: quote.finalAmount,
-      customerDetails: {
-        customerId: req.corporateUser._id.toString(),
-        email: req.corporateUser.email,
-        phone: normalizePhone(req.corporateUser.phone || address.phone),
-        name: req.corporateUser.companyName
-      },
-      returnUrl: `${(process.env.CLIENT_URL || '').split(',')[0].trim() || 'http://localhost:5173'}/corporate/orders?cf_id=${orderNumber}`
+    // Create PayU payment
+    const apiBaseUrl = (process.env.API_BASE_URL || '').replace(/\/$/, '');
+    const payu = buildPaymentRequest({
+      txnid: orderNumber,
+      amount: quote.finalAmount,
+      productinfo: `Giftsity quote ${quote.quoteNumber}`,
+      firstname: req.corporateUser.companyName,
+      email: req.corporateUser.email,
+      phone: normalizePhone(req.corporateUser.phone || address.phone),
+      surl: `${apiBaseUrl}/api/payments/payu/return`,
+      furl: `${apiBaseUrl}/api/payments/payu/return`,
+      udf1: 'corporate'
     });
 
     order.cashfreeOrderId = orderNumber;
-    order.paymentSessionId = cfOrder.payment_session_id;
     await order.save();
 
     // Update quote status
@@ -157,13 +157,9 @@ router.post('/:id/approve', async (req, res) => {
     res.json({
       message: 'Quote approved! Proceed to payment.',
       order,
-      cashfreeOrder: {
-        orderId: orderNumber,
-        paymentSessionId: cfOrder.payment_session_id,
-        orderAmount: quote.finalAmount
-      },
-      appId: process.env.CASHFREE_APP_ID,
-      env: process.env.CASHFREE_ENV || 'sandbox'
+      payu,
+      orderAmount: quote.finalAmount,
+      env: process.env.PAYU_ENV || 'test'
     });
   } catch (err) {
     logger.error('Quote approve error:', err.message);

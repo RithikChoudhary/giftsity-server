@@ -7,7 +7,7 @@
  */
 
 const Product = require('../models/Product');
-const { createRefund, getCashfreeOrder } = require('../config/cashfree');
+const { createRefund, verifyPayment } = require('../config/payu');
 const { sendCancellationEmail } = require('./email');
 const { createNotification } = require('./notify');
 const { logActivity } = require('./audit');
@@ -43,20 +43,21 @@ async function handleRTO(shipment, order) {
   if (order.paymentStatus === 'paid' && order.cashfreeOrderId) {
     try {
       let refundAmount = order.totalAmount;
+      let mihpayid = order.cashfreePaymentId;
       try {
-        const cfOrderData = await getCashfreeOrder(order.cashfreeOrderId);
-        if (cfOrderData.order_amount) {
-          refundAmount = Math.min(order.totalAmount, parseFloat(cfOrderData.order_amount));
+        const verification = await verifyPayment(order.cashfreeOrderId);
+        if (verification.found) {
+          if (verification.amount) refundAmount = Math.min(order.totalAmount, verification.amount);
+          if (verification.mihpayid) mihpayid = verification.mihpayid;
         }
       } catch (cfErr) {
-        logger.warn(`[RTO] Could not verify Cashfree amount: ${cfErr.message}`);
+        logger.warn(`[RTO] Could not verify PayU payment: ${cfErr.message}`);
       }
       const refundId = `refund_rto_${order.orderNumber}_${Date.now()}`;
       await createRefund({
-        orderId: order.cashfreeOrderId,
+        mihpayid,
         refundAmount,
-        refundId,
-        refundNote: 'Order cancelled — RTO (shipment returned to origin)'
+        refundId
       });
       order.paymentStatus = 'refunded';
       order.refundId = refundId;

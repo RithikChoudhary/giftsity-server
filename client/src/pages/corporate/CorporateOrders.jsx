@@ -11,11 +11,16 @@ export default function CorporateOrders() {
   const [pages, setPages] = useState(1);
   const [verifyMsg, setVerifyMsg] = useState('');
 
-  // Verify payment on return from Cashfree
+  // Verify payment on return from PayU
   useEffect(() => {
-    const cfId = searchParams.get('cf_id');
-    if (cfId) {
-      corporateAPI.verifyPayment({ orderId: cfId })
+    const txnid = searchParams.get('txnid');
+    const payuStatus = searchParams.get('payu_status');
+    if (txnid && payuStatus && payuStatus !== 'success') {
+      setVerifyMsg('Payment was not completed. Please try again.');
+      return;
+    }
+    if (txnid) {
+      corporateAPI.verifyPayment({ orderId: txnid })
         .then(() => {
           // Payment confirmed — clear corporate cart
           localStorage.removeItem('giftsity_corporate_cart');

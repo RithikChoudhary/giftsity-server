@@ -6,6 +6,7 @@ import { ShoppingBag, Trash2, Minus, Plus, ArrowRight, ArrowLeft, CreditCard, Ma
 import toast from 'react-hot-toast';
 import API from '../../api';
 import ProfileCompleteModal from '../../components/ProfileCompleteModal';
+import { submitPayuForm } from '../../utils/payu';
 
 export default function Cart() {
   const { user } = useAuth();
@@ -113,13 +114,10 @@ export default function Cart() {
       // Cart is NOT cleared here — it will be cleared after payment is verified
       // in CustomerOrders.jsx. If payment is abandoned, the cart stays intact.
 
-      // If Cashfree payment session returned, redirect to payment
-      const paymentSessionId = data.cashfreeOrder?.paymentSessionId || data.paymentSessionId;
-      if (paymentSessionId && window.Cashfree) {
-        const env = data.env || 'sandbox';
-        const cashfree = window.Cashfree({ mode: env });
-        await cashfree.checkout({ paymentSessionId, redirectTarget: '_self' });
-        // User will be redirected to Cashfree, then back to /orders?cf_id=...
+      // If PayU payment request returned, redirect to PayU Hosted Checkout
+      if (data.payu) {
+        submitPayuForm(data.payu);
+        // User will be redirected to PayU, then back to /orders?txnid=...
         return;
       }
 

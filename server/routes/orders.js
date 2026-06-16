@@ -4,7 +4,7 @@ const Product = require('../models/Product');
 const Seller = require('../models/Seller');
 const Shipment = require('../models/Shipment');
 const PlatformSettings = require('../models/PlatformSettings');
-const { createCashfreeOrder, getCashfreeOrder, getCashfreePayments, createRefund } = require('../config/cashfree');
+const { buildPaymentRequest, verifyPayment, createRefund } = require('../config/payu');
 const shiprocket = require('../config/shiprocket');
 const { requireAuth } = require('../middleware/auth');
 const { getCommissionRate, calculateOrderFinancials } = require('../utils/commission');
@@ -27,7 +27,7 @@ const orderCreationLimiter = rateLimit({
   legacyHeaders: false
 });
 
-// Normalize phone to 10 digits for Cashfree
+// Normalize phone to 10 digits for PayU
 const normalizePhone = (phone) => {
   const digits = (phone || '').replace(/\D/g, '');
   if (digits.length >= 10) return digits.slice(-10);
@@ -42,7 +42,7 @@ const generateOrderNumber = () => {
   return `GFT-${date}-${rand}`;
 };
 
-// POST /api/orders - create order + Cashfree payment session
+// POST /api/orders - create order + PayU payment request
 router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async (req, res) => {
   // Declared at function scope so the catch block can roll back reserved stock
   let reservedItems = []; // { productId, quantity }
@@ -164,7 +164,7 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
         // Customer-facing total: includes shipping only if customer pays
         const totalAmount = shippingPaidBy === 'customer' ? itemTotal + shippingCost : itemTotal;
 
-        // Gateway fee on full payment amount (what Cashfree charges), commission on item total only
+        // Gateway fee on full payment amount (what PayU charges), commission on item total only
         const financials = calculateOrderFinancials(itemTotal, totalAmount, commissionRate, settings.paymentGatewayFeeRate);
 
         const order = new Order({
@@ -239,26 +239,26 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
       // Note: Coupon usage is tracked after payment verification, not here
     }
 
-    // Create Cashfree order for the total
+    // Create PayU payment for the total
     const grandTotal = orders.reduce((s, o) => s + o.totalAmount, 0);
-    const cfOrderId = orders[0].orderNumber; // Use our order number as Cashfree order_id
+    const txnid = orders[0].orderNumber; // Use our order number as PayU txnid
 
-    const cfOrder = await createCashfreeOrder({
-      orderId: cfOrderId,
-      orderAmount: grandTotal,
-      customerDetails: {
-        customerId: req.user._id.toString(),
-        email: req.user.email,
-        phone: normalizePhone(req.user.phone || shippingAddress.phone),
-        name: req.user.name || 'Customer'
-      },
-      returnUrl: `${(process.env.CLIENT_URL || '').split(',')[0].trim() || 'http://localhost:5173'}/orders?cf_id=${cfOrderId}`
+    const apiBaseUrl = (process.env.API_BASE_URL || '').replace(/\/$/, '');
+    const payu = buildPaymentRequest({
+      txnid,
+      amount: grandTotal,
+      productinfo: `Giftsity order ${txnid}`,
+      firstname: req.user.name || 'Customer',
+      email: req.user.email,
+      phone: normalizePhone(req.user.phone || shippingAddress.phone),
+      surl: `${apiBaseUrl}/api/payments/payu/return`,
+      furl: `${apiBaseUrl}/api/payments/payu/return`,
+      udf1: 'customer'
     });
 
-    // Store Cashfree order ID and payment session on all orders
+    // Store txnid on all orders (paymentSessionId is unused with PayU)
     for (const order of orders) {
-      order.cashfreeOrderId = cfOrderId;
-      order.paymentSessionId = cfOrder.payment_session_id;
+      order.cashfreeOrderId = txnid;
       await order.save();
     }
 
@@ -268,16 +268,12 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
 
     res.status(201).json({
       orders,
-      cashfreeOrder: {
-        orderId: cfOrderId,
-        paymentSessionId: cfOrder.payment_session_id,
-        orderAmount: grandTotal
-      },
-      appId: process.env.CASHFREE_APP_ID,
-      env: process.env.CASHFREE_ENV || 'sandbox'
+      payu,
+      orderAmount: grandTotal,
+      env: process.env.PAYU_ENV || 'test'
     });
   } catch (err) {
-    // Rollback reserved stock on any failure (Cashfree error, DB error, etc.)
+    // Rollback reserved stock on any failure (PayU error, DB error, etc.)
     if (reservedItems && reservedItems.length) {
       for (const ri of reservedItems) {
         try { await Product.findByIdAndUpdate(ri.productId, { $inc: { stock: ri.quantity } }); } catch (rollbackErr) {
@@ -340,7 +336,7 @@ const paymentVerifyLimiter = rateLimit({
   legacyHeaders: false
 });
 
-// POST /api/orders/verify-payment - verify Cashfree payment
+// POST /api/orders/verify-payment - verify PayU payment
 router.post('/verify-payment', requireAuth, paymentVerifyLimiter, validatePaymentVerification, async (req, res) => {
   try {
     if ((req.user.userType || req.user.role) !== 'customer') {
@@ -349,22 +345,20 @@ router.post('/verify-payment', requireAuth, paymentVerifyLimiter, validatePaymen
     const { orderId } = req.body;
     if (!orderId) return res.status(400).json({ message: 'orderId required' });
 
-    // Fetch order status from Cashfree
-    const cfOrder = await getCashfreeOrder(orderId);
-    if (cfOrder.order_status !== 'PAID') {
-      return res.status(400).json({ message: `Payment not completed. Status: ${cfOrder.order_status}` });
+    // Fetch payment status from PayU (orderId === our txnid)
+    const verification = await verifyPayment(orderId);
+    if (!verification.found || verification.status !== 'success') {
+      return res.status(400).json({ message: `Payment not completed. Status: ${verification.status}` });
     }
 
-    // Get payment details
-    const payments = await getCashfreePayments(orderId);
-    const successPayment = payments.find(p => p.payment_status === 'SUCCESS');
+    const successPayment = { cf_payment_id: verification.mihpayid };
 
-    // Update all orders with this cashfree order ID (ownership check)
+    // Update all orders with this PayU txnid (ownership check)
     const orders = await Order.find({ cashfreeOrderId: orderId, customerId: req.user._id });
 
     // Verify payment amount matches order total (prevent amount tampering)
     const expectedTotal = orders.reduce((s, o) => s + o.totalAmount, 0);
-    const paidAmount = parseFloat(cfOrder.order_amount);
+    const paidAmount = verification.amount;
     if (Math.abs(paidAmount - expectedTotal) > 1) {
       logger.error(`[Payment] AMOUNT MISMATCH on verify: paid ${paidAmount}, expected ${expectedTotal}, orderId=${orderId}`);
       logActivity({ domain: 'payment', action: 'payment_amount_mismatch', actorRole: 'customer', actorId: req.user._id, actorEmail: req.user.email, targetType: 'Order', targetId: orders[0]?._id, message: `Amount mismatch: paid ${paidAmount}, expected ${expectedTotal}` });
@@ -743,23 +737,24 @@ router.post('/:id/cancel', requireAuth, sanitizeBody, async (req, res) => {
     // Initiate refund if payment was completed
     if (order.paymentStatus === 'paid') {
 
-      // Initiate Cashfree refund (verify actual paid amount to prevent over-refund)
+      // Initiate PayU refund (verify actual paid amount to prevent over-refund)
       try {
         let refundAmount = order.totalAmount;
+        let mihpayid = order.cashfreePaymentId;
         try {
-          const cfOrderData = await getCashfreeOrder(order.cashfreeOrderId);
-          if (cfOrderData.order_amount) {
-            refundAmount = Math.min(order.totalAmount, parseFloat(cfOrderData.order_amount));
+          const verification = await verifyPayment(order.cashfreeOrderId);
+          if (verification.found) {
+            if (verification.amount) refundAmount = Math.min(order.totalAmount, verification.amount);
+            if (verification.mihpayid) mihpayid = verification.mihpayid;
           }
         } catch (cfErr) {
-          logger.warn('[Refund] Could not verify Cashfree amount, using order total:', cfErr.message);
+          logger.warn('[Refund] Could not verify PayU payment, using order total:', cfErr.message);
         }
         const refundId = `refund_${order.orderNumber}_${Date.now()}`;
         await createRefund({
-          orderId: order.cashfreeOrderId,
+          mihpayid,
           refundAmount,
-          refundId,
-          refundNote: order.cancelReason || 'Order cancelled by customer'
+          refundId
         });
         order.paymentStatus = 'refunded';
         order.refundId = refundId;

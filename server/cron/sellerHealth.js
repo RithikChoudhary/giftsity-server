@@ -6,7 +6,7 @@ const Product = require('../models/Product');
 const User = require('../models/User');
 const { sendOTP } = require('../utils/email'); // reuse transporter
 const { logActivity } = require('../utils/audit');
-const { createRefund, getCashfreeOrder } = require('../config/cashfree');
+const { createRefund, verifyPayment } = require('../config/payu');
 const { createNotification } = require('../utils/notify');
 const logger = require('../utils/logger');
 
@@ -37,24 +37,25 @@ async function autoCancelUnshippedOrders() {
     order.cancelledAt = new Date();
     order.cancelReason = `Auto-cancelled: not shipped within ${AUTO_CANCEL_HOURS} hours`;
 
-    // Initiate Cashfree refund for paid orders
+    // Initiate PayU refund for paid orders
     if (order.cashfreeOrderId && order.totalAmount > 0) {
       try {
         let refundAmount = order.totalAmount;
+        let mihpayid = order.cashfreePaymentId;
         try {
-          const cfOrderData = await getCashfreeOrder(order.cashfreeOrderId);
-          if (cfOrderData.order_amount) {
-            refundAmount = Math.min(order.totalAmount, parseFloat(cfOrderData.order_amount));
+          const verification = await verifyPayment(order.cashfreeOrderId);
+          if (verification.found) {
+            if (verification.amount) refundAmount = Math.min(order.totalAmount, verification.amount);
+            if (verification.mihpayid) mihpayid = verification.mihpayid;
           }
         } catch (cfErr) {
-          logger.warn(`[AutoCancel] Could not verify Cashfree order amount for ${order.orderNumber}, using order total`);
+          logger.warn(`[AutoCancel] Could not verify PayU payment for ${order.orderNumber}, using order total`);
         }
         const refundId = `refund_${order.orderNumber}_${Date.now()}`;
         await createRefund({
-          orderId: order.cashfreeOrderId,
+          mihpayid,
           refundAmount,
-          refundId,
-          refundNote: `Auto-cancelled: not shipped within ${AUTO_CANCEL_HOURS} hours`
+          refundId
         });
         order.paymentStatus = 'refunded';
         order.refundId = refundId;
@@ -706,21 +707,22 @@ async function retryFailedRefunds() {
     for (const order of pendingOrders) {
       try {
         let refundAmount = order.totalAmount;
+        let mihpayid = order.cashfreePaymentId;
         try {
-          const cfOrderData = await getCashfreeOrder(order.cashfreeOrderId);
-          if (cfOrderData.order_amount) {
-            refundAmount = Math.min(order.totalAmount, parseFloat(cfOrderData.order_amount));
+          const verification = await verifyPayment(order.cashfreeOrderId);
+          if (verification.found) {
+            if (verification.amount) refundAmount = Math.min(order.totalAmount, verification.amount);
+            if (verification.mihpayid) mihpayid = verification.mihpayid;
           }
         } catch (cfErr) {
-          logger.warn(`[RefundRetry] Could not verify Cashfree amount for ${order.orderNumber}, using order total`);
+          logger.warn(`[RefundRetry] Could not verify PayU payment for ${order.orderNumber}, using order total`);
         }
 
         const refundId = `refund_${order.orderNumber}_retry${order.refundRetryCount + 1}_${Date.now()}`;
         await createRefund({
-          orderId: order.cashfreeOrderId,
+          mihpayid,
           refundAmount,
-          refundId,
-          refundNote: `Auto-retry refund (attempt ${order.refundRetryCount + 1})`
+          refundId
         });
 
         order.paymentStatus = 'refunded';

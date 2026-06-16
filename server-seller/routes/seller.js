@@ -11,7 +11,7 @@ const { uploadImage, uploadVideo, deleteImage, deleteVideo, deleteMedia } = requ
 const { slugify } = require('../../server/utils/slugify');
 const { getCommissionRate } = require('../../server/utils/commission');
 const shiprocket = require('../../server/config/shiprocket');
-const { createRefund, getCashfreeOrder } = require('../../server/config/cashfree');
+const { createRefund, verifyPayment } = require('../../server/config/payu');
 const { sanitizeBody } = require('../../server/middleware/sanitize');
 const { logActivity } = require('../../server/utils/audit');
 const { createNotification } = require('../../server/utils/notify');
@@ -773,20 +773,22 @@ router.put('/orders/:id/status', async (req, res) => {
         await Product.findByIdAndUpdate(item.productId, { $inc: stockInc });
       }
 
-      // Initiate Cashfree refund if payment was completed
+      // Initiate PayU refund if payment was completed
       if (order.paymentStatus === 'paid' && order.cashfreeOrderId) {
         try {
           let refundAmount = order.totalAmount;
+          let mihpayid = order.cashfreePaymentId;
           try {
-            const cfOrderData = await getCashfreeOrder(order.cashfreeOrderId);
-            if (cfOrderData.order_amount) {
-              refundAmount = Math.min(order.totalAmount, parseFloat(cfOrderData.order_amount));
+            const verification = await verifyPayment(order.cashfreeOrderId);
+            if (verification.found) {
+              if (verification.amount) refundAmount = Math.min(order.totalAmount, verification.amount);
+              if (verification.mihpayid) mihpayid = verification.mihpayid;
             }
           } catch (cfErr) {
-            logger.warn(`[Refund] Could not verify Cashfree amount: ${cfErr.message}`);
+            logger.warn(`[Refund] Could not verify PayU payment: ${cfErr.message}`);
           }
           const refundId = `refund_${order.orderNumber}_${Date.now()}`;
-          await createRefund({ orderId: order.cashfreeOrderId, refundAmount, refundId, refundNote: 'Order cancelled by seller' });
+          await createRefund({ mihpayid, refundAmount, refundId });
           order.paymentStatus = 'refunded';
           order.refundId = refundId;
         } catch (refundErr) {
@@ -1777,11 +1779,10 @@ router.put('/returns/:id/received', async (req, res) => {
     if (returnReq.type === 'return' && order && order.cashfreeOrderId && returnReq.refundAmount > 0) {
       try {
         const refundId = `return_${order.orderNumber}_${Date.now()}`;
-        await require('../../server/config/cashfree').createRefund({
-          orderId: order.cashfreeOrderId,
+        await createRefund({
+          mihpayid: order.cashfreePaymentId,
           refundAmount: returnReq.refundAmount,
-          refundId,
-          refundNote: `Return refund for order ${order.orderNumber}`
+          refundId
         });
         returnReq.refundId = refundId;
         returnReq.status = 'refunded';

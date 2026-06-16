@@ -35,7 +35,7 @@ export default function About() {
         <div className="grid md:grid-cols-3 gap-8">
           {[
             { icon: Gift, title: 'Browse & Discover', desc: 'Explore products from verified creators across India. Filter by category, price, and occasion.' },
-            { icon: Shield, title: 'Secure Checkout', desc: 'Pay safely with Cashfree payment gateway. Your payment details are never stored on our servers.' },
+            { icon: Shield, title: 'Secure Checkout', desc: 'Pay safely with PayU payment gateway. Your payment details are never stored on our servers.' },
             { icon: Truck, title: 'Track & Receive', desc: 'Creators ship directly to you with tracked delivery via Shiprocket logistics partners.' },
           ].map((item, i) => (
             <div key={i} className="bg-card border border-edge/50 rounded-2xl p-6 text-center">

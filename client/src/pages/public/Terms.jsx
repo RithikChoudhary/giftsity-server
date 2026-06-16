@@ -28,7 +28,7 @@ export default function Terms() {
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">4. Orders &amp; Payments</h2>
-          <p>All payments are processed securely through our payment gateway partner, Cashfree Payments. By placing an order, you authorize us to charge the specified amount. Prices are listed in Indian Rupees (INR) and include applicable taxes unless otherwise stated. The minimum product listing price on the Platform is Rs. 100. Orders are subject to product availability and creator acceptance. The total amount at checkout includes the product price and shipping charges (if applicable). All prices shown at checkout are final.</p>
+          <p>All payments are processed securely through our payment gateway partner, PayU. By placing an order, you authorize us to charge the specified amount. Prices are listed in Indian Rupees (INR) and include applicable taxes unless otherwise stated. The minimum product listing price on the Platform is Rs. 100. Orders are subject to product availability and creator acceptance. The total amount at checkout includes the product price and shipping charges (if applicable). All prices shown at checkout are final.</p>
         </section>
 
         <section>
@@ -38,7 +38,7 @@ export default function Terms() {
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">6. Cancellations &amp; Refunds</h2>
-          <p>Customers may cancel orders before the package has been picked up by the courier. Once the package has been physically picked up, cancellation is not possible from the customer side. If a shipment is returned to origin (RTO) by the courier, the order is automatically cancelled and a full refund is initiated. Refunds for cancelled orders are processed within 5-7 business days to the original payment method via Cashfree. For damaged or incorrect items, customers may request a return within 7 days of delivery as per our <Link to="/return-policy" className="text-amber-400 hover:text-amber-300">Return &amp; Refund Policy</Link>.</p>
+          <p>Customers may cancel orders before the package has been picked up by the courier. Once the package has been physically picked up, cancellation is not possible from the customer side. If a shipment is returned to origin (RTO) by the courier, the order is automatically cancelled and a full refund is initiated. Refunds for cancelled orders are processed within 5-7 business days to the original payment method via PayU. For damaged or incorrect items, customers may request a return within 7 days of delivery as per our <Link to="/return-policy" className="text-amber-400 hover:text-amber-300">Return &amp; Refund Policy</Link>.</p>
         </section>
 
         <section>
@@ -53,7 +53,7 @@ export default function Terms() {
 
         <section>
           <h2 className="text-lg font-semibold text-theme-primary mb-2">9. Commission, Fees &amp; Payouts</h2>
-          <p>Giftsity currently charges 0% platform commission on sales (promotional rate, subject to change with 30 days prior notice). A payment gateway fee of 3% is deducted from each transaction to cover payment processing costs (Cashfree). Creators retain 97% of every sale. Detailed earnings breakdowns are visible in the creator dashboard. Payouts for delivered orders are processed on a biweekly basis (1st and 15th of each month) via bank transfer (NEFT/IMPS) to the creator's registered bank account. The minimum payout amount is Rs. 100. Orders that are pending, cancelled, returned, or refunded are excluded from payout calculations. If shipping is paid by the creator, the actual shipping cost is deducted from the payout.</p>
+          <p>Giftsity currently charges 0% platform commission on sales (promotional rate, subject to change with 30 days prior notice). A payment gateway fee of 3% is deducted from each transaction to cover payment processing costs (PayU). Creators retain 97% of every sale. Detailed earnings breakdowns are visible in the creator dashboard. Payouts for delivered orders are processed on a biweekly basis (1st and 15th of each month) via bank transfer (NEFT/IMPS) to the creator's registered bank account. The minimum payout amount is Rs. 100. Orders that are pending, cancelled, returned, or refunded are excluded from payout calculations. If shipping is paid by the creator, the actual shipping cost is deducted from the payout.</p>
         </section>
 
         <section>

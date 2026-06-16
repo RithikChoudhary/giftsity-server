@@ -79,7 +79,7 @@ export default function AdminSettings() {
             <h3 className="font-semibold text-theme-primary mb-4">Payment Gateway Fee</h3>
             <div className="flex items-center gap-4 mb-2">
               <span className="text-2xl font-bold text-theme-primary">{form.paymentGatewayFeeRate}%</span>
-              <span className="text-sm text-theme-muted">(Cashfree standard rate)</span>
+              <span className="text-sm text-theme-muted">(PayU standard rate)</span>
             </div>
             <p className="text-xs text-theme-dim">This is deducted from seller earnings. Set by payment provider.</p>
             <input type="number" value={form.paymentGatewayFeeRate} onChange={e => setForm(f => ({ ...f, paymentGatewayFeeRate: +e.target.value }))} min={0} max={10} step={0.1} className="mt-3 w-32 px-3 py-2 bg-inset border border-edge rounded-lg text-sm text-theme-primary" />

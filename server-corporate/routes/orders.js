@@ -2,7 +2,7 @@ const express = require('express');
 const Order = require('../../server/models/Order');
 const Product = require('../../server/models/Product');
 const CorporateCatalog = require('../../server/models/CorporateCatalog');
-const { createCashfreeOrder, getCashfreeOrder, getCashfreePayments, createRefund } = require('../../server/config/cashfree');
+const { buildPaymentRequest, verifyPayment, createRefund } = require('../../server/config/payu');
 const { requireCorporateAuth, requireActiveStatus, generateDownloadToken } = require('../middleware/corporateAuth');
 const { logActivity } = require('../../server/utils/audit');
 const { sanitizeBody } = require('../../server/middleware/sanitize');
@@ -13,7 +13,7 @@ const router = express.Router();
 
 router.use(requireCorporateAuth, requireActiveStatus);
 
-// Normalize phone to 10 digits for Cashfree
+// Normalize phone to 10 digits for PayU
 const normalizePhone = (phone) => {
   const digits = (phone || '').replace(/\D/g, '');
   if (digits.length >= 10) return digits.slice(-10);
@@ -99,25 +99,25 @@ router.post('/', validateCorporateOrder, async (req, res) => {
       orders.push(order);
     }
 
-    // Create Cashfree payment
+    // Create PayU payment
     const grandTotal = orders.reduce((s, o) => s + o.totalAmount, 0);
-    const cfOrderId = orders[0].orderNumber;
+    const txnid = orders[0].orderNumber;
 
-    const cfOrder = await createCashfreeOrder({
-      orderId: cfOrderId,
-      orderAmount: grandTotal,
-      customerDetails: {
-        customerId: corpUser._id.toString(),
-        email: corpUser.email,
-        phone: normalizePhone(corpUser.phone || shippingAddress.phone),
-        name: corpUser.companyName
-      },
-      returnUrl: `${(process.env.CLIENT_URL || '').split(',')[0].trim() || 'http://localhost:5173'}/corporate/orders?cf_id=${cfOrderId}`
+    const apiBaseUrl = (process.env.API_BASE_URL || '').replace(/\/$/, '');
+    const payu = buildPaymentRequest({
+      txnid,
+      amount: grandTotal,
+      productinfo: `Giftsity corporate order ${txnid}`,
+      firstname: corpUser.companyName,
+      email: corpUser.email,
+      phone: normalizePhone(corpUser.phone || shippingAddress.phone),
+      surl: `${apiBaseUrl}/api/payments/payu/return`,
+      furl: `${apiBaseUrl}/api/payments/payu/return`,
+      udf1: 'corporate'
     });
 
     for (const order of orders) {
-      order.cashfreeOrderId = cfOrderId;
-      order.paymentSessionId = cfOrder.payment_session_id;
+      order.cashfreeOrderId = txnid;
       await order.save();
     }
 
@@ -127,13 +127,9 @@ router.post('/', validateCorporateOrder, async (req, res) => {
 
     res.status(201).json({
       orders,
-      cashfreeOrder: {
-        orderId: cfOrderId,
-        paymentSessionId: cfOrder.payment_session_id,
-        orderAmount: grandTotal
-      },
-      appId: process.env.CASHFREE_APP_ID,
-      env: process.env.CASHFREE_ENV || 'sandbox'
+      payu,
+      orderAmount: grandTotal,
+      env: process.env.PAYU_ENV || 'test'
     });
   } catch (err) {
     logger.error('Corporate create order error:', err?.response?.data || err.message);
@@ -147,23 +143,27 @@ router.post('/verify-payment', validatePaymentVerification, async (req, res) => 
     const { orderId } = req.body;
     if (!orderId) return res.status(400).json({ message: 'orderId required' });
 
-    const cfOrder = await getCashfreeOrder(orderId);
-    if (cfOrder.order_status !== 'PAID') {
-      return res.status(400).json({ message: `Payment not completed. Status: ${cfOrder.order_status}` });
+    const verification = await verifyPayment(orderId);
+    if (!verification.found || verification.status !== 'success') {
+      return res.status(400).json({ message: `Payment not completed. Status: ${verification.status}` });
     }
-
-    const payments = await getCashfreePayments(orderId);
-    const successPayment = payments.find(p => p.payment_status === 'SUCCESS');
 
     const orders = await Order.find({ cashfreeOrderId: orderId, customerEmail: req.corporateUser.email });
     if (!orders.length) return res.status(404).json({ message: 'No matching orders found' });
+
+    // Verify payment amount matches order total (prevent amount tampering)
+    const expectedTotal = orders.reduce((s, o) => s + o.totalAmount, 0);
+    if (Math.abs(verification.amount - expectedTotal) > 1) {
+      logger.error(`[Corporate Payment] AMOUNT MISMATCH: paid ${verification.amount}, expected ${expectedTotal}, txnid=${orderId}`);
+      return res.status(400).json({ message: 'Payment amount does not match order total. Please contact support.' });
+    }
 
     for (const order of orders) {
       if (order.paymentStatus === 'paid') continue;
 
       order.paymentStatus = 'paid';
       order.status = 'confirmed';
-      order.cashfreePaymentId = successPayment?.cf_payment_id?.toString() || '';
+      order.cashfreePaymentId = verification.mihpayid || '';
       order.paidAt = new Date();
       await order.save();
 
@@ -294,7 +294,7 @@ router.post('/:id/cancel', sanitizeBody, async (req, res) => {
       }
       try {
         const refundId = `refund_${order.orderNumber}_${Date.now()}`;
-        await createRefund({ orderId: order.cashfreeOrderId, refundAmount: order.totalAmount, refundId });
+        await createRefund({ mihpayid: order.cashfreePaymentId, refundAmount: order.totalAmount, refundId });
         order.paymentStatus = 'refunded';
         order.refundId = refundId;
       } catch (refundErr) {

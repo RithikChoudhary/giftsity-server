@@ -56,7 +56,7 @@ export default function ReturnPolicy() {
           <h2 className="text-lg font-semibold text-theme-primary mb-2">5. Refund Process</h2>
           <p>Once the returned item is received and inspected by the creator:</p>
           <ul className="list-disc pl-5 mt-2 space-y-1">
-            <li><strong>Approved refunds</strong> will be processed within <strong>5-7 business days</strong> to your original payment method (via Cashfree).</li>
+            <li><strong>Approved refunds</strong> will be processed within <strong>5-7 business days</strong> to your original payment method (via PayU).</li>
             <li>The refund amount will include the product price. Shipping charges are non-refundable unless the return is due to a creator error or defective product.</li>
             <li>You will receive an email notification when the refund is initiated.</li>
           </ul>

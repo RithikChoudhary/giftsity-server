@@ -367,7 +367,7 @@ async function testWishlist() {
 }
 
 // =====================================================================
-// 9) ORDER CREATION (DB bypass for Cashfree)
+// 9) ORDER CREATION (DB bypass for PayU)
 // =====================================================================
 async function testOrderCreation() {
   if (!shouldRun('orders')) return;
@@ -377,7 +377,7 @@ async function testOrderCreation() {
     skp('Orders', 'Missing customer, product, or seller'); return;
   }
 
-  // Attempt real order creation -- should fail at Cashfree
+  // Attempt real order creation -- should fail at PayU
   let r = await api(`${MAIN}/api/orders`, {
     method: 'POST', headers: auth(state.customerToken),
     body: {
@@ -385,7 +385,7 @@ async function testOrderCreation() {
       shippingAddress: { name: 'Test', phone: '9999888877', street: '123 St', city: 'Mumbai', state: 'MH', pincode: '400001' }
     }
   });
-  ok(r.status === 500 || r.status === 400 || r.status === 201, 'Order attempt (Cashfree may fail)', `${r.status}`);
+  ok(r.status === 500 || r.status === 400 || r.status === 201, 'Order attempt (PayU may fail)', `${r.status}`);
 
   // Direct DB insert: create 2 paid orders
   await db();

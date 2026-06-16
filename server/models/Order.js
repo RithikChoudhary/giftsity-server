@@ -63,9 +63,12 @@ const orderSchema = new mongoose.Schema({
   },
   refundId: { type: String, default: '' },
   refundRetryCount: { type: Number, default: 0 },
+  // PayU integration (field names kept for backward compatibility):
+  // cashfreeOrderId stores the PayU txnid (= our order number)
+  // cashfreePaymentId stores the PayU mihpayid (gateway payment id)
   cashfreeOrderId: { type: String, default: '' },
   cashfreePaymentId: { type: String, default: '' },
-  paymentSessionId: { type: String, default: '' },
+  paymentSessionId: { type: String, default: '' }, // unused with PayU (legacy field)
   paidAt: { type: Date, default: null },
 
   // Order status
