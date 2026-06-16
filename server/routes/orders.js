@@ -42,6 +42,107 @@ const generateOrderNumber = () => {
   return `GFT-${date}-${rand}`;
 };
 
+// Whether checkout runs in temporary Cash-on-Delivery mode (for PayU review).
+// Set ORDER_MODE=cod to bypass online payment; revert to PayU by removing it.
+const isCodMode = () => (process.env.ORDER_MODE || '').toLowerCase() === 'cod';
+
+/**
+ * Confirm Cash-on-Delivery orders at placement time (no payment step).
+ * Mirrors the post-payment bookkeeping done in verify-payment, but COD orders
+ * stay unpaid (paymentStatus='pending') with paymentMethod='cod'.
+ */
+async function confirmCodOrders(orders, actor) {
+  const productBulkOps = [];
+  const sellerIncrements = {};
+  const sellerIdsToCheck = new Set();
+
+  for (const order of orders) {
+    order.paymentMethod = 'cod';
+    order.status = 'confirmed';
+    if (!order.statusHistory) order.statusHistory = [];
+    order.statusHistory.push({ status: 'confirmed', timestamp: new Date(), changedByRole: 'system', note: 'Order placed (Cash on Delivery)' });
+    await order.save();
+
+    for (const item of order.items) {
+      productBulkOps.push({ updateOne: { filter: { _id: item.productId }, update: { $inc: { orderCount: item.quantity } } } });
+    }
+
+    const sid = order.sellerId.toString();
+    if (!sellerIncrements[sid]) sellerIncrements[sid] = { totalSales: 0, totalOrders: 0 };
+    sellerIncrements[sid].totalSales += order.itemTotal || order.totalAmount;
+    sellerIncrements[sid].totalOrders += 1;
+    sellerIdsToCheck.add(sid);
+
+    createNotification({
+      userId: order.customerId.toString(), userRole: 'customer',
+      type: 'order_confirmed', title: `Order #${order.orderNumber} confirmed`,
+      message: 'Your Cash on Delivery order has been placed and is being processed',
+      link: `/orders/${order._id}`, metadata: { orderId: order._id.toString() }
+    });
+    createNotification({
+      userId: order.sellerId.toString(), userRole: 'seller',
+      type: 'order_confirmed', title: `New order #${order.orderNumber}`,
+      message: `New COD order worth Rs.${order.itemTotal || order.totalAmount}`,
+      link: '/seller/orders', metadata: { orderId: order._id.toString() }
+    });
+  }
+
+  if (productBulkOps.length) await Product.bulkWrite(productBulkOps);
+  for (const [sid, inc] of Object.entries(sellerIncrements)) {
+    await Seller.findByIdAndUpdate(sid, {
+      $inc: { 'sellerProfile.totalSales': inc.totalSales, 'sellerProfile.totalOrders': inc.totalOrders }
+    });
+  }
+
+  for (const sid of sellerIdsToCheck) {
+    try {
+      const sellerDoc = await Seller.findById(sid).select('email sellerProfile.bankDetails').lean();
+      const bank = sellerDoc?.sellerProfile?.bankDetails;
+      const hasBankDetails = bank?.accountHolderName && bank?.accountNumber && bank?.ifscCode && bank?.bankName;
+      if (!hasBankDetails) {
+        createNotification({
+          userId: sid, userRole: 'seller',
+          type: 'bank_details_reminder', title: 'Add bank details to receive payouts',
+          message: 'You have a new order! Please add your bank account details in Settings to receive payouts.',
+          link: '/seller/settings'
+        });
+      }
+      const sellerOrders = orders.filter(o => o.sellerId.toString() === sid);
+      for (const so of sellerOrders) {
+        try { await sendOrderConfirmation(sellerDoc.email, so, 'seller'); } catch (_e) { /* non-critical */ }
+      }
+    } catch (_bankErr) { /* non-critical */ }
+  }
+
+  for (const order of orders) {
+    try { await sendOrderConfirmation(order.customerEmail, order, 'customer'); } catch (emailErr) {
+      logger.error('[COD] Email send error:', emailErr.message);
+    }
+  }
+
+  // Track coupon usage (race-condition-safe predicate)
+  const couponCode = orders.find(o => o.couponCode)?.couponCode;
+  if (couponCode) {
+    try {
+      const Coupon = require('../models/Coupon');
+      const couponDoc = await Coupon.findOne({ code: couponCode });
+      if (couponDoc) {
+        const result = await Coupon.findOneAndUpdate(
+          { code: couponCode, usedCount: { $lt: couponDoc.usageLimit } },
+          { $inc: { usedCount: 1 }, $addToSet: { usedBy: actor.actorId } }
+        );
+        if (!result) logger.warn('[COD][Coupon] Usage limit exceeded for', couponCode);
+      }
+    } catch (couponErr) {
+      logger.error('[COD][Coupon] Failed to track usage:', couponErr.message);
+    }
+  }
+
+  for (const order of orders) {
+    logActivity({ domain: 'order', action: 'order_placed_cod', actorRole: 'customer', actorId: actor.actorId, actorEmail: actor.actorEmail, targetType: 'Order', targetId: order._id, message: `COD order ${order.orderNumber} placed`, metadata: { orderNumber: order.orderNumber, totalAmount: order.totalAmount } });
+  }
+}
+
 // POST /api/orders - create order + PayU payment request
 router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async (req, res) => {
   // Declared at function scope so the catch block can roll back reserved stock
@@ -242,6 +343,13 @@ router.post('/', requireAuth, orderCreationLimiter, validateOrderCreation, async
     // Create PayU payment for the total
     const grandTotal = orders.reduce((s, o) => s + o.totalAmount, 0);
     const txnid = orders[0].orderNumber; // Use our order number as PayU txnid
+
+    // Temporary Cash-on-Delivery mode (for PayU review before activation):
+    // skip the payment gateway and confirm the order immediately.
+    if (isCodMode()) {
+      await confirmCodOrders(orders, { actorId: req.user._id, actorEmail: req.user.email });
+      return res.status(201).json({ orders, cod: true, orderAmount: grandTotal });
+    }
 
     const apiBaseUrl = (process.env.API_BASE_URL || '').replace(/\/$/, '');
     const payu = buildPaymentRequest({

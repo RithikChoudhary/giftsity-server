@@ -10,7 +10,7 @@ import { submitPayuForm } from '../../utils/payu';
 
 export default function Cart() {
   const { user } = useAuth();
-  const { items, updateQuantity, removeItem } = useCart();
+  const { items, updateQuantity, removeItem, clearCart } = useCart();
   const navigate = useNavigate();
   const [step, setStep] = useState('cart'); // cart | address | payment
   const [address, setAddress] = useState({ name: '', phone: '', street: '', city: '', state: '', pincode: '' });
@@ -24,6 +24,12 @@ export default function Cart() {
   const [shippingEstimates, setShippingEstimates] = useState([]); // [{ sellerId, shippingCost, shippingPaidBy, courierName, estimatedDays }]
   const [estimatingShipping, setEstimatingShipping] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [codMode, setCodMode] = useState(false);
+
+  useEffect(() => {
+    // Detect temporary Cash-on-Delivery checkout mode
+    API.get('/store/info').then(r => setCodMode(!!r.data?.codMode)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     // Pre-fill default address from user profile
@@ -113,6 +119,14 @@ export default function Cart() {
 
       // Cart is NOT cleared here — it will be cleared after payment is verified
       // in CustomerOrders.jsx. If payment is abandoned, the cart stays intact.
+
+      // Cash-on-Delivery mode: order is already confirmed, no payment step
+      if (data.cod) {
+        clearCart();
+        toast.success('Order placed! Pay cash on delivery.');
+        const ids = (data.orders || []).map(o => o._id).join(',');
+        return navigate(ids ? `/orders/confirmation?ids=${ids}` : '/orders');
+      }
 
       // If PayU payment request returned, redirect to PayU Hosted Checkout
       if (data.payu) {
@@ -334,7 +348,7 @@ export default function Cart() {
               if (!shippingEstimates.length) await fetchShippingEstimate(address.pincode);
               setStep('payment');
             }} disabled={estimatingShipping} className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors">
-              {estimatingShipping ? <><Loader className="w-4 h-4 animate-spin" /> Checking shipping...</> : <>Continue to Payment <ArrowRight className="w-4 h-4" /></>}
+              {estimatingShipping ? <><Loader className="w-4 h-4 animate-spin" /> Checking shipping...</> : <>{codMode ? 'Continue to Checkout' : 'Continue to Payment'} <ArrowRight className="w-4 h-4" /></>}
             </button>
           </div>
         </div>
@@ -350,7 +364,7 @@ export default function Cart() {
       {step === 'payment' && (
         <div className="max-w-lg mx-auto">
           <button onClick={() => setStep('address')} className="flex items-center gap-1 text-sm text-theme-muted hover:text-theme-primary mb-4"><ArrowLeft className="w-4 h-4" /> Back to Address</button>
-          <h2 className="text-xl font-bold text-theme-primary mb-6 flex items-center gap-2"><CreditCard className="w-5 h-5 text-amber-400" /> Payment</h2>
+          <h2 className="text-xl font-bold text-theme-primary mb-6 flex items-center gap-2">{codMode ? <><Truck className="w-5 h-5 text-amber-400" /> Cash on Delivery</> : <><CreditCard className="w-5 h-5 text-amber-400" /> Payment</>}</h2>
           <div className="bg-card border border-edge/50 rounded-xl p-5 mb-6">
             <h3 className="font-semibold text-theme-primary mb-3">Order Summary</h3>
             {items.map(i => (
@@ -391,7 +405,11 @@ export default function Cart() {
             </div>
           </div>
           <button onClick={handlePlaceOrder} disabled={loading} className="w-full py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors">
-            {loading ? <><Loader className="w-4 h-4 animate-spin" /> Processing...</> : <><CreditCard className="w-4 h-4" /> Pay Rs. {total.toLocaleString('en-IN')}</>}
+            {loading
+              ? <><Loader className="w-4 h-4 animate-spin" /> Processing...</>
+              : codMode
+                ? <><Truck className="w-4 h-4" /> Place Order - Cash on Delivery</>
+                : <><CreditCard className="w-4 h-4" /> Pay Rs. {total.toLocaleString('en-IN')}</>}
           </button>
         </div>
       )}

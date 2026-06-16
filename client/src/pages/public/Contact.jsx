@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Phone, MapPin, Send, MessageCircle } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, MessageCircle, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import SEO from '../../components/SEO';
 import API from '../../api';
@@ -46,6 +46,15 @@ export default function Contact() {
         {/* Contact Info */}
         <div className="md:col-span-2 space-y-6">
           <div className="bg-card border border-edge/50 rounded-2xl p-6 space-y-5">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                <User className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-theme-primary">Contact Person</p>
+                <p className="text-sm text-theme-muted">Rithik Choudhary</p>
+              </div>
+            </div>
             {info.supportEmail && (
               <a href={`mailto:${info.supportEmail}`} className="flex items-start gap-3 group">
                 <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">

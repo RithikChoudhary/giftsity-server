@@ -56,6 +56,7 @@ const orderSchema = new mongoose.Schema({
   sellerAmount: { type: Number, default: 0 },
 
   // Payment
+  paymentMethod: { type: String, enum: ['prepaid', 'cod'], default: 'prepaid' },
   paymentStatus: {
     type: String,
     enum: ['pending', 'paid', 'failed', 'refunded', 'refund_pending'],

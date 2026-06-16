@@ -30,7 +30,8 @@ router.get('/info', cacheMiddleware(600), async (req, res) => {
       supportPhone: settings.supportPhone || '',
       instagramUrl: settings.instagramUrl || '',
       facebookUrl: settings.facebookUrl || '',
-      whatsappNumber: settings.whatsappNumber || ''
+      whatsappNumber: settings.whatsappNumber || '',
+      codMode: (process.env.ORDER_MODE || '').toLowerCase() === 'cod'
     });
   } catch (err) {
     logger.error('[Store] Platform info error:', err.message);
