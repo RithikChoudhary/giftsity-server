@@ -93,8 +93,8 @@ export default function Contact() {
                 <MapPin className="w-5 h-5 text-amber-400" />
               </div>
               <div>
-                <p className="text-sm font-medium text-theme-primary">Location</p>
-                <p className="text-sm text-theme-muted">India</p>
+                <p className="text-sm font-medium text-theme-primary">Address</p>
+                <p className="text-sm text-theme-muted">Rithik Choudhary<br />1155, Luhari, Baraut,<br />Uttar Pradesh - 250611, India</p>
               </div>
             </div>
           </div>
