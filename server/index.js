@@ -15,9 +15,21 @@ const PORT = process.env.PORT || 5000;
 
 // CORS must run before helmet so preflight OPTIONS requests get proper headers
 const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:5173').split(',').map(s => s.trim());
+
+function isPayuOrigin(origin) {
+  if (!origin) return false;
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === 'payu.in' || hostname.endsWith('.payu.in');
+  } catch {
+    return false;
+  }
+}
+
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) cb(null, true);
+    // PayU Hosted Checkout POSTs back to /api/payments/payu/return with Origin: secure.payu.in
+    if (!origin || allowedOrigins.includes(origin) || isPayuOrigin(origin)) cb(null, true);
     else cb(new Error('CORS not allowed'));
   },
   credentials: true
